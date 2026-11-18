@@ -19,7 +19,8 @@ npm run dev                  # http://localhost:3000
 | `app/(auth)/` | `/login`, `/register`, `/join`, `/forgot-password`, `/reset-password` and their server actions |
 | `app/auth/callback` | Landing point for links in Supabase auth emails |
 | `app/page.tsx` | Routes each person to their workspace by role |
-| `app/(workspace)/` | `/dashboard` (staff), `/student`, `/parent` |
+| `app/(staff)/` | Staff workspace: `/dashboard`, `/branches`, `/groups` (+ courses), `/students`, `/staff` |
+| `app/(workspace)/` | `/student`, `/parent` (placeholder frames) |
 | `lib/supabase/` | Browser, server and service-role clients, generated DB types |
 | `lib/auth/workspace.ts` | Memberships, role → home route, finishing sign-up (create centre / redeem invite) |
 
@@ -46,6 +47,8 @@ npm run dev                  # http://localhost:3000
 | `0004_views.sql` | Read models: `invoice_balances`, `student_overview` (Student 360), `group_overview`, `mock_result_scores` |
 | `0005_profile_phone_login.sql` | Unique, normalised phone on profiles for phone sign-in |
 | `0006_invite_preview.sql` | `invite_preview(code)` — centre and role shown on `/join` |
+| `0007_workspace_rpcs.sql` | `create_student` (student + parent + enrolment + first invoice) and `create_group` (room + group + slots + 12 weeks of lessons), each in one transaction |
+| `0008_first_invoice_due_date.sql` | First invoice is never due before the enrolment start date |
 
 Apply in order with `supabase db push` (after `supabase link`) or paste
 into the SQL editor of a new Supabase project.
