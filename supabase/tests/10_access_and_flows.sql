@@ -314,4 +314,13 @@ select tests.expect_fail(format($$select create_student(%L, 'Sneaky')$$, :'cente
 :as_ownerB
 select tests.expect_fail(format($$select create_group(%L, 'X group', %L, %L)$$, :'center_a', :'course_a', :'branch_a'), 'forbidden');
 
+\echo '12. portal helpers'
+:as_parent
+select tests.assert(group_mentor_name(:'group1') = 'Mentor A', 'parent sees child''s mentor');
+select tests.assert(group_mentor_name(:'group2') is null, 'parent cannot see other group mentor');
+:as_student2
+select tests.assert(group_mentor_name(:'group1') = 'Mentor A', 'student sees own mentor');
+:as_ownerB
+select tests.assert(group_mentor_name(:'group1') is null, 'other centre sees nothing');
+
 \echo 'ALL TESTS PASSED'

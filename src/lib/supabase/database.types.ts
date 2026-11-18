@@ -1670,6 +1670,7 @@ export type Database = {
         Args: { p_center: string; p_period: string }
         Returns: number
       }
+      group_mentor_name: { Args: { p_group: string }; Returns: string }
       generate_lessons: {
         Args: { p_from: string; p_group: string; p_to: string }
         Returns: number
