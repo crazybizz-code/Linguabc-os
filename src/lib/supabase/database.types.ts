@@ -148,6 +148,32 @@ export type Database = {
           },
         ]
       }
+      assignment_keys: {
+        Row: {
+          answers: Json
+          assignment_id: string
+          center_id: string
+        }
+        Insert: {
+          answers?: Json
+          assignment_id: string
+          center_id: string
+        }
+        Update: {
+          answers?: Json
+          assignment_id?: string
+          center_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_keys_assignment_id_center_id_fkey"
+            columns: ["assignment_id", "center_id"]
+            isOneToOne: true
+            referencedRelation: "assignments"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           center_id: string
@@ -638,6 +664,7 @@ export type Database = {
           due_at: string
           group_id: string
           id: string
+          note: string | null
         }
         Insert: {
           assigned_at?: string
@@ -647,6 +674,7 @@ export type Database = {
           due_at: string
           group_id: string
           id?: string
+          note?: string | null
         }
         Update: {
           assigned_at?: string
@@ -656,6 +684,7 @@ export type Database = {
           due_at?: string
           group_id?: string
           id?: string
+          note?: string | null
         }
         Relationships: [
           {
@@ -813,6 +842,113 @@ export type Database = {
             referencedColumns: ["id", "center_id"]
           },
         ]
+      }
+      library_answer_keys: {
+        Row: {
+          answers: Json
+          item_id: string
+        }
+        Insert: {
+          answers?: Json
+          item_id: string
+        }
+        Update: {
+          answers?: Json
+          item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_answer_keys_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "library_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_items: {
+        Row: {
+          attribution: string | null
+          audio_url: string | null
+          author: string | null
+          body_format: string
+          body_html: string | null
+          created_at: string
+          description: string | null
+          discussion: Json
+          duration_seconds: number | null
+          id: string
+          kind: string
+          level_max: Database["public"]["Enums"]["cefr_level"] | null
+          level_min: Database["public"]["Enums"]["cefr_level"] | null
+          licence: string | null
+          minutes: number | null
+          questions: Json
+          skill: Database["public"]["Enums"]["skill"]
+          source_name: string | null
+          source_url: string | null
+          status: string
+          summary: string | null
+          title: string
+          topics: string[]
+          transcript: Json | null
+          vocabulary: Json
+        }
+        Insert: {
+          attribution?: string | null
+          audio_url?: string | null
+          author?: string | null
+          body_format?: string
+          body_html?: string | null
+          created_at?: string
+          description?: string | null
+          discussion?: Json
+          duration_seconds?: number | null
+          id: string
+          kind: string
+          level_max?: Database["public"]["Enums"]["cefr_level"] | null
+          level_min?: Database["public"]["Enums"]["cefr_level"] | null
+          licence?: string | null
+          minutes?: number | null
+          questions?: Json
+          skill: Database["public"]["Enums"]["skill"]
+          source_name?: string | null
+          source_url?: string | null
+          status?: string
+          summary?: string | null
+          title: string
+          topics?: string[]
+          transcript?: Json | null
+          vocabulary?: Json
+        }
+        Update: {
+          attribution?: string | null
+          audio_url?: string | null
+          author?: string | null
+          body_format?: string
+          body_html?: string | null
+          created_at?: string
+          description?: string | null
+          discussion?: Json
+          duration_seconds?: number | null
+          id?: string
+          kind?: string
+          level_max?: Database["public"]["Enums"]["cefr_level"] | null
+          level_min?: Database["public"]["Enums"]["cefr_level"] | null
+          licence?: string | null
+          minutes?: number | null
+          questions?: Json
+          skill?: Database["public"]["Enums"]["skill"]
+          source_name?: string | null
+          source_url?: string | null
+          status?: string
+          summary?: string | null
+          title?: string
+          topics?: string[]
+          transcript?: Json | null
+          vocabulary?: Json
+        }
+        Relationships: []
       }
       memberships: {
         Row: {
@@ -1669,6 +1805,10 @@ export type Database = {
       generate_invoices: {
         Args: { p_center: string; p_period: string }
         Returns: number
+      }
+      assign_library_item: {
+        Args: { p_center: string; p_due_at: string; p_group: string; p_instructions?: string; p_item: string }
+        Returns: string
       }
       create_mock_session: {
         Args: {

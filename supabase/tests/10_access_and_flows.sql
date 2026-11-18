@@ -354,4 +354,37 @@ select save_mock_results(:'ms3', jsonb_build_array(jsonb_build_object('student_i
 select tests.assert((select status from mock_results where mock_session_id = :'ms3' and student_id = :'st1') = 'completed', 'single-module result completes');
 select tests.assert((select reading_band from mock_results where mock_session_id = :'ms3' and student_id = :'st1') is null, 'off-session module ignored');
 
+\echo '14. library and answer keys'
+:as_superuser
+insert into library_items (id, kind, title, skill, level_min, level_max, body_html, questions)
+  values ('lib-1', 'article', 'Ocean currents', 'reading', 'B1', 'B2', 'Text', '[{"id":"q1","type":"mc","prompt":"Why?","options":["a","b"]}]'),
+         ('lib-empty', 'article', 'No questions', 'reading', 'B1', 'B2', 'Text', '[]'),
+         ('lib-hidden', 'article', 'Hidden', 'reading', 'B1', 'B2', 'Text', '[]');
+update library_items set status = 'hidden' where id = 'lib-hidden';
+insert into library_answer_keys (item_id, answers) values ('lib-1', '{"q1":{"answer":1,"explanation":"Because"}}');
+:as_student
+select tests.expect_count($$select * from library_items$$, 2);
+select tests.expect_count($$select * from library_answer_keys$$, 0);
+:as_mentor
+select tests.expect_count($$select * from library_answer_keys$$, 1);
+select assign_library_item(:'center_a', 'lib-1', :'group1', now() + interval '2 days', 'Read twice') as hw_lib \gset
+select tests.assert((select note from homework where id = :'hw_lib') = 'Read twice', 'note stored on homework');
+select tests.assert((select status from assignments a join homework h on h.assignment_id = a.id where h.id = :'hw_lib') = 'approved', 'library work needs no approval');
+select tests.expect_fail(format($$select assign_library_item(%L, 'lib-1', %L, now() + interval '2 days')$$, :'center_a', :'group2'), 'forbidden');
+select tests.expect_fail(format($$select assign_library_item(%L, 'lib-empty', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'no questions');
+select tests.expect_fail(format($$select assign_library_item(%L, 'lib-hidden', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'not found');
+:as_acad
+select assign_library_item(:'center_a', 'lib-1', :'group1', now() + interval '9 days') as hw_lib2 \gset
+select tests.assert((select count(*) from assignments where library_item_id = 'lib-1') = 1, 'one centre copy per item');
+select tests.assert((select answers->'q1'->>'answer' from assignment_keys k join assignments a on a.id = k.assignment_id where a.library_item_id = 'lib-1') = '1', 'key copied');
+:as_student
+select tests.expect_count($$select * from assignments where library_item_id = 'lib-1'$$, 1);
+select tests.expect_count($$select * from assignment_keys$$, 0);
+select tests.assert((select content::text from assignments where library_item_id = 'lib-1') not like '%explanation%', 'no answers in student-visible content');
+:as_parent
+select tests.expect_count($$select * from assignment_keys$$, 0);
+:as_ownerB
+select tests.expect_count($$select * from assignment_keys$$, 0);
+select tests.expect_fail(format($$select assign_library_item(%L, 'lib-1', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+
 \echo 'ALL TESTS PASSED'

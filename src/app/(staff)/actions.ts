@@ -275,3 +275,23 @@ export async function saveMockResults(sessionId: string, rows: MockRow[]): Promi
   revalidatePath("/students", "layout");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------- homework
+export async function assignLibraryItem(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase, workspace } = await getStaffContext();
+  const date = str(form.get("due_date"));
+  const time = str(form.get("due_time")) || "23:59";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return { error: "Choose a due date." };
+  const note = str(form.get("note"));
+  if (note.length > 2000) return { error: "Keep the note under 2000 characters." };
+  const { data, error } = await supabase.rpc("assign_library_item", {
+    p_center: workspace.centerId,
+    p_item: str(form.get("item_id")),
+    p_group: str(form.get("group_id")),
+    p_due_at: `${date}T${time}:00+05:00`,
+    p_instructions: note || undefined,
+  });
+  if (error) return { error: /due date must be in the future/i.test(error.message) ? "The due date must be in the future." : friendly(error.message) };
+  revalidatePath("/homework", "layout");
+  return { ok: true, id: data ?? undefined };
+}
