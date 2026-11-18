@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:3000
 | `app/(auth)/` | `/login`, `/register`, `/join`, `/forgot-password`, `/reset-password` and their server actions |
 | `app/auth/callback` | Landing point for links in Supabase auth emails |
 | `app/page.tsx` | Routes each person to their workspace by role |
-| `app/(staff)/` | Staff workspace: `/dashboard`, `/branches`, `/groups` (+ courses), `/students`, `/staff` |
+| `app/(staff)/` | Staff workspace: `/dashboard`, `/branches`, `/groups` (+ courses), `/students` + `/students/[id]` (Student 360), `/attendance`, `/payments` (+ printable receipts), `/staff` |
 | `app/(workspace)/` | `/student`, `/parent` (placeholder frames) |
 | `lib/supabase/` | Browser, server and service-role clients, generated DB types |
 | `lib/auth/workspace.ts` | Memberships, role → home route, finishing sign-up (create centre / redeem invite) |

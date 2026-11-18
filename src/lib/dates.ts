@@ -10,3 +10,13 @@ export function todayISO(tz = CENTER_TZ): string {
 export function monthStartISO(tz = CENTER_TZ): string {
   return `${todayISO(tz).slice(0, 7)}-01`;
 }
+
+/** Request-time window for the attendance list: last 7 days up to tomorrow. */
+export function attendanceWindow() {
+  const now = Date.now();
+  return {
+    now,
+    from: new Date(now - 7 * 86400000).toISOString(),
+    to: new Date(now + 36 * 3600000).toISOString(),
+  };
+}

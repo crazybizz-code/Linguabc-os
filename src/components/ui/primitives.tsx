@@ -119,3 +119,8 @@ export function formatUZS(amount: number | null | undefined) {
   if (amount == null) return "—";
   return `${Math.round(amount).toLocaleString("en-US")} UZS`;
 }
+
+/** Adds thousands separators to long numbers in free text ("500000 UZS" → "500,000 UZS"). */
+export function prettyNumbers(text: string | null | undefined) {
+  return (text ?? "").replace(/\b\d{4,}\b/g, (n) => Number(n).toLocaleString("en-US"));
+}

@@ -1,0 +1,90 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
+import { Check, Loader2, Printer } from "lucide-react";
+import { Dialog, FieldLabel } from "@/components/ui/dialog";
+import { buttonPrimary, buttonSecondary, cn, formatUZS, inputClass } from "@/components/ui/primitives";
+import { FormError } from "@/components/workspace/form-dialog";
+import { recordPayment } from "../actions";
+
+const METHODS = [
+  ["cash", "Cash"],
+  ["card", "Card"],
+  ["bank_transfer", "Bank transfer"],
+  ["click", "Click"],
+  ["payme", "Payme"],
+  ["uzum", "Uzum"],
+] as const;
+
+export function RecordPayment({ invoiceId, student, balance, period, compact }: { invoiceId: string; student: string; balance: number; period: string; compact?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState(0);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setKey((k) => k + 1); setOpen(true); }}
+        className={compact ? "h-7 rounded-[8px] bg-[#12392B] px-2.5 text-[11.5px] font-medium text-[#FAF5EF] hover:bg-[#0D3024]" : buttonPrimary}
+      >
+        Record{compact ? "" : " payment"}
+      </button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Record payment" description={`${student} · ${period}`} width="max-w-[460px]">
+        <Form key={key} invoiceId={invoiceId} balance={balance} onClose={() => setOpen(false)} />
+      </Dialog>
+    </>
+  );
+}
+
+function Form({ invoiceId, balance, onClose }: { invoiceId: string; balance: number; onClose: () => void }) {
+  const [state, action] = useActionState(recordPayment, undefined);
+  const [method, setMethod] = useState("cash");
+  if (state?.ok) {
+    return (
+      <div className="flex flex-col items-center py-2 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E7EFE4]"><Check className="h-6 w-6 text-[#3F6B4A]" strokeWidth={2.2} /></div>
+        <p className="mt-4 text-[15px] font-semibold">Payment recorded</p>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">Receipt <span className="font-mono font-medium text-[#17211D]">{state.link}</span></p>
+        <div className="mt-5 flex gap-2">
+          <Link href={`/payments/receipt/${state.id}`} target="_blank" className={buttonSecondary}><Printer className="h-4 w-4" /> Print receipt</Link>
+          <button type="button" onClick={onClose} className={buttonPrimary}>Done</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <form action={action} className="space-y-4">
+      <FormError message={state?.error} />
+      <input type="hidden" name="invoice_id" value={invoiceId} />
+      <input type="hidden" name="method" value={method} />
+      <FieldLabel label="Amount received (UZS)" hint={`Outstanding: ${formatUZS(balance)}`}>
+        <input name="amount" inputMode="numeric" autoFocus defaultValue={balance.toLocaleString("en-US")} className={inputClass} />
+      </FieldLabel>
+      <div>
+        <span className="mb-1.5 block text-[11.5px] font-medium text-[#3B4A42]">Method</span>
+        <div className="grid grid-cols-3 gap-2">
+          {METHODS.map(([v, label]) => (
+            <button key={v} type="button" onClick={() => setMethod(v)}
+              className={cn("h-9 rounded-[9px] border text-[12.5px] font-medium", method === v ? "border-[#12392B] bg-[#12392B] text-[#FAF5EF]" : "border-border/80 text-[#3B4A42] hover:bg-white")}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <FieldLabel label="Note" hint="Optional"><input name="note" placeholder="e.g. paid by father" className={inputClass} /></FieldLabel>
+      <p className="rounded-[10px] bg-[#F5ECE8] px-3.5 py-2.5 text-[11.5px] leading-relaxed text-muted-foreground">
+        Payments can&apos;t be edited or deleted once recorded — mistakes are corrected with a refund by the owner. A numbered receipt is issued automatically.
+      </p>
+      <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+        <button type="button" onClick={onClose} className="h-10 rounded-[11px] px-4 text-[13px] text-[#3B4A42] hover:bg-[#EFE6DF]">Cancel</button>
+        <Save />
+      </div>
+    </form>
+  );
+}
+
+function Save() {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={pending} className={buttonPrimary}>{pending && <Loader2 className="h-4 w-4 animate-spin" />} Record payment</button>;
+}
