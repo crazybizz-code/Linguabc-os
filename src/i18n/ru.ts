@@ -551,4 +551,8 @@ export const ru: Record<string, string> = {
   "The AI took too long. Try a shorter document or fewer questions.": "ИИ отвечал слишком долго. Попробуйте документ короче или меньше вопросов.",
   "Could not reach the AI service.": "Не удалось связаться с сервисом ИИ.",
   "Something went wrong. Try again.": "Что-то пошло не так. Попробуйте снова.",
+  "AI this month: {n} drafts · {tokens} tokens · ${cost}": "ИИ в этом месяце: {n} черновиков · {tokens} токенов · ${cost}",
+  "about ${avg} per draft": "примерно ${avg} за черновик",
+  "This is too much for one assignment. Split the document or ask for fewer questions.": "Слишком много для одного задания. Разделите документ или попросите меньше вопросов.",
+  "The PDF is longer than 12 pages. Upload only the pages with the exercise.": "PDF длиннее 12 страниц. Загрузите только страницы с упражнением.",
 };

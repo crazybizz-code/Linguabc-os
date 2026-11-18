@@ -148,6 +148,45 @@ export type Database = {
           },
         ]
       }
+      ai_requests: {
+        Row: {
+          center_id: string
+          completion_tokens: number | null
+          cost_usd: number | null
+          created_at: string
+          id: number
+          kind: string
+          model: string | null
+          ok: boolean | null
+          prompt_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          center_id: string
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          id?: number
+          kind: string
+          model?: string | null
+          ok?: boolean | null
+          prompt_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          center_id?: string
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          id?: number
+          kind?: string
+          model?: string | null
+          ok?: boolean | null
+          prompt_tokens?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       assignment_keys: {
         Row: {
           answers: Json
@@ -1811,7 +1850,11 @@ export type Database = {
         Returns: string
       }
       my_homework_result: { Args: { p_homework: string }; Returns: Json }
-      claim_ai_request: { Args: { p_center: string; p_kind: string }; Returns: undefined }
+      claim_ai_request: { Args: { p_center: string; p_kind: string }; Returns: number }
+      finish_ai_request: {
+        Args: { p_completion: number; p_cost: number; p_id: number; p_model: string; p_ok: boolean; p_prompt: number }
+        Returns: undefined
+      }
       create_custom_assignment: {
         Args: {
           p_answers: Json
