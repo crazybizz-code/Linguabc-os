@@ -4,6 +4,8 @@ import { ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { Avatar, Badge, Card, type Tone } from "@/components/ui/primitives";
 import { intlLocale } from "@/i18n";
+import type { AnswerKey, Question } from "@/lib/library/render";
+import { ReviewDialog } from "./review";
 
 export const metadata = { title: "Homework" };
 const TZ = "Asia/Tashkent";
@@ -17,15 +19,21 @@ export default async function HomeworkDetailPage({ params }: PageProps<"/homewor
   const { data: h } = await supabase.from("homework")
     .select("id, due_at, assigned_at, note, group_id, groups(name), assignments(title, skill, level, library_item_id, content)").eq("id", id).maybeSingle();
   if (!h) notFound();
-  const { data: subs } = await supabase.from("submissions")
-    .select("id, status, score, submitted_at, students(full_name)").eq("homework_id", id);
+  const [{ data: subs }, { data: keyRow }] = await Promise.all([
+    supabase.from("submissions").select("id, status, score, feedback, answers, submitted_at, students(full_name)").eq("homework_id", id),
+    supabase.from("homework").select("assignments(assignment_keys(answers))").eq("id", id).maybeSingle(),
+  ]);
+  const questions = ((h.assignments?.content as { questions?: Question[] } | null)?.questions ?? []);
+  // PostgREST may embed the one-to-one key as an object or a one-element array.
+  const keyEmbed = (keyRow?.assignments as { assignment_keys?: { answers: unknown } | { answers: unknown }[] | null } | null)?.assignment_keys;
+  const keyed = ((Array.isArray(keyEmbed) ? keyEmbed[0]?.answers : keyEmbed?.answers) ?? {}) as AnswerKey;
   const rows = (subs ?? []).sort((a, b) => (a.students?.full_name ?? "").localeCompare(b.students?.full_name ?? ""));
   const done = rows.filter((r) => r.status === "submitted" || r.status === "reviewed").length;
   const scores = rows.map((r) => r.score).filter((s): s is number => s != null).map(Number);
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
   const overdue = new Date(h.due_at).getTime() < Date.parse(new Date().toISOString());
   const fmt = (iso: string) => new Date(iso).toLocaleString(L, { timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  const nq = ((h.assignments?.content as { questions?: unknown[] } | null)?.questions ?? []).length;
+  const nq = questions.length;
 
   return (
     <div className="space-y-5">
@@ -51,6 +59,11 @@ export default async function HomeworkDetailPage({ params }: PageProps<"/homewor
                   {r.submitted_at && <span className="hidden text-[11.5px] text-muted-foreground sm:block">{fmt(r.submitted_at)}</span>}
                   {r.score != null && <span className="w-12 text-right text-[13px] font-semibold tabular-nums">{Math.round(Number(r.score))}%</span>}
                   <Badge tone={r.status === "not_started" && overdue ? "red" : TONE[r.status]}>{t(r.status === "not_started" && overdue ? "Missed" : LABEL[r.status])}</Badge>
+                  {(r.status === "submitted" || r.status === "reviewed") && (
+                    <ReviewDialog submissionId={r.id} student={r.students?.full_name ?? ""} questions={questions}
+                      answers={(r.answers ?? {}) as Record<string, number>} keyed={keyed}
+                      score={r.score != null ? Number(r.score) : null} feedback={r.feedback} reviewed={r.status === "reviewed"} />
+                  )}
                 </li>
               ))}
             </ul>

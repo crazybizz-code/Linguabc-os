@@ -10,3 +10,13 @@ export async function setParentLocale(locale: string) {
   await supabase.from("profiles").update({ locale }).eq("id", userId);
   revalidatePath("/parent", "layout");
 }
+
+/** Students save progress or submit their homework answers ({question id: option index}). */
+export async function saveHomework(homeworkId: string, answers: Record<string, number>, submit: boolean) {
+  const clean = Object.fromEntries(Object.entries(answers).filter(([k, v]) => /^[\w-]{1,40}$/.test(k) && Number.isInteger(v) && v >= 0 && v < 10));
+  const { supabase } = await getPortalContext("student");
+  const { error } = await supabase.rpc("save_submission", { p_homework: homeworkId, p_answers: clean, p_submit: submit });
+  if (error) return { error: /already submitted/i.test(error.message) ? "This homework was already submitted." : "Could not save. Please try again." };
+  revalidatePath("/student", "layout");
+  return { ok: true };
+}

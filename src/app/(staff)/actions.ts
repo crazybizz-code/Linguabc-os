@@ -295,3 +295,16 @@ export async function assignLibraryItem(_: ActionState, form: FormData): Promise
   revalidatePath("/homework", "layout");
   return { ok: true, id: data ?? undefined };
 }
+
+export async function reviewSubmission(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const score = Number(str(form.get("score")));
+  if (!Number.isFinite(score) || score < 0 || score > 100) return { error: "Enter a score from 0 to 100." };
+  const feedback = str(form.get("feedback"));
+  if (feedback.length > 2000) return { error: "Keep the note under 2000 characters." };
+  const { error } = await supabase.rpc("review_submission", { p_submission: str(form.get("submission_id")), p_score: score, p_feedback: feedback });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/homework", "layout");
+  revalidatePath("/students", "layout");
+  return { ok: true };
+}
