@@ -1,9 +1,42 @@
-# LinguABC OS — backend (V1)
+# LinguABC OS (V1)
 
-Database, access control and server logic for the learning-center OS,
-built on Supabase (Postgres + Auth + Row Level Security).
+The learning-centre operating system: a Next.js app on Vercel with a
+Supabase backend (Postgres + Auth + Row Level Security).
 
-## Migrations (`supabase/migrations`)
+## Run locally
+
+```bash
+cp .env.example .env.local   # fill SUPABASE_SECRET_KEY for phone sign-in
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+## App structure (`src/`)
+
+| Path | What it is |
+|---|---|
+| `proxy.ts` | Refreshes the Supabase session; sends signed-out visitors to `/login` |
+| `app/(auth)/` | `/login`, `/register`, `/join`, `/forgot-password`, `/reset-password` and their server actions |
+| `app/auth/callback` | Landing point for links in Supabase auth emails |
+| `app/page.tsx` | Routes each person to their workspace by role |
+| `app/(workspace)/` | `/dashboard` (staff), `/student`, `/parent` |
+| `lib/supabase/` | Browser, server and service-role clients, generated DB types |
+| `lib/auth/workspace.ts` | Memberships, role → home route, finishing sign-up (create centre / redeem invite) |
+
+### Sign-up flows
+
+- **Owner:** `/register` → confirm email → the centre is created on first sign-in.
+- **Everyone else:** staff invite them (`invite_member`) → they open `/join?code=…` → confirm email → the invite is redeemed on first sign-in.
+- **Phone sign-in:** the phone is resolved to the account email on the server with the secret key. The error is the same for an unknown phone and a wrong password.
+
+### Supabase settings to configure
+
+- **Auth → URL Configuration:** set the Site URL to the production domain, and add `https://<domain>/auth/callback` (plus preview domains) to the Redirect URLs.
+- **Auth → SMTP:** add a custom SMTP provider (e.g. Resend). The built-in mailer only sends to team members and is heavily rate-limited.
+
+## Database
+
+### Migrations (`supabase/migrations`)
 
 | File | What it holds |
 |---|---|
@@ -11,11 +44,13 @@ built on Supabase (Postgres + Auth + Row Level Security).
 | `0002_access_control.sql` | Row Level Security for all six roles |
 | `0003_server_functions.sql` | RPCs: `create_center`, `invite_member`, `accept_invite`, `set_member_status`, `enroll_student`, `generate_invoices`, `record_payment`, `refund_payment`, `void_invoice`, `generate_lessons`, `mark_attendance`, `approve_assignment`, `assign_homework`, `save_submission`, `review_submission`; ledger immutability; audit triggers |
 | `0004_views.sql` | Read models: `invoice_balances`, `student_overview` (Student 360), `group_overview`, `mock_result_scores` |
+| `0005_profile_phone_login.sql` | Unique, normalised phone on profiles for phone sign-in |
+| `0006_invite_preview.sql` | `invite_preview(code)` — centre and role shown on `/join` |
 
 Apply in order with `supabase db push` (after `supabase link`) or paste
 into the SQL editor of a new Supabase project.
 
-## Guarantees enforced by the database
+### Guarantees enforced by the database
 
 - **Tenant isolation** — every row has `center_id`; composite foreign keys
   stop a row in one center from referencing another center's data; RLS
@@ -32,7 +67,7 @@ into the SQL editor of a new Supabase project.
 - **Audit** — memberships, students, guardians, enrollments, invoices,
   payments, attendance and mock results are logged with the acting user.
 
-## Tests
+### Database tests
 
 `supabase/tests/run.sh` builds a throwaway database (with a minimal
 Supabase auth stub) and runs ~90 checks across two centers and every role:

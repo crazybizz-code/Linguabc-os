@@ -1,0 +1,1938 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18"
+  }
+  public: {
+    Tables: {
+      activities: {
+        Row: {
+          actor_id: string | null
+          center_id: string
+          detail: string | null
+          id: string
+          occurred_at: string
+          ref_id: string | null
+          student_id: string
+          title: string
+          type: Database["public"]["Enums"]["activity_type"]
+        }
+        Insert: {
+          actor_id?: string | null
+          center_id: string
+          detail?: string | null
+          id?: string
+          occurred_at?: string
+          ref_id?: string | null
+          student_id: string
+          title: string
+          type: Database["public"]["Enums"]["activity_type"]
+        }
+        Update: {
+          actor_id?: string | null
+          center_id?: string
+          detail?: string | null
+          id?: string
+          occurred_at?: string
+          ref_id?: string | null
+          student_id?: string
+          title?: string
+          type?: Database["public"]["Enums"]["activity_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_actor_id_center_id_fkey"
+            columns: ["actor_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "activities_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "activities_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      assignments: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          center_id: string
+          content: Json
+          created_at: string
+          created_by: string
+          id: string
+          level: Database["public"]["Enums"]["cefr_level"] | null
+          library_item_id: string | null
+          skill: Database["public"]["Enums"]["skill"]
+          source: Database["public"]["Enums"]["assignment_source"]
+          status: Database["public"]["Enums"]["assignment_status"]
+          sub_skill: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          center_id: string
+          content?: Json
+          created_at?: string
+          created_by: string
+          id?: string
+          level?: Database["public"]["Enums"]["cefr_level"] | null
+          library_item_id?: string | null
+          skill: Database["public"]["Enums"]["skill"]
+          source: Database["public"]["Enums"]["assignment_source"]
+          status?: Database["public"]["Enums"]["assignment_status"]
+          sub_skill?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          center_id?: string
+          content?: Json
+          created_at?: string
+          created_by?: string
+          id?: string
+          level?: Database["public"]["Enums"]["cefr_level"] | null
+          library_item_id?: string | null
+          skill?: Database["public"]["Enums"]["skill"]
+          source?: Database["public"]["Enums"]["assignment_source"]
+          status?: Database["public"]["Enums"]["assignment_status"]
+          sub_skill?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_approved_by_center_id_fkey"
+            columns: ["approved_by", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "assignments_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_created_by_center_id_fkey"
+            columns: ["created_by", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      attendance_records: {
+        Row: {
+          center_id: string
+          id: string
+          lesson_id: string
+          marked_at: string
+          marked_by: string | null
+          note: string | null
+          status: Database["public"]["Enums"]["attendance_status"]
+          student_id: string
+        }
+        Insert: {
+          center_id: string
+          id?: string
+          lesson_id: string
+          marked_at?: string
+          marked_by?: string | null
+          note?: string | null
+          status: Database["public"]["Enums"]["attendance_status"]
+          student_id: string
+        }
+        Update: {
+          center_id?: string
+          id?: string
+          lesson_id?: string
+          marked_at?: string
+          marked_by?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["attendance_status"]
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_lesson_id_center_id_fkey"
+            columns: ["lesson_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "attendance_records_marked_by_center_id_fkey"
+            columns: ["marked_by", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "attendance_records_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "attendance_records_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          at: string
+          center_id: string | null
+          id: number
+          new_data: Json | null
+          old_data: Json | null
+          row_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          at?: string
+          center_id?: string | null
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          row_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          at?: string
+          center_id?: string | null
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          row_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      branches: {
+        Row: {
+          address: string | null
+          center_id: string
+          created_at: string
+          id: string
+          name: string
+          phone: string | null
+          status: Database["public"]["Enums"]["record_status"]
+        }
+        Insert: {
+          address?: string | null
+          center_id: string
+          created_at?: string
+          id?: string
+          name: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+        }
+        Update: {
+          address?: string | null
+          center_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branches_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      centers: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          name: string
+          receipt_seq: number
+          slug: string
+          timezone: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          id?: string
+          name: string
+          receipt_seq?: number
+          slug: string
+          timezone?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          name?: string
+          receipt_seq?: number
+          slug?: string
+          timezone?: string
+        }
+        Relationships: []
+      }
+      courses: {
+        Row: {
+          center_id: string
+          code: string
+          created_at: string
+          default_monthly_fee: number
+          description: string | null
+          duration_weeks: number | null
+          id: string
+          level: Database["public"]["Enums"]["cefr_level"] | null
+          name: string
+          status: Database["public"]["Enums"]["record_status"]
+        }
+        Insert: {
+          center_id: string
+          code: string
+          created_at?: string
+          default_monthly_fee?: number
+          description?: string | null
+          duration_weeks?: number | null
+          id?: string
+          level?: Database["public"]["Enums"]["cefr_level"] | null
+          name: string
+          status?: Database["public"]["Enums"]["record_status"]
+        }
+        Update: {
+          center_id?: string
+          code?: string
+          created_at?: string
+          default_monthly_fee?: number
+          description?: string | null
+          duration_weeks?: number | null
+          id?: string
+          level?: Database["public"]["Enums"]["cefr_level"] | null
+          name?: string
+          status?: Database["public"]["Enums"]["record_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrollments: {
+        Row: {
+          center_id: string
+          created_at: string
+          discount_percent: number
+          due_day: number
+          end_date: string | null
+          group_id: string
+          id: string
+          monthly_fee: number
+          start_date: string
+          status: Database["public"]["Enums"]["enrollment_status"]
+          student_id: string
+        }
+        Insert: {
+          center_id: string
+          created_at?: string
+          discount_percent?: number
+          due_day?: number
+          end_date?: string | null
+          group_id: string
+          id?: string
+          monthly_fee: number
+          start_date?: string
+          status?: Database["public"]["Enums"]["enrollment_status"]
+          student_id: string
+        }
+        Update: {
+          center_id?: string
+          created_at?: string
+          discount_percent?: number
+          due_day?: number
+          end_date?: string | null
+          group_id?: string
+          id?: string
+          monthly_fee?: number
+          start_date?: string
+          status?: Database["public"]["Enums"]["enrollment_status"]
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "group_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "enrollments_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "enrollments_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "enrollments_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      group_schedule_slots: {
+        Row: {
+          center_id: string
+          end_time: string
+          group_id: string
+          id: string
+          room_id: string | null
+          start_time: string
+          weekday: number
+        }
+        Insert: {
+          center_id: string
+          end_time: string
+          group_id: string
+          id?: string
+          room_id?: string | null
+          start_time: string
+          weekday: number
+        }
+        Update: {
+          center_id?: string
+          end_time?: string
+          group_id?: string
+          id?: string
+          room_id?: string | null
+          start_time?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_schedule_slots_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "group_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "group_schedule_slots_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "group_schedule_slots_room_id_center_id_fkey"
+            columns: ["room_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          branch_id: string
+          capacity: number | null
+          center_id: string
+          course_id: string
+          created_at: string
+          end_date: string | null
+          id: string
+          mentor_id: string | null
+          name: string
+          room_id: string | null
+          short_name: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["record_status"]
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          capacity?: number | null
+          center_id: string
+          course_id: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          mentor_id?: string | null
+          name: string
+          room_id?: string | null
+          short_name?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          capacity?: number | null
+          center_id?: string
+          course_id?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          mentor_id?: string | null
+          name?: string
+          room_id?: string | null
+          short_name?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_branch_id_center_id_fkey"
+            columns: ["branch_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "groups_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_course_id_center_id_fkey"
+            columns: ["course_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "groups_mentor_id_center_id_fkey"
+            columns: ["mentor_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "groups_room_id_center_id_fkey"
+            columns: ["room_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      guardians: {
+        Row: {
+          center_id: string
+          created_at: string
+          full_name: string
+          id: string
+          is_primary: boolean
+          membership_id: string | null
+          phone: string | null
+          relationship: string | null
+          student_id: string
+        }
+        Insert: {
+          center_id: string
+          created_at?: string
+          full_name: string
+          id?: string
+          is_primary?: boolean
+          membership_id?: string | null
+          phone?: string | null
+          relationship?: string | null
+          student_id: string
+        }
+        Update: {
+          center_id?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_primary?: boolean
+          membership_id?: string | null
+          phone?: string | null
+          relationship?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardians_membership_id_center_id_fkey"
+            columns: ["membership_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "guardians_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "guardians_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      homework: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          assignment_id: string
+          center_id: string
+          due_at: string
+          group_id: string
+          id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          assignment_id: string
+          center_id: string
+          due_at: string
+          group_id: string
+          id?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          assignment_id?: string
+          center_id?: string
+          due_at?: string
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "homework_assigned_by_center_id_fkey"
+            columns: ["assigned_by", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "homework_assignment_id_center_id_fkey"
+            columns: ["assignment_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "homework_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "group_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "homework_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          center_id: string
+          created_at: string
+          due_date: string
+          enrollment_id: string
+          id: string
+          period: string
+          status: Database["public"]["Enums"]["invoice_status"]
+          student_id: string
+        }
+        Insert: {
+          amount: number
+          center_id: string
+          created_at?: string
+          due_date: string
+          enrollment_id: string
+          id?: string
+          period: string
+          status?: Database["public"]["Enums"]["invoice_status"]
+          student_id: string
+        }
+        Update: {
+          amount?: number
+          center_id?: string
+          created_at?: string
+          due_date?: string
+          enrollment_id?: string
+          id?: string
+          period?: string
+          status?: Database["public"]["Enums"]["invoice_status"]
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_enrollment_id_center_id_fkey"
+            columns: ["enrollment_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "invoices_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "invoices_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      lessons: {
+        Row: {
+          center_id: string
+          created_at: string
+          ends_at: string
+          group_id: string
+          id: string
+          mentor_id: string | null
+          room_id: string | null
+          starts_at: string
+          status: Database["public"]["Enums"]["lesson_status"]
+          topic: string | null
+        }
+        Insert: {
+          center_id: string
+          created_at?: string
+          ends_at: string
+          group_id: string
+          id?: string
+          mentor_id?: string | null
+          room_id?: string | null
+          starts_at: string
+          status?: Database["public"]["Enums"]["lesson_status"]
+          topic?: string | null
+        }
+        Update: {
+          center_id?: string
+          created_at?: string
+          ends_at?: string
+          group_id?: string
+          id?: string
+          mentor_id?: string | null
+          room_id?: string | null
+          starts_at?: string
+          status?: Database["public"]["Enums"]["lesson_status"]
+          topic?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "group_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "lessons_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "lessons_mentor_id_center_id_fkey"
+            columns: ["mentor_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "lessons_room_id_center_id_fkey"
+            columns: ["room_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      memberships: {
+        Row: {
+          branch_id: string | null
+          center_id: string
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          invite_code: string | null
+          invited_by: string | null
+          phone: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          status: Database["public"]["Enums"]["member_status"]
+          user_id: string | null
+        }
+        Insert: {
+          branch_id?: string | null
+          center_id: string
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          invite_code?: string | null
+          invited_by?: string | null
+          phone?: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          status?: Database["public"]["Enums"]["member_status"]
+          user_id?: string | null
+        }
+        Update: {
+          branch_id?: string | null
+          center_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          invite_code?: string | null
+          invited_by?: string | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          status?: Database["public"]["Enums"]["member_status"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_branch_id_center_id_fkey"
+            columns: ["branch_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "memberships_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mock_results: {
+        Row: {
+          center_id: string
+          id: string
+          listening_band: number | null
+          mock_session_id: string
+          notes: string | null
+          reading_band: number | null
+          speaking_band: number | null
+          status: Database["public"]["Enums"]["mock_result_status"]
+          student_id: string
+          updated_at: string
+          weaknesses: string[]
+          writing_band: number | null
+        }
+        Insert: {
+          center_id: string
+          id?: string
+          listening_band?: number | null
+          mock_session_id: string
+          notes?: string | null
+          reading_band?: number | null
+          speaking_band?: number | null
+          status?: Database["public"]["Enums"]["mock_result_status"]
+          student_id: string
+          updated_at?: string
+          weaknesses?: string[]
+          writing_band?: number | null
+        }
+        Update: {
+          center_id?: string
+          id?: string
+          listening_band?: number | null
+          mock_session_id?: string
+          notes?: string | null
+          reading_band?: number | null
+          speaking_band?: number | null
+          status?: Database["public"]["Enums"]["mock_result_status"]
+          student_id?: string
+          updated_at?: string
+          weaknesses?: string[]
+          writing_band?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_results_mock_session_id_center_id_fkey"
+            columns: ["mock_session_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "mock_sessions"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_results_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_results_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      mock_sessions: {
+        Row: {
+          center_id: string
+          created_at: string
+          examiner_id: string | null
+          group_id: string | null
+          id: string
+          modules: Database["public"]["Enums"]["skill"][]
+          name: string
+          room_id: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["mock_status"]
+          version: string | null
+        }
+        Insert: {
+          center_id: string
+          created_at?: string
+          examiner_id?: string | null
+          group_id?: string | null
+          id?: string
+          modules?: Database["public"]["Enums"]["skill"][]
+          name: string
+          room_id?: string | null
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["mock_status"]
+          version?: string | null
+        }
+        Update: {
+          center_id?: string
+          created_at?: string
+          examiner_id?: string | null
+          group_id?: string | null
+          id?: string
+          modules?: Database["public"]["Enums"]["skill"][]
+          name?: string
+          room_id?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["mock_status"]
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_sessions_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mock_sessions_examiner_id_center_id_fkey"
+            columns: ["examiner_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_sessions_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "group_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_sessions_group_id_center_id_fkey"
+            columns: ["group_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_sessions_room_id_center_id_fkey"
+            columns: ["room_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          center_id: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          data: Json
+          id: string
+          read_at: string | null
+          recipient_id: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notification_status"]
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          center_id: string
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          data?: Json
+          id?: string
+          read_at?: string | null
+          recipient_id: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status"]
+          title: string
+        }
+        Update: {
+          body?: string | null
+          center_id?: string
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          data?: Json
+          id?: string
+          read_at?: string | null
+          recipient_id?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status"]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_id_center_id_fkey"
+            columns: ["recipient_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          center_id: string
+          created_at: string
+          id: string
+          invoice_id: string | null
+          kind: Database["public"]["Enums"]["payment_kind"]
+          method: Database["public"]["Enums"]["payment_method"]
+          note: string | null
+          paid_at: string
+          provider_txn_id: string | null
+          receipt_no: string
+          received_by: string | null
+          refund_of: string | null
+          student_id: string
+        }
+        Insert: {
+          amount: number
+          center_id: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          kind?: Database["public"]["Enums"]["payment_kind"]
+          method: Database["public"]["Enums"]["payment_method"]
+          note?: string | null
+          paid_at?: string
+          provider_txn_id?: string | null
+          receipt_no: string
+          received_by?: string | null
+          refund_of?: string | null
+          student_id: string
+        }
+        Update: {
+          amount?: number
+          center_id?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          kind?: Database["public"]["Enums"]["payment_kind"]
+          method?: Database["public"]["Enums"]["payment_method"]
+          note?: string | null
+          paid_at?: string
+          provider_txn_id?: string | null
+          receipt_no?: string
+          received_by?: string | null
+          refund_of?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_center_id_fkey"
+            columns: ["invoice_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_balances"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "payments_invoice_id_center_id_fkey"
+            columns: ["invoice_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "payments_received_by_center_id_fkey"
+            columns: ["received_by", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "payments_refund_of_fkey"
+            columns: ["refund_of"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "payments_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      rooms: {
+        Row: {
+          branch_id: string
+          capacity: number | null
+          center_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          branch_id: string
+          capacity?: number | null
+          center_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          branch_id?: string
+          capacity?: number | null
+          center_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_branch_id_center_id_fkey"
+            columns: ["branch_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "rooms_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          branch_id: string | null
+          center_id: string
+          created_at: string
+          date_of_birth: string | null
+          email: string | null
+          full_name: string
+          id: string
+          joined_on: string
+          membership_id: string | null
+          notes: string | null
+          phone: string | null
+          status: Database["public"]["Enums"]["student_status"]
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          center_id: string
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          joined_on?: string
+          membership_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["student_status"]
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          center_id?: string
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          joined_on?: string
+          membership_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["student_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_branch_id_center_id_fkey"
+            columns: ["branch_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "students_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_membership_id_center_id_fkey"
+            columns: ["membership_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      submissions: {
+        Row: {
+          answers: Json
+          center_id: string
+          feedback: string | null
+          homework_id: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          score: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["submission_status"]
+          student_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          center_id: string
+          feedback?: string | null
+          homework_id: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          score?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["submission_status"]
+          student_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          center_id?: string
+          feedback?: string | null
+          homework_id?: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          score?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["submission_status"]
+          student_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_homework_id_center_id_fkey"
+            columns: ["homework_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "homework"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "submissions_reviewed_by_center_id_fkey"
+            columns: ["reviewed_by", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "submissions_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "submissions_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      group_overview: {
+        Row: {
+          branch_id: string | null
+          capacity: number | null
+          center_id: string | null
+          course_id: string | null
+          id: string | null
+          mentor_id: string | null
+          name: string | null
+          next_lesson_at: string | null
+          room_id: string | null
+          short_name: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["record_status"] | null
+          student_count: number | null
+        }
+        Insert: {
+          branch_id?: string | null
+          capacity?: number | null
+          center_id?: string | null
+          course_id?: string | null
+          id?: string | null
+          mentor_id?: string | null
+          name?: string | null
+          next_lesson_at?: never
+          room_id?: string | null
+          short_name?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["record_status"] | null
+          student_count?: never
+        }
+        Update: {
+          branch_id?: string | null
+          capacity?: number | null
+          center_id?: string | null
+          course_id?: string | null
+          id?: string | null
+          mentor_id?: string | null
+          name?: string | null
+          next_lesson_at?: never
+          room_id?: string | null
+          short_name?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["record_status"] | null
+          student_count?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_branch_id_center_id_fkey"
+            columns: ["branch_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "groups_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_course_id_center_id_fkey"
+            columns: ["course_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "groups_mentor_id_center_id_fkey"
+            columns: ["mentor_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "groups_room_id_center_id_fkey"
+            columns: ["room_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      invoice_balances: {
+        Row: {
+          amount: number | null
+          balance: number | null
+          center_id: string | null
+          due_date: string | null
+          enrollment_id: string | null
+          id: string | null
+          paid: number | null
+          payment_status: string | null
+          period: string | null
+          student_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_enrollment_id_center_id_fkey"
+            columns: ["enrollment_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "invoices_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "invoices_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      mock_result_scores: {
+        Row: {
+          center_id: string | null
+          id: string | null
+          listening_band: number | null
+          mock_session_id: string | null
+          notes: string | null
+          overall_band: number | null
+          reading_band: number | null
+          speaking_band: number | null
+          status: Database["public"]["Enums"]["mock_result_status"] | null
+          student_id: string | null
+          updated_at: string | null
+          weaknesses: string[] | null
+          writing_band: number | null
+        }
+        Insert: {
+          center_id?: string | null
+          id?: string | null
+          listening_band?: number | null
+          mock_session_id?: string | null
+          notes?: string | null
+          overall_band?: never
+          reading_band?: number | null
+          speaking_band?: number | null
+          status?: Database["public"]["Enums"]["mock_result_status"] | null
+          student_id?: string | null
+          updated_at?: string | null
+          weaknesses?: string[] | null
+          writing_band?: number | null
+        }
+        Update: {
+          center_id?: string | null
+          id?: string | null
+          listening_band?: number | null
+          mock_session_id?: string | null
+          notes?: string | null
+          overall_band?: never
+          reading_band?: number | null
+          speaking_band?: number | null
+          status?: Database["public"]["Enums"]["mock_result_status"] | null
+          student_id?: string | null
+          updated_at?: string | null
+          weaknesses?: string[] | null
+          writing_band?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mock_results_mock_session_id_center_id_fkey"
+            columns: ["mock_session_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "mock_sessions"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_results_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "student_overview"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "mock_results_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
+      student_overview: {
+        Row: {
+          attendance_pct: number | null
+          attended: number | null
+          branch_id: string | null
+          center_id: string | null
+          full_name: string | null
+          hw_assigned: number | null
+          hw_completed: number | null
+          id: string | null
+          joined_on: string | null
+          last_activity_at: string | null
+          last_overall_band: number | null
+          open_balance: number | null
+          overdue_count: number | null
+          phone: string | null
+          status: Database["public"]["Enums"]["student_status"] | null
+          total_marked: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_branch_id_center_id_fkey"
+            columns: ["branch_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id", "center_id"]
+          },
+          {
+            foreignKeyName: "students_center_id_fkey"
+            columns: ["center_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Functions: {
+      accept_invite: { Args: { p_code: string }; Returns: string }
+      approve_assignment: { Args: { p_assignment: string }; Returns: undefined }
+      assign_homework: {
+        Args: { p_assignment: string; p_due_at: string; p_group: string }
+        Returns: string
+      }
+      create_center: {
+        Args: { p_name: string; p_owner_name: string; p_slug: string }
+        Returns: string
+      }
+      enroll_student: {
+        Args: {
+          p_discount_percent?: number
+          p_due_day?: number
+          p_group: string
+          p_monthly_fee?: number
+          p_start_date?: string
+          p_student: string
+        }
+        Returns: string
+      }
+      generate_invoices: {
+        Args: { p_center: string; p_period: string }
+        Returns: number
+      }
+      generate_lessons: {
+        Args: { p_from: string; p_group: string; p_to: string }
+        Returns: number
+      }
+      invite_member: {
+        Args: {
+          p_branch?: string
+          p_center: string
+          p_email?: string
+          p_full_name: string
+          p_guardian?: string
+          p_phone?: string
+          p_role: Database["public"]["Enums"]["member_role"]
+          p_student?: string
+        }
+        Returns: {
+          invite_code: string
+          membership_id: string
+        }[]
+      }
+      invite_preview: {
+        Args: { p_code: string }
+        Returns: {
+          center_name: string
+          email: string
+          full_name: string
+          role: Database["public"]["Enums"]["member_role"]
+        }[]
+      }
+      mark_attendance: {
+        Args: { p_lesson: string; p_records: Json }
+        Returns: number
+      }
+      record_payment: {
+        Args: {
+          p_amount: number
+          p_invoice: string
+          p_method: Database["public"]["Enums"]["payment_method"]
+          p_note?: string
+          p_paid_at?: string
+          p_provider_txn_id?: string
+        }
+        Returns: {
+          payment_id: string
+          receipt_no: string
+        }[]
+      }
+      refund_payment: {
+        Args: { p_amount: number; p_payment: string; p_reason: string }
+        Returns: {
+          payment_id: string
+          receipt_no: string
+        }[]
+      }
+      review_submission: {
+        Args: { p_feedback: string; p_score: number; p_submission: string }
+        Returns: undefined
+      }
+      save_submission: {
+        Args: { p_answers: Json; p_homework: string; p_submit?: boolean }
+        Returns: Database["public"]["Enums"]["submission_status"]
+      }
+      set_member_status: {
+        Args: {
+          p_membership: string
+          p_status: Database["public"]["Enums"]["member_status"]
+        }
+        Returns: undefined
+      }
+      void_invoice: { Args: { p_invoice: string }; Returns: undefined }
+    }
+    Enums: {
+      activity_type:
+        | "enrollment"
+        | "attendance"
+        | "payment"
+        | "homework"
+        | "mock"
+        | "note"
+      assignment_source: "library" | "upload" | "ai"
+      assignment_status: "draft" | "pending_approval" | "approved" | "archived"
+      attendance_status: "present" | "late" | "absent" | "excused"
+      cefr_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
+      enrollment_status: "active" | "paused" | "completed" | "dropped"
+      invoice_status: "open" | "void"
+      lesson_status: "scheduled" | "held" | "cancelled"
+      member_role:
+        | "owner"
+        | "admin"
+        | "academic_manager"
+        | "mentor"
+        | "student"
+        | "parent"
+      member_status: "invited" | "active" | "suspended"
+      mock_result_status: "pending" | "in_progress" | "completed" | "absent"
+      mock_status: "scheduled" | "in_progress" | "completed" | "cancelled"
+      notification_channel: "in_app" | "sms" | "telegram" | "push"
+      notification_status: "queued" | "sent" | "failed"
+      payment_kind: "payment" | "refund"
+      payment_method:
+        | "cash"
+        | "card"
+        | "bank_transfer"
+        | "click"
+        | "payme"
+        | "uzum"
+      record_status: "active" | "archived"
+      skill:
+        | "reading"
+        | "listening"
+        | "writing"
+        | "speaking"
+        | "vocabulary"
+        | "grammar"
+      student_status: "lead" | "active" | "paused" | "graduated" | "left"
+      submission_status:
+        | "not_started"
+        | "in_progress"
+        | "submitted"
+        | "reviewed"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      activity_type: [
+        "enrollment",
+        "attendance",
+        "payment",
+        "homework",
+        "mock",
+        "note",
+      ],
+      assignment_source: ["library", "upload", "ai"],
+      assignment_status: ["draft", "pending_approval", "approved", "archived"],
+      attendance_status: ["present", "late", "absent", "excused"],
+      cefr_level: ["A1", "A2", "B1", "B2", "C1", "C2"],
+      enrollment_status: ["active", "paused", "completed", "dropped"],
+      invoice_status: ["open", "void"],
+      lesson_status: ["scheduled", "held", "cancelled"],
+      member_role: [
+        "owner",
+        "admin",
+        "academic_manager",
+        "mentor",
+        "student",
+        "parent",
+      ],
+      member_status: ["invited", "active", "suspended"],
+      mock_result_status: ["pending", "in_progress", "completed", "absent"],
+      mock_status: ["scheduled", "in_progress", "completed", "cancelled"],
+      notification_channel: ["in_app", "sms", "telegram", "push"],
+      notification_status: ["queued", "sent", "failed"],
+      payment_kind: ["payment", "refund"],
+      payment_method: [
+        "cash",
+        "card",
+        "bank_transfer",
+        "click",
+        "payme",
+        "uzum",
+      ],
+      record_status: ["active", "archived"],
+      skill: [
+        "reading",
+        "listening",
+        "writing",
+        "speaking",
+        "vocabulary",
+        "grammar",
+      ],
+      student_status: ["lead", "active", "paused", "graduated", "left"],
+      submission_status: [
+        "not_started",
+        "in_progress",
+        "submitted",
+        "reviewed",
+      ],
+    },
+  },
+} as const
