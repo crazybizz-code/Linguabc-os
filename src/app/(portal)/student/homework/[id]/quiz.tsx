@@ -7,13 +7,13 @@ import { buttonPrimary, cn } from "@/components/ui/primitives";
 import { saveHomework } from "../../../actions";
 import type { Question } from "@/lib/library/render";
 
-export function Quiz({ homeworkId, questions, initial }: { homeworkId: string; questions: Question[]; initial: Record<string, number> }) {
+export function Quiz({ homeworkId, questions, initial }: { homeworkId: string; questions: Question[]; initial: Record<string, number | string> }) {
   const [answers, setAnswers] = useState(initial);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
   const [pending, start] = useTransition();
   const router = useRouter();
-  const answered = questions.filter((q) => answers[q.id] != null).length;
+  const answered = questions.filter((q) => answers[q.id] != null && answers[q.id] !== "").length;
   const save = (submit: boolean) => start(async () => {
     setMsg({});
     const r = await saveHomework(homeworkId, answers, submit);
@@ -26,7 +26,13 @@ export function Quiz({ homeworkId, questions, initial }: { homeworkId: string; q
       {questions.map((q, n) => (
         <fieldset key={q.id} className="rounded-[16px] border border-border/70 bg-[#FCF8F4] p-4">
           <legend className="sr-only">Question {n + 1}</legend>
-          <p className="text-[14px] font-medium leading-snug">{n + 1}. {q.prompt}</p>
+          <p className="whitespace-pre-line text-[14px] font-medium leading-snug">{n + 1}. {q.prompt}</p>
+          {q.type === "open" ? (
+            <textarea value={typeof answers[q.id] === "string" ? (answers[q.id] as string) : ""} rows={8} maxLength={20000}
+              onChange={(e) => { setMsg({}); setConfirm(false); setAnswers((a) => ({ ...a, [q.id]: e.target.value })); }}
+              placeholder="Write your answer here…"
+              className="mt-3 w-full rounded-[11px] border border-border/80 bg-white/60 p-3 text-[14px] leading-relaxed focus:border-[#12392B]/35 focus:outline-none" />
+          ) : (
           <div className="mt-3 space-y-2">
             {(q.options ?? []).map((o, i) => {
               const on = answers[q.id] === i;
@@ -40,6 +46,8 @@ export function Quiz({ homeworkId, questions, initial }: { homeworkId: string; q
               );
             })}
           </div>
+          )}
+          {q.type === "open" && typeof answers[q.id] === "string" && <p className="mt-1 text-right text-[11px] text-muted-foreground">{(answers[q.id] as string).trim().split(/\s+/).filter(Boolean).length} words</p>}
         </fieldset>
       ))}
       <div className="sticky bottom-20 z-[5] rounded-[16px] border border-border/70 bg-[#FCF8F4]/95 p-3 shadow-[0_4px_16px_rgba(23,33,29,0.06)] backdrop-blur">

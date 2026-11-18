@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/primitives";
 
 export const metadata = { title: "Create assignment" };
 
-const WAYS = [
+const WAYS: { icon: typeof Upload; title: string; desc: string; points: string[]; href: string | null }[] = [
   { icon: Upload, title: "Upload your material", desc: "Bring a worksheet you already trust. PDF, DOCX or plain text.",
-    points: ["PDF, DOCX, TXT", "Existing worksheet", "Questions extracted for you"], href: null },
+    points: ["PDF, DOCX, TXT", "Existing worksheet", "Questions extracted for you"], href: "/homework/new/upload" },
   { icon: Layers, title: "Choose from LinguABC Library", desc: "Curated articles and podcasts, organised by skill, level and topic.",
     points: ["Reading and listening", "Filter by level and topic", "Ready to assign in one click"], href: "/homework/library" },
   { icon: Sparkles, title: "Create with AI", desc: "Describe the exact sub-skill you want to drill this week.",
-    points: ["Skill and sub-skill targeting", "Choose level and question count", "Edit the result before assigning"], href: null },
-] as const;
+    points: ["Skill and sub-skill targeting", "Choose level and question count", "Edit the result before assigning"], href: "/homework/new/ai" },
+];
 
 export default async function NewAssignmentPage() {
   const { t } = await getStaffContext();

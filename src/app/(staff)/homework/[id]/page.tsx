@@ -17,7 +17,7 @@ export default async function HomeworkDetailPage({ params }: PageProps<"/homewor
   const { supabase, t, locale } = await getStaffContext();
   const L = intlLocale(locale);
   const { data: h } = await supabase.from("homework")
-    .select("id, due_at, assigned_at, note, group_id, groups(name), assignments(title, skill, level, library_item_id, content)").eq("id", id).maybeSingle();
+    .select("id, due_at, assigned_at, note, group_id, assignment_id, groups(name), assignments(title, skill, level, library_item_id, content)").eq("id", id).maybeSingle();
   if (!h) notFound();
   const [{ data: subs }, { data: keyRow }] = await Promise.all([
     supabase.from("submissions").select("id, status, score, feedback, answers, submitted_at, students(full_name)").eq("homework_id", id),
@@ -76,6 +76,9 @@ export default async function HomeworkDetailPage({ params }: PageProps<"/homewor
                 <div key={k} className="flex justify-between py-2.5"><dt className="text-muted-foreground">{k}</dt><dd className="font-medium">{v}</dd></div>
               ))}
             </dl>
+            {!h.assignments?.library_item_id && (
+              <Link href={`/homework/assignments/${h.assignment_id}`} className="mt-3 block text-[12.5px] font-medium text-[#12392B] underline">{t("Open the assignment")}</Link>
+            )}
             {h.assignments?.library_item_id && (
               <Link href={`/homework/library/${h.assignments.library_item_id}`} className="mt-3 block text-[12.5px] font-medium text-[#12392B] underline">{t("Open the material")}</Link>
             )}

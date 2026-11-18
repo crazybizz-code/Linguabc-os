@@ -25,8 +25,9 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
     me ? supabase.from("submissions").select("status, answers").eq("homework_id", id).eq("student_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.rpc("my_homework_result", { p_homework: id }),
   ]);
-  const questions = ((h.assignments?.content as { questions?: Question[] } | null)?.questions ?? []);
-  const res = result as { status: string; score: number | null; feedback: string | null; answers: Record<string, number>; key: AnswerKey | null } | null;
+  const content = (h.assignments?.content ?? {}) as { questions?: Question[]; passage?: string | null };
+  const questions = content.questions ?? [];
+  const res = result as { status: string; score: number | null; feedback: string | null; answers: Record<string, number | string>; key: AnswerKey | null } | null;
   const due = new Date(h.due_at);
   const late = due.getTime() < Date.parse(new Date().toISOString());
 
@@ -50,6 +51,7 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
       )}
 
       {item && <PortalCard><MaterialView item={item} t={t} /></PortalCard>}
+      {!item && content.passage && <PortalCard><div className="library-prose whitespace-pre-line">{content.passage}</div></PortalCard>}
 
       {res ? (
         <PortalCard title={t("Answers")}>
@@ -59,7 +61,10 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
               const right = res.key?.[q.id];
               return (
                 <li key={q.id} className="text-[13.5px]">
-                  <p className="font-medium">{n + 1}. {q.prompt}</p>
+                  <p className="whitespace-pre-line font-medium">{n + 1}. {q.prompt}</p>
+                  {q.type === "open" ? (
+                    <div className="mt-1.5 whitespace-pre-line rounded-[9px] bg-white/60 px-3 py-2 text-[13px]">{typeof mine === "string" && mine.trim() ? mine : <span className="text-muted-foreground">{t("No answer")}</span>}</div>
+                  ) : (
                   <ul className="mt-1.5 space-y-1">
                     {(q.options ?? []).map((o, i) => {
                       const correct = right?.answer === i;
@@ -72,6 +77,7 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
                       );
                     })}
                   </ul>
+                  )}
                   {right?.explanation && <p className="mt-1.5 text-[12px] text-muted-foreground">{right.explanation}</p>}
                 </li>
               );
@@ -79,7 +85,7 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
           </ol>
         </PortalCard>
       ) : (
-        <Quiz homeworkId={h.id} questions={questions} initial={(sub?.answers ?? {}) as Record<string, number>} />
+        <Quiz homeworkId={h.id} questions={questions} initial={(sub?.answers ?? {}) as Record<string, number | string>} />
       )}
     </>
   );

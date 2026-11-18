@@ -308,3 +308,31 @@ export async function reviewSubmission(_: ActionState, form: FormData): Promise<
   revalidatePath("/students", "layout");
   return { ok: true };
 }
+
+export async function assignAssignment(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const date = str(form.get("due_date"));
+  const time = str(form.get("due_time")) || "23:59";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return { error: "Choose a due date." };
+  const note = str(form.get("note"));
+  if (note.length > 2000) return { error: "Keep the note under 2000 characters." };
+  const { data, error } = await supabase.rpc("assign_assignment", {
+    p_assignment: str(form.get("assignment_id")), p_group: str(form.get("group_id")),
+    p_due_at: `${date}T${time}:00+05:00`, p_note: note || undefined,
+  });
+  if (error) {
+    if (/due date must be in the future/i.test(error.message)) return { error: "The due date must be in the future." };
+    if (/approved first/i.test(error.message)) return { error: "A manager needs to approve this assignment first." };
+    return { error: friendly(error.message) };
+  }
+  revalidatePath("/homework", "layout");
+  return { ok: true, id: data ?? undefined };
+}
+
+export async function approveAssignment(id: string): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const { error } = await supabase.rpc("approve_assignment", { p_assignment: id });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/homework", "layout");
+  return { ok: true };
+}
