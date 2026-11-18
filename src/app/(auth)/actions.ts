@@ -5,10 +5,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finishOnboarding } from "@/lib/auth/workspace";
+import { siteUrl } from "@/lib/supabase/config";
 
 export type FormState = { error?: string; sent?: string } | undefined;
 
-const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const callbackUrl = (next = "/") => `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
 
 /** Only allow same-site relative redirects. */
