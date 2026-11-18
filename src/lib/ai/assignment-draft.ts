@@ -10,21 +10,21 @@ export type DraftQuestion = { id: string; type: "mc" | "open"; prompt: string; o
 export type Draft = { title: string; skill: Skill; level: Level; passage: string; questions: DraftQuestion[] };
 
 const SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
-    title: { type: "STRING" },
-    level: { type: "STRING", enum: [...LEVELS] },
-    passage: { type: "STRING" },
+    title: { type: "string" },
+    level: { type: "string", enum: [...LEVELS] },
+    passage: { type: "string" },
     questions: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "OBJECT",
+        type: "object",
         properties: {
-          type: { type: "STRING", enum: ["mc", "open"] },
-          prompt: { type: "STRING" },
-          options: { type: "ARRAY", items: { type: "STRING" } },
-          answer: { type: "INTEGER" },
-          explanation: { type: "STRING" },
+          type: { type: "string", enum: ["mc", "open"] },
+          prompt: { type: "string" },
+          options: { type: "array", items: { type: "string" } },
+          answer: { type: "integer" },
+          explanation: { type: "string" },
         },
         required: ["type", "prompt"],
       },
