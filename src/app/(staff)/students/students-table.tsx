@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Users } from "lucide-react";
 import { Avatar, Badge, EmptyState, cn, inputClass, type Tone } from "@/components/ui/primitives";
+import { useT } from "@/i18n/client";
+import type { T } from "@/i18n";
 
 const filterClass =
   "h-9 rounded-[10px] border border-border/80 bg-[#FCF8F4] pl-3 pr-8 text-[12.5px] text-[#17211D] focus:border-[#12392B]/35 focus:outline-none focus:ring-2 focus:ring-[#12392B]/10";
@@ -27,14 +29,15 @@ export type StudentRow = {
 const PAY_TONE: Record<string, Tone> = { Paid: "green", Pending: "amber", Overdue: "red", Lead: "neutral" };
 const ACAD_TONE: Record<string, Tone> = { "On track": "green", "Needs attention": "amber", "At risk": "red", New: "neutral" };
 
-function ago(iso: string | null) {
+function ago(iso: string | null, t: T) {
   if (!iso) return "—";
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`;
+  return d <= 0 ? t("today") : d === 1 ? t("yesterday") : t("{n} days ago", { n: d });
 }
 
 export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showPayment: boolean }) {
   const router = useRouter();
+  const t = useT();
   const [q, setQ] = useState("");
   const [f, setF] = useState({ branch: "", group: "", status: "", payment: "" });
   const uniq = (k: keyof StudentRow) => [...new Set(rows.map((r) => String(r[k] ?? "")).filter((x) => x && x !== "—"))].sort();
@@ -53,13 +56,13 @@ export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showP
   const select = (key: keyof typeof f, label: string, options: string[]) =>
     options.length > 0 && (
       <select value={f[key]} onChange={(e) => setF((x) => ({ ...x, [key]: e.target.value }))} className={filterClass}>
-        <option value="">{label}: All</option>
-        {options.map((o) => <option key={o}>{o}</option>)}
+        <option value="">{t("{label}: All", { label: t(label) })}</option>
+        {options.map((o) => <option key={o} value={o}>{t(o)}</option>)}
       </select>
     );
 
   if (!rows.length) {
-    return <EmptyState icon={Users} title="No students yet" description="Add your first student. Their attendance, homework, mock results and payments will all live on one record." />;
+    return <EmptyState icon={Users} title={t("No students yet")} description={t("Add your first student. Their attendance, homework, mock results and payments will all live on one record.")} />;
   }
 
   return (
@@ -67,20 +70,20 @@ export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showP
       <div className="flex flex-wrap items-center gap-2 border-b border-border/60 p-4">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or phone…" className={cn(inputClass, "h-9 pl-9 text-[12.5px]")} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search by name or phone…")} className={cn(inputClass, "h-9 pl-9 text-[12.5px]")} />
         </div>
         {select("branch", "Branch", uniq("branch"))}
         {select("group", "Group", uniq("group"))}
         {select("status", "Academic", ["On track", "Needs attention", "At risk", "New"])}
         {showPayment && select("payment", "Payment", ["Paid", "Pending", "Overdue", "Lead"])}
-        <span className="ml-auto text-[12px] text-muted-foreground">{filtered.length} of {rows.length} students</span>
+        <span className="ml-auto text-[12px] text-muted-foreground">{t("{a} of {b} students", { a: filtered.length, b: rows.length })}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left">
           <thead>
             <tr className="border-b border-border/60 text-[10.5px] uppercase tracking-[0.1em] text-[#5F6B66]">
               {["Student", "Course", "Group", "Mentor", "Attendance", ...(showPayment ? ["Payment"] : []), "Academic", "Last activity"].map((h) => (
-                <th key={h} className="px-4 py-3 font-medium first:pl-5">{h}</th>
+                <th key={h} className="px-4 py-3 font-medium first:pl-5">{t(h)}</th>
               ))}
             </tr>
           </thead>
@@ -111,9 +114,9 @@ export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showP
                     </div>
                   )}
                 </td>
-                {showPayment && <td className="px-4 py-3">{r.payment ? <Badge tone={PAY_TONE[r.payment]}>{r.payment}</Badge> : "—"}</td>}
-                <td className="px-4 py-3"><Badge tone={ACAD_TONE[r.academic]}>{r.academic}</Badge></td>
-                <td className="px-4 py-3 text-muted-foreground">{ago(r.lastActivity)}</td>
+                {showPayment && <td className="px-4 py-3">{r.payment ? <Badge tone={PAY_TONE[r.payment]}>{t(r.payment)}</Badge> : "—"}</td>}
+                <td className="px-4 py-3"><Badge tone={ACAD_TONE[r.academic]}>{t(r.academic)}</Badge></td>
+                <td className="px-4 py-3 text-muted-foreground">{ago(r.lastActivity, t)}</td>
               </tr>
             ))}
           </tbody>

@@ -11,7 +11,7 @@ const hhmm = (t: string) => t.slice(0, 5);
 export default async function GroupsPage({ searchParams }: PageProps<"/groups">) {
   const { tab } = await searchParams;
   const showCourses = tab === "courses";
-  const { supabase, workspace, isStaff } = await getStaffContext();
+  const { supabase, workspace, isStaff, t } = await getStaffContext();
   const center = workspace.centerId;
 
   const [groups, courses, branches, mentors, rooms, slots, attendance] = await Promise.all([
@@ -35,7 +35,7 @@ export default async function GroupsPage({ searchParams }: PageProps<"/groups">)
     <div className="flex rounded-[11px] border border-border/70 bg-[#FCF8F4] p-1 text-[12.5px]">
       {[["Groups", "/groups", !showCourses], ["Courses", "/groups?tab=courses", showCourses]].map(([label, href, on]) => (
         <Link key={label as string} href={href as string} className={cn("rounded-[8px] px-3 py-1.5", on ? "bg-[#F5ECE8] font-medium text-[#17211D]" : "text-muted-foreground")}>
-          {label as string}
+          {t(label as string)}
         </Link>
       ))}
     </div>
@@ -51,15 +51,15 @@ export default async function GroupsPage({ searchParams }: PageProps<"/groups">)
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Academic operations"
-        title="Groups & courses"
-        description="Every running group, its mentor, room and rhythm — and the course structure behind them."
+        eyebrow={t("Academic operations")}
+        title={t("Groups & courses")}
+        description={t("Every running group, its mentor, room and rhythm — and the course structure behind them.")}
         actions={<>{tabs}{isStaff && (showCourses ? <CreateCourse /> : createGroup)}</>}
       />
 
       {showCourses ? (
         (courses.data ?? []).length === 0 ? (
-          <Card><EmptyState icon={BookOpen} title="No courses yet" description="Create the programmes you teach — e.g. IELTS Foundation, General English B1. Every group follows one course." action={isStaff && <CreateCourse />} /></Card>
+          <Card><EmptyState icon={BookOpen} title={t("No courses yet")} description={t("Create the programmes you teach — e.g. IELTS Foundation, General English B1. Every group follows one course.")} action={isStaff && <CreateCourse />} /></Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {(courses.data ?? []).map((c) => (
@@ -70,21 +70,21 @@ export default async function GroupsPage({ searchParams }: PageProps<"/groups">)
                 </div>
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">{c.code}</p>
                 <div className="mt-4 space-y-1.5 text-[12.5px] text-muted-foreground">
-                  <p>{c.duration_weeks ? `${c.duration_weeks} weeks` : "Open-ended"}</p>
-                  <p>{formatUZS(c.default_monthly_fee)} / month</p>
-                  <p>{gr.filter((g) => g.course_id === c.id).length} groups running</p>
+                  <p>{c.duration_weeks ? t("{n} weeks", { n: c.duration_weeks }) : t("Open-ended")}</p>
+                  <p>{t("{amount} / month", { amount: formatUZS(c.default_monthly_fee) })}</p>
+                  <p>{t("{n} groups running", { n: gr.filter((g) => g.course_id === c.id).length })}</p>
                 </div>
               </Card>
             ))}
           </div>
         )
       ) : gr.length === 0 ? (
-        <Card><EmptyState icon={Layers} title="No groups yet" description="Create your first group to start scheduling lessons and enrolling students." action={createGroup} /></Card>
+        <Card><EmptyState icon={Layers} title={t("No groups yet")} description={t("Create your first group to start scheduling lessons and enrolling students.")} action={createGroup} /></Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {gr.map((g) => {
             const gs = (slots.data ?? []).filter((s) => s.group_id === g.id);
-            const days = [...new Set(gs.map((s) => s.weekday))].sort().map((d) => DAY[d]).join(" / ");
+            const days = [...new Set(gs.map((s) => s.weekday))].sort().map((d) => t(DAY[d])).join(" / ");
             const time = gs[0] ? `${hhmm(gs[0].start_time)}–${hhmm(gs[0].end_time)}` : null;
             const att = (attendance.data ?? []).filter((a) => a.lessons?.group_id === g.id);
             const marked = att.filter((a) => a.status !== "excused");
@@ -101,23 +101,23 @@ export default async function GroupsPage({ searchParams }: PageProps<"/groups">)
                   <p className="flex items-center gap-2">
                     <Users className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.8} />
                     <span className={full ? "font-medium text-[#9A5B1E]" : ""}>{g.student_count} / {g.capacity ?? "∞"}</span>
-                    {g.room_id && <span className="text-muted-foreground">· Room {roomName.get(g.room_id)}</span>}
+                    {g.room_id && <span className="text-muted-foreground">· {t("Room")} {roomName.get(g.room_id)}</span>}
                   </p>
                   <p className="flex items-center gap-2">
                     <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.8} />
-                    {days ? `${days} · ${time}` : "No weekly schedule"}
+                    {days ? `${days} · ${time}` : t("No weekly schedule")}
                   </p>
                 </div>
                 <div className="mt-4 border-t border-border/60 pt-3">
                   <div className="flex justify-between text-[12px]">
-                    <span className="text-muted-foreground">Attendance</span>
+                    <span className="text-muted-foreground">{t("Attendance")}</span>
                     <span className="font-medium">{pct == null ? "—" : `${pct}%`}</span>
                   </div>
                   <div className="mt-2"><Progress value={pct} tone={tone} /></div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-[12px] text-muted-foreground">{g.mentor_id ? mentorName.get(g.mentor_id) : "No mentor"}</span>
-                  {full ? <Badge tone="amber">At capacity</Badge> : pct != null && pct < 85 ? <Badge tone="red">Needs attention</Badge> : <Badge tone="green">On track</Badge>}
+                  <span className="text-[12px] text-muted-foreground">{g.mentor_id ? mentorName.get(g.mentor_id) : t("No mentor")}</span>
+                  {full ? <Badge tone="amber">{t("At capacity")}</Badge> : pct != null && pct < 85 ? <Badge tone="red">{t("Needs attention")}</Badge> : <Badge tone="green">{t("On track")}</Badge>}
                 </div>
               </Card>
             );

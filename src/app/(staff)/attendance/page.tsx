@@ -3,15 +3,16 @@ import { CalendarCheck, ChevronRight } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { attendanceWindow, todayISO } from "@/lib/dates";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { intlLocale } from "@/i18n";
 
 export const metadata = { title: "Attendance" };
 const TZ = "Asia/Tashkent";
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
-const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
 const dayKey = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
 
 export default async function AttendancePage() {
-  const { supabase, workspace } = await getStaffContext();
+  const { supabase, workspace, t, locale } = await getStaffContext();
+  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString(intlLocale(locale), { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
   const today = todayISO();
   const { now, from, to } = attendanceWindow();
 
@@ -36,13 +37,13 @@ export default async function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Daily operations" title="Attendance" description="Today's lessons first. Open a lesson to mark who came — it takes a few taps per student." />
+      <PageHeader eyebrow={t("Daily operations")} title={t("Attendance")} description={t("Today's lessons first. Open a lesson to mark who came — it takes a few taps per student.")} />
       {days.length === 0 ? (
-        <Card><EmptyState icon={CalendarCheck} title="No lessons yet" description="Lessons appear here once a group has a weekly schedule. Create a group on the Groups page." /></Card>
+        <Card><EmptyState icon={CalendarCheck} title={t("No lessons yet")} description={t("Lessons appear here once a group has a weekly schedule. Create a group on the Groups page.")} /></Card>
       ) : (
         days.map((d) => (
           <section key={d}>
-            <h2 className="mb-2.5 text-[13px] font-semibold text-[#3B4A42]">{d === today ? "Today" : fmtDay(byDay.get(d)![0].starts_at)}</h2>
+            <h2 className="mb-2.5 text-[13px] font-semibold text-[#3B4A42]">{d === today ? t("Today") : fmtDay(byDay.get(d)![0].starts_at)}</h2>
             <Card className="divide-y divide-border/60 overflow-hidden">
               {byDay.get(d)!.sort((a, b) => a.starts_at.localeCompare(b.starts_at)).map((l) => {
                 const total = size.get(l.group_id) ?? 0;
@@ -53,10 +54,10 @@ export default async function AttendancePage() {
                     className={`flex items-center gap-4 px-5 py-3.5 ${started ? "hover:bg-white/60" : "pointer-events-none opacity-60"}`}>
                     <div className="w-[92px] text-[13px] font-medium tabular-nums">{fmtTime(l.starts_at)}–{fmtTime(l.ends_at)}</div>
                     <div className="flex-1">
-                      <p className="text-[13.5px] font-medium">{groupName.get(l.group_id) ?? "Group"}</p>
-                      <p className="text-[11.5px] text-muted-foreground">{total} students</p>
+                      <p className="text-[13.5px] font-medium">{groupName.get(l.group_id) ?? t("Group")}</p>
+                      <p className="text-[11.5px] text-muted-foreground">{t("{n} students", { n: total })}</p>
                     </div>
-                    {done > 0 && done >= total ? <Badge tone="green">Marked</Badge> : done > 0 ? <Badge tone="amber">{done}/{total} marked</Badge> : started ? <Badge tone="red">Not marked</Badge> : <Badge tone="neutral">Later today</Badge>}
+                    {done > 0 && done >= total ? <Badge tone="green">{t("Marked")}</Badge> : done > 0 ? <Badge tone="amber">{t("{a}/{b} marked", { a: done, b: total })}</Badge> : started ? <Badge tone="red">{t("Not marked")}</Badge> : <Badge tone="neutral">{t("Later today")}</Badge>}
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
                 );

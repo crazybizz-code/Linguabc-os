@@ -3,20 +3,21 @@ import { ArrowUpRight, BarChart3, Building2, Check, GraduationCap, Layers, Targe
 import { getStaffContext } from "@/lib/auth/current";
 import { ROLE_LABEL } from "@/lib/auth/workspace";
 import { monthStartISO } from "@/lib/dates";
+import type { T } from "@/i18n";
 import { Card, PageHeader, Progress, StatCard, buttonPrimary, buttonSecondary, formatUZS, prettyNumbers } from "@/components/ui/primitives";
 
 export const metadata = { title: "Overview" };
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: T) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 60) return `${Math.max(mins, 1)}m ago`;
+  if (mins < 60) return t("{n}m ago", { n: Math.max(mins, 1) });
   const h = Math.round(mins / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
+  if (h < 24) return t("{n}h ago", { n: h });
+  return t("{n}d ago", { n: Math.round(h / 24) });
 }
 
 export default async function OverviewPage() {
-  const { supabase, workspace, isAdmin, isStaff } = await getStaffContext();
+  const { supabase, workspace, isAdmin, isStaff, t } = await getStaffContext();
   const center = workspace.centerId;
   const monthStart = monthStartISO();
 
@@ -51,11 +52,11 @@ export default async function OverviewPage() {
   };
 
   const setup = [
-    { done: br.length > 0, label: "Add your first branch", href: "/branches" },
-    { done: (courses.data ?? []).length > 0, label: "Create a course", href: "/groups?tab=courses" },
-    { done: (mentors.data ?? []).length > 0, label: "Invite mentors", href: "/staff" },
-    { done: gr.length > 0, label: "Create a group with its weekly schedule", href: "/groups" },
-    { done: st.length > 0, label: "Add students", href: "/students" },
+    { done: br.length > 0, label: t("Add your first branch"), href: "/branches" },
+    { done: (courses.data ?? []).length > 0, label: t("Create a course"), href: "/groups?tab=courses" },
+    { done: (mentors.data ?? []).length > 0, label: t("Invite mentors"), href: "/staff" },
+    { done: gr.length > 0, label: t("Create a group with its weekly schedule"), href: "/groups" },
+    { done: st.length > 0, label: t("Add students"), href: "/students" },
   ];
   const setupLeft = setup.filter((s) => !s.done).length;
 
@@ -69,17 +70,17 @@ export default async function OverviewPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow={`${ROLE_LABEL[workspace.role]} · Centre overview`}
+        eyebrow={`${t(ROLE_LABEL[workspace.role])} · ${t("Centre overview")}`}
         title={workspace.centerName}
-        description={`${br.length} ${br.length === 1 ? "branch" : "branches"} · ${st.length} students · ${allMentors.length} mentors. How each branch is performing, and where a decision is needed.`}
+        description={t("{b} branches · {s} students · {m} mentors. How each branch is performing, and where a decision is needed.", { b: br.length, s: st.length, m: allMentors.length })}
         actions={
           isStaff && (
             <>
               <Link href="/branches" className={buttonSecondary}>
-                <Building2 className="h-4 w-4" strokeWidth={1.8} /> Branches
+                <Building2 className="h-4 w-4" strokeWidth={1.8} /> {t("Branches")}
               </Link>
               <Link href="/students" className={buttonPrimary}>
-                Students <ArrowUpRight className="h-4 w-4" />
+                {t("Students")} <ArrowUpRight className="h-4 w-4" />
               </Link>
             </>
           )
@@ -89,8 +90,8 @@ export default async function OverviewPage() {
       {isStaff && setupLeft > 0 && (
         <Card className="p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-[15px] font-semibold">Set up {workspace.centerName}</h2>
-            <span className="text-[12px] text-muted-foreground">{setup.length - setupLeft} of {setup.length} done</span>
+            <h2 className="text-[15px] font-semibold">{t("Set up {name}", { name: workspace.centerName })}</h2>
+            <span className="text-[12px] text-muted-foreground">{t("{a} of {b} done", { a: setup.length - setupLeft, b: setup.length })}</span>
           </div>
           <ol className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
             {setup.map((s, i) => (
@@ -113,17 +114,17 @@ export default async function OverviewPage() {
       )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Active students" value={activeStudents.length} hint={`of ${st.length} enrolled`} icon={Users} />
-        <StatCard label="Mentors" value={allMentors.length} hint={invitedMentors ? `${invitedMentors} yet to accept invite` : `teaching ${gr.length} groups`} icon={GraduationCap} />
-        <StatCard label="Active groups" value={gr.length} hint={`${atCapacity} at capacity`} icon={Layers} />
-        <StatCard label="Mocks completed" value={completedMocks} hint={`${scheduledMocks} scheduled`} icon={Target} />
-        <StatCard label="Average band" value={avgBand} hint="across all students" icon={BarChart3} />
+        <StatCard label={t("Active students")} value={activeStudents.length} hint={t("of {n} enrolled", { n: st.length })} icon={Users} />
+        <StatCard label={t("Mentors")} value={allMentors.length} hint={invitedMentors ? t("{n} yet to accept invite", { n: invitedMentors }) : t("teaching {n} groups", { n: gr.length })} icon={GraduationCap} />
+        <StatCard label={t("Active groups")} value={gr.length} hint={t("{n} at capacity", { n: atCapacity })} icon={Layers} />
+        <StatCard label={t("Mocks completed")} value={completedMocks} hint={t("{n} scheduled", { n: scheduledMocks })} icon={Target} />
+        <StatCard label={t("Average band")} value={avgBand} hint={t("across all students")} icon={BarChart3} />
       </div>
 
       {br.length > 0 && (
         <section>
-          <h2 className="text-[16px] font-semibold tracking-[-0.01em]">Branch performance</h2>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">Each branch as its own business — its groups, mentors and students.</p>
+          <h2 className="text-[16px] font-semibold tracking-[-0.01em]">{t("Branch performance")}</h2>
+          <p className="mt-0.5 text-[12.5px] text-muted-foreground">{t("Each branch as its own business — its groups, mentors and students.")}</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {br.map((b) => {
               const bs = st.filter((s) => s.branch_id === b.id);
@@ -134,24 +135,24 @@ export default async function OverviewPage() {
               const attention = bs.filter((s) => s.attendance_pct != null && s.attendance_pct < 85).length;
               return (
                 <Card key={b.id} className="p-5">
-                  <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">Branch</p>
+                  <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">{t("Branch")}</p>
                   <h3 className="mt-1 text-[17px] font-semibold tracking-[-0.02em]">{b.name}</h3>
                   <div className="mt-4 flex items-end justify-between">
                     <div>
                       <p className="text-[30px] font-semibold leading-none tracking-[-0.03em]">{bs.length}</p>
-                      <p className="mt-1.5 text-[12px] text-muted-foreground">students · {active}% active</p>
+                      <p className="mt-1.5 text-[12px] text-muted-foreground">{t("students · {p}% active", { p: active })}</p>
                     </div>
                     <div className="text-right text-[12px] text-muted-foreground">
-                      <p><span className="text-[#17211D]">{bm}</span> mentors</p>
-                      <p><span className="text-[#17211D]">{bg.length}</span> groups</p>
+                      <p><span className="text-[#17211D]">{bm}</span> {t("mentors")}</p>
+                      <p><span className="text-[#17211D]">{bg.length}</span> {t("groups")}</p>
                     </div>
                   </div>
                   <div className="mt-5 flex justify-between text-[12px]">
-                    <span className="text-muted-foreground">Attendance</span>
+                    <span className="text-muted-foreground">{t("Attendance")}</span>
                     <span className="font-medium">{att == null ? "—" : `${att}%`}</span>
                   </div>
                   <div className="mt-2"><Progress value={att} /></div>
-                  {attention > 0 && <p className="mt-3 text-[12px] text-[#9A5B1E]">{attention} need attention</p>}
+                  {attention > 0 && <p className="mt-3 text-[12px] text-[#9A5B1E]">{t("{n} need attention", { n: attention })}</p>}
                 </Card>
               );
             })}
@@ -161,11 +162,11 @@ export default async function OverviewPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Card className="p-5">
-          <h2 className="text-[15px] font-semibold">Recent activity</h2>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">What the centre recorded lately, across every module.</p>
+          <h2 className="text-[15px] font-semibold">{t("Recent activity")}</h2>
+          <p className="mt-0.5 text-[12.5px] text-muted-foreground">{t("What the centre recorded lately, across every module.")}</p>
           {(activities.data ?? []).length === 0 ? (
             <p className="mt-6 rounded-[12px] bg-[#F5ECE8]/70 p-4 text-[12.5px] text-muted-foreground">
-              Nothing yet. Enrolments, attendance, payments and homework will appear here as they happen.
+              {t("Nothing yet. Enrolments, attendance, payments and homework will appear here as they happen.")}
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
@@ -174,14 +175,14 @@ export default async function OverviewPage() {
                   <div className="flex gap-3">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#5F6B66]" />
                     <div>
-                      <p className="text-[13px] font-medium">{a.title}</p>
+                      <p className="text-[13px] font-medium">{t(a.title)}</p>
                       <p className="text-[12px] text-muted-foreground">
                         {a.students?.full_name}
                         {a.detail ? ` · ${prettyNumbers(a.detail)}` : ""}
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 text-[11.5px] text-muted-foreground">{timeAgo(a.occurred_at)}</span>
+                  <span className="shrink-0 text-[11.5px] text-muted-foreground">{timeAgo(a.occurred_at, t)}</span>
                 </li>
               ))}
             </ul>
@@ -190,28 +191,28 @@ export default async function OverviewPage() {
 
         {isAdmin && (
           <Card className="p-5">
-            <h2 className="text-[15px] font-semibold">Business snapshot</h2>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">Collections and enrolment this month.</p>
+            <h2 className="text-[15px] font-semibold">{t("Business snapshot")}</h2>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground">{t("Collections and enrolment this month.")}</p>
             <div className="mt-4 rounded-[14px] bg-[#F5ECE8]/70 p-4">
               <div className="flex items-baseline justify-between">
-                <span className="text-[12.5px] text-muted-foreground">Collected</span>
+                <span className="text-[12.5px] text-muted-foreground">{t("Collected")}</span>
                 <span className="text-[19px] font-semibold tracking-[-0.02em]">{formatUZS(collected)}</span>
               </div>
               <div className="mt-3"><Progress value={billed ? (100 * collected) / billed : 0} /></div>
               <p className="mt-2 text-[11.5px] text-muted-foreground">
-                {billed ? Math.round((100 * collected) / billed) : 0}% of {formatUZS(billed)} billed
+                {t("{p}% of {amount} billed", { p: billed ? Math.round((100 * collected) / billed) : 0, amount: formatUZS(billed) })}
               </p>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div className={`rounded-[14px] border p-4 ${overdue ? "border-[#F0C9C2] bg-[#FBEDEA]" : "border-border/70"}`}>
-                <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">Outstanding</p>
+                <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">{t("Outstanding")}</p>
                 <p className="mt-1.5 text-[19px] font-semibold">{formatUZS(outstanding)}</p>
-                <p className={`mt-1 text-[11.5px] ${overdue ? "text-[#B4483D]" : "text-muted-foreground"}`}>{overdue} overdue invoices</p>
+                <p className={`mt-1 text-[11.5px] ${overdue ? "text-[#B4483D]" : "text-muted-foreground"}`}>{t("{n} overdue invoices", { n: overdue })}</p>
               </div>
               <div className="rounded-[14px] border border-border/70 p-4">
-                <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">New this month</p>
+                <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">{t("New this month")}</p>
                 <p className="mt-1.5 text-[19px] font-semibold">{newThisMonth}</p>
-                <p className="mt-1 text-[11.5px] text-muted-foreground">students joined</p>
+                <p className="mt-1 text-[11.5px] text-muted-foreground">{t("students joined")}</p>
               </div>
             </div>
           </Card>

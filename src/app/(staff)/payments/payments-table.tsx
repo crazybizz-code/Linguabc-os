@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Wallet } from "lucide-react";
 import { Avatar, Badge, EmptyState, formatUZS, type Tone } from "@/components/ui/primitives";
 import { RecordPayment } from "./record-payment";
+import { useT } from "@/i18n/client";
 
 export type InvoiceRow = {
   id: string;
@@ -24,33 +25,34 @@ const TONE: Record<string, Tone> = { paid: "green", partial: "amber", pending: "
 const filterClass = "h-9 rounded-[10px] border border-border/80 bg-[#FCF8F4] pl-3 pr-8 text-[12.5px] text-[#17211D] focus:outline-none";
 
 export function PaymentsTable({ rows, periodLabel }: { rows: InvoiceRow[]; periodLabel: string }) {
+  const t = useT();
   const [group, setGroup] = useState("");
   const [status, setStatus] = useState("");
   const groups = [...new Set(rows.map((r) => r.group))].sort();
   const filtered = useMemo(() => rows.filter((r) => (!group || r.group === group) && (!status || r.status === status)), [rows, group, status]);
 
   if (!rows.length) {
-    return <EmptyState icon={Wallet} title={`No invoices for ${periodLabel}`} description="Invoices are created when a student is enrolled, and for every active student when you run the monthly billing." />;
+    return <EmptyState icon={Wallet} title={t("No invoices for {period}", { period: periodLabel })} description={t("Invoices are created when a student is enrolled, and for every active student when you run the monthly billing.")} />;
   }
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 border-b border-border/60 p-4">
         <select value={group} onChange={(e) => setGroup(e.target.value)} className={filterClass}>
-          <option value="">Group: All</option>
+          <option value="">{t("{label}: All", { label: t("Group") })}</option>
           {groups.map((g) => <option key={g}>{g}</option>)}
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={filterClass}>
-          <option value="">Status: All</option>
-          {["paid", "partial", "pending", "overdue"].map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+          <option value="">{t("{label}: All", { label: t("Status") })}</option>
+          {["paid", "partial", "pending", "overdue"].map((s) => <option key={s} value={s}>{t(s[0].toUpperCase() + s.slice(1))}</option>)}
         </select>
-        <span className="ml-auto text-[12px] text-muted-foreground">{filtered.length} records</span>
+        <span className="ml-auto text-[12px] text-muted-foreground">{t("{n} records", { n: filtered.length })}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[920px] text-left">
           <thead>
             <tr className="border-b border-border/60 text-[10.5px] uppercase tracking-[0.1em] text-[#5F6B66]">
               {["Student", "Group", "Monthly fee", "Due date", "Status", "Outstanding", "Last payment", "Parent", ""].map((h, i) => (
-                <th key={i} className="px-4 py-3 font-medium first:pl-5">{h}</th>
+                <th key={i} className="px-4 py-3 font-medium first:pl-5">{h && t(h)}</th>
               ))}
             </tr>
           </thead>
@@ -66,7 +68,7 @@ export function PaymentsTable({ rows, periodLabel }: { rows: InvoiceRow[]; perio
                 <td className="px-4 py-3 text-[#3B4A42]">{r.group}</td>
                 <td className="px-4 py-3">{formatUZS(r.amount)}</td>
                 <td className="px-4 py-3 text-[#3B4A42]">{r.dueDate}</td>
-                <td className="px-4 py-3"><Badge tone={TONE[r.status]}>{r.status[0].toUpperCase() + r.status.slice(1)}</Badge></td>
+                <td className="px-4 py-3"><Badge tone={TONE[r.status]}>{t(r.status[0].toUpperCase() + r.status.slice(1))}</Badge></td>
                 <td className="px-4 py-3">{r.balance > 0 ? formatUZS(r.balance) : "—"}</td>
                 <td className="px-4 py-3 text-[#3B4A42]">
                   {r.lastPayment ? <Link href={`/payments/receipt/${r.lastPaymentId}`} target="_blank" className="hover:underline">{r.lastPayment}</Link> : "—"}

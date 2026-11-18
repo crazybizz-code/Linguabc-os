@@ -6,7 +6,7 @@ import { StudentsTable, type StudentRow } from "./students-table";
 export const metadata = { title: "Students" };
 
 export default async function StudentsPage() {
-  const { supabase, workspace, isAdmin } = await getStaffContext();
+  const { supabase, workspace, isAdmin, t } = await getStaffContext();
   const center = workspace.centerId;
 
   const [students, enrollments, groups, courses, branches, mentors, invoices] = await Promise.all([
@@ -68,9 +68,9 @@ export default async function StudentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Student directory"
-        title="Students"
-        description="Every enrolled student — academic standing, attendance and payment in one row."
+        eyebrow={t("Student directory")}
+        title={t("Students")}
+        description={t("Every enrolled student — academic standing, attendance and payment in one row.")}
         actions={isAdmin && <AddStudent groups={groupOptions} branches={branches.data ?? []} />}
       />
       <Card className="overflow-hidden">
