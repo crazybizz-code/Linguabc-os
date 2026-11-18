@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check, ChevronLeft, Layers, Sparkles, Upload } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { Badge } from "@/components/ui/primitives";
+import { monthStartISO } from "@/lib/dates";
 
 export const metadata = { title: "Create assignment" };
 
@@ -15,7 +16,14 @@ const WAYS: { icon: typeof Upload; title: string; desc: string; points: string[]
 ];
 
 export default async function NewAssignmentPage() {
-  const { t } = await getStaffContext();
+  const { t, supabase, workspace, isAdmin } = await getStaffContext();
+  // Owners and admins see what AI drafting has cost this month (RLS: admins only).
+  const { data: usage } = isAdmin
+    ? await supabase.from("ai_requests").select("cost_usd, ok, prompt_tokens, completion_tokens").eq("center_id", workspace.centerId).gte("created_at", `${monthStartISO()}T00:00:00+05:00`)
+    : { data: null };
+  const done = (usage ?? []).filter((u) => u.ok);
+  const cost = done.reduce((a, u) => a + Number(u.cost_usd ?? 0), 0);
+  const tokens = done.reduce((a, u) => a + (u.prompt_tokens ?? 0) + (u.completion_tokens ?? 0), 0);
   return (
     <div className="space-y-6">
       <Link href="/homework" className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground hover:text-[#17211D]"><ChevronLeft className="h-4 w-4" /> {t("Homework")}</Link>
@@ -46,6 +54,12 @@ export default async function NewAssignmentPage() {
           );
         })}
       </div>
+      {isAdmin && (
+        <p className="text-[12px] text-muted-foreground">
+          {t("AI this month: {n} drafts · {tokens} tokens · ${cost}", { n: done.length, tokens: tokens.toLocaleString("en-US"), cost: cost.toFixed(2) })}
+          {done.length > 0 && ` · ${t("about ${avg} per draft", { avg: (cost / done.length).toFixed(3) })}`}
+        </p>
+      )}
     </div>
   );
 }

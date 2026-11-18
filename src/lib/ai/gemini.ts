@@ -12,7 +12,13 @@ import "server-only";
 export class AiUnavailable extends Error {}
 
 export type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
-type Opts = { system?: string; temperature?: number };
+/**
+ * Token economy: reasoning is billed as output even when hidden, so every
+ * call caps it (reasoningBudget) and caps the whole answer (maxOutput).
+ */
+type Opts = { system?: string; temperature?: number; maxOutput: number; reasoningBudget?: number };
+export type Usage = { model: string; prompt: number; completion: number; cost: number | null };
+export type AiResult<T> = { data: T; usage: Usage };
 
 const provider = () => (process.env.OPENROUTER_API_KEY ? "openrouter" : process.env.GEMINI_API_KEY ? "google" : null);
 export const aiConfigured = () => provider() !== null;
@@ -53,7 +59,7 @@ async function failure(res: Response): Promise<never> {
   throw new AiUnavailable("The AI service had a problem. Try again shortly.");
 }
 
-async function viaOpenRouter<T>(parts: Part[], schema: Record<string, unknown>, opts: Opts): Promise<T> {
+async function viaOpenRouter<T>(parts: Part[], schema: Record<string, unknown>, opts: Opts): Promise<AiResult<T>> {
   const base = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai";
   const content = parts.map((p) => {
     if ("text" in p) return { type: "text", text: p.text };
@@ -62,21 +68,32 @@ async function viaOpenRouter<T>(parts: Part[], schema: Record<string, unknown>, 
       ? { type: "file", file: { filename: "worksheet.pdf", file_data: url } }
       : { type: "image_url", image_url: { url } };
   });
+  const model = process.env.OPENROUTER_MODEL || "google/gemini-3.7-flash";
+  const budget = opts.reasoningBudget ?? 1024;
   const body = {
-    model: process.env.OPENROUTER_MODEL || "google/gemini-3.7-flash",
+    model,
     messages: [...(opts.system ? [{ role: "system", content: opts.system }] : []), { role: "user", content }],
     temperature: opts.temperature ?? 0.4,
     response_format: { type: "json_schema", json_schema: { name: "assignment", strict: false, schema } },
-    reasoning: { effort: "low" },
+    max_tokens: opts.maxOutput + budget,
+    reasoning: { max_tokens: budget, exclude: true },
+    usage: { include: true },
     provider: { require_parameters: true },
   };
   const headers = { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "HTTP-Referer": "https://app.linguabc.xyz", "X-Title": "LinguABC" };
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await post(`${base}/api/v1/chat/completions`, headers, body);
     if (res.ok) {
-      const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; error?: { message?: string } };
+      const data = (await res.json()) as {
+        choices?: { message?: { content?: string }; finish_reason?: string }[]; error?: { message?: string };
+        usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }; model?: string;
+      };
       if (data.error) { console.error("OpenRouter error", data.error.message); throw new AiUnavailable("The AI service had a problem. Try again shortly."); }
-      return parse<T>(data.choices?.[0]?.message?.content);
+      if (data.choices?.[0]?.finish_reason === "length") throw new AiUnavailable("This is too much for one assignment. Split the document or ask for fewer questions.");
+      return {
+        data: parse<T>(data.choices?.[0]?.message?.content),
+        usage: { model: data.model ?? model, prompt: data.usage?.prompt_tokens ?? 0, completion: data.usage?.completion_tokens ?? 0, cost: data.usage?.cost ?? null },
+      };
     }
     if ((res.status === 429 || res.status >= 500) && attempt === 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
     return failure(res);
@@ -84,19 +101,30 @@ async function viaOpenRouter<T>(parts: Part[], schema: Record<string, unknown>, 
   throw new AiUnavailable("The AI service is busy. Try again in a minute.");
 }
 
-async function viaGoogle<T>(parts: Part[], schema: Record<string, unknown>, opts: Opts): Promise<T> {
+async function viaGoogle<T>(parts: Part[], schema: Record<string, unknown>, opts: Opts): Promise<AiResult<T>> {
   const base = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
   const model = process.env.GEMINI_MODEL || "gemini-3.7-flash";
   const body = {
     ...(opts.system && { systemInstruction: { parts: [{ text: opts.system }] } }),
     contents: [{ role: "user", parts }],
-    generationConfig: { responseMimeType: "application/json", responseSchema: toGoogleSchema(schema), temperature: opts.temperature ?? 0.4 },
+    generationConfig: {
+      responseMimeType: "application/json", responseSchema: toGoogleSchema(schema), temperature: opts.temperature ?? 0.4,
+      maxOutputTokens: opts.maxOutput + (opts.reasoningBudget ?? 1024),
+    },
   };
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await post(`${base}/v1beta/models/${model}:generateContent`, { "x-goog-api-key": process.env.GEMINI_API_KEY! }, body);
     if (res.ok) {
-      const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-      return parse<T>(data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join(""));
+      const data = (await res.json()) as {
+        candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
+      };
+      if (data.candidates?.[0]?.finishReason === "MAX_TOKENS") throw new AiUnavailable("This is too much for one assignment. Split the document or ask for fewer questions.");
+      const u = data.usageMetadata ?? {};
+      return {
+        data: parse<T>(data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("")),
+        usage: { model, prompt: u.promptTokenCount ?? 0, completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0), cost: null },
+      };
     }
     if ((res.status === 429 || res.status >= 500) && attempt === 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
     return failure(res);
@@ -105,7 +133,7 @@ async function viaGoogle<T>(parts: Part[], schema: Record<string, unknown>, opts
 }
 
 /** Ask the configured model for JSON matching `schema` (standard JSON Schema). */
-export async function generateJson<T>(parts: Part[], schema: Record<string, unknown>, opts: Opts = {}): Promise<T> {
+export async function generateJson<T>(parts: Part[], schema: Record<string, unknown>, opts: Opts): Promise<AiResult<T>> {
   const p = provider();
   if (!p) throw new AiUnavailable("AI is not configured yet. Add an AI key in the hosting settings.");
   return p === "openrouter" ? viaOpenRouter<T>(parts, schema, opts) : viaGoogle<T>(parts, schema, opts);

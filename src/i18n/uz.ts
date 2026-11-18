@@ -551,4 +551,8 @@ export const uz: Record<string, string> = {
   "The AI took too long. Try a shorter document or fewer questions.": "AI juda uzoq ishladi. Qisqaroq hujjat yoki kamroq savol bilan urinib ko'ring.",
   "Could not reach the AI service.": "AI xizmatiga ulanib bo'lmadi.",
   "Something went wrong. Try again.": "Nimadir xato ketdi. Qayta urinib ko'ring.",
+  "AI this month: {n} drafts · {tokens} tokens · ${cost}": "Bu oy AI: {n} ta qoralama · {tokens} token · ${cost}",
+  "about ${avg} per draft": "har biri taxminan ${avg}",
+  "This is too much for one assignment. Split the document or ask for fewer questions.": "Bitta vazifa uchun juda ko'p. Hujjatni bo'ling yoki kamroq savol so'rang.",
+  "The PDF is longer than 12 pages. Upload only the pages with the exercise.": "PDF 12 sahifadan uzun. Faqat mashq bor sahifalarni yuklang.",
 };

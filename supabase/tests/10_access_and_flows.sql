@@ -436,9 +436,21 @@ select tests.expect_fail(format($$select save_submission(%L, %L, false)$$, :'hw_
 select tests.expect_fail(format($$select create_custom_assignment(%L, 'Sneaky', 'reading', 'B2', 'ai', null, '[{"id":"q1","type":"open","prompt":"Write"}]', '{}')$$, :'center_a'), 'forbidden');
 select tests.expect_fail(format($$select claim_ai_request(%L, 'generate')$$, :'center_a'), 'forbidden');
 :as_mentor
-select claim_ai_request(:'center_a', 'generate') from generate_series(1, 20);
+select claim_ai_request(:'center_a', 'generate') as ai1 \gset
+select finish_ai_request(:'ai1', 'google/gemini-3.7-flash', 900, 1500, 0.003150, true);
+select finish_ai_request(:'ai1', 'x', 1, 1, 9, true);
+select tests.expect_count('select * from ai_requests', 0);
+:as_superuser
+select tests.assert((select cost_usd from ai_requests where id = :'ai1') = 0.003150, 'usage recorded once');
+:as_ownerA
+select tests.expect_count(format('select * from ai_requests where center_id = %L', :'center_a'), 1);
+:as_mentor
+select claim_ai_request(:'center_a', 'generate') from generate_series(1, 19);
 select tests.expect_fail(format($$select claim_ai_request(%L, 'generate')$$, :'center_a'), '20 requests per hour');
 :as_ownerB
 select tests.expect_fail(format($$select claim_ai_request(%L, 'extract')$$, :'center_a'), 'forbidden');
+select finish_ai_request(:'ai1', 'x', 1, 1, 9, false);
+:as_superuser
+select tests.assert((select ok from ai_requests where id = :'ai1'), 'other users cannot overwrite usage');
 
 \echo 'ALL TESTS PASSED'
