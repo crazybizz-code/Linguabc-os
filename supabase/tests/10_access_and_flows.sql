@@ -292,4 +292,26 @@ select tests.expect_fail(format($$update notifications set title = 'x' where id 
 :as_student2
 select tests.expect_count('select * from notifications', 0);
 
+\echo '11. workspace RPCs'
+:as_admin
+select create_student(:'center_a', 'Wizard Kid', '+998 90 555 44 33', null, null, null, null) as wz_lead \gset
+select tests.assert((select status from students where id = :'wz_lead') = 'lead', 'student without group is a lead');
+select create_group(:'center_a', 'B1 Evening', :'course_a', :'branch_a', :'m_mentor2', 'Room 7', 12, current_date,
+                    '{2,4}'::smallint[], '18:00', '19:30') as g3 \gset
+select tests.assert((select count(*) from lessons where group_id = :'g3') between 20 and 26, 'lessons for 12 weeks');
+select tests.assert((select count(*) from rooms where name = 'Room 7') = 1, 'room created');
+select create_student(:'center_a', 'Wizard Two', null, null, null, null, :'g3', 500000, 0, 10::smallint,
+                      'Mum Two', '+998 91 000 00 00', 'mother') as wz2 \gset
+select tests.assert((select count(*) from enrollments where student_id = :'wz2') = 1, 'wizard enrolled');
+select tests.assert((select amount from invoices where student_id = :'wz2') = 500000, 'wizard invoiced');
+select tests.assert((select due_date from invoices where student_id = :'wz2') >= current_date, 'first invoice not due before start');
+select tests.assert((select count(*) from guardians where student_id = :'wz2') = 1, 'wizard guardian');
+select tests.expect_fail(format($$select create_group(%L, 'Clash', %L, %L, %L, 'Room 7', 10, current_date, '{2}'::smallint[], '19:00', '20:00')$$,
+                                :'center_a', :'course_a', :'branch_a', :'m_mentor'), 'schedule conflict');
+select tests.expect_count($$select * from groups where name = 'Clash'$$, 0);
+:as_mentor
+select tests.expect_fail(format($$select create_student(%L, 'Sneaky')$$, :'center_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select create_group(%L, 'X group', %L, %L)$$, :'center_a', :'course_a', :'branch_a'), 'forbidden');
+
 \echo 'ALL TESTS PASSED'

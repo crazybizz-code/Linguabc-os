@@ -1618,6 +1618,40 @@ export type Database = {
         Args: { p_name: string; p_owner_name: string; p_slug: string }
         Returns: string
       }
+      create_group: {
+        Args: {
+          p_branch: string
+          p_capacity?: number
+          p_center: string
+          p_course: string
+          p_end_time?: string
+          p_mentor?: string
+          p_name: string
+          p_room_name?: string
+          p_start_date?: string
+          p_start_time?: string
+          p_weekdays?: number[]
+        }
+        Returns: string
+      }
+      create_student: {
+        Args: {
+          p_branch?: string
+          p_center: string
+          p_date_of_birth?: string
+          p_discount_percent?: number
+          p_due_day?: number
+          p_email?: string
+          p_full_name: string
+          p_group?: string
+          p_monthly_fee?: number
+          p_parent_name?: string
+          p_parent_phone?: string
+          p_parent_relationship?: string
+          p_phone?: string
+        }
+        Returns: string
+      }
       enroll_student: {
         Args: {
           p_discount_percent?: number
