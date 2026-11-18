@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#F5ECE8;font-family:Inter,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#17211D;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5ECE8;padding:40px 16px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+          <tr><td style="padding:0 4px 20px;font-size:16px;font-weight:600;letter-spacing:-0.02em;color:#12392B;">LinguABC</td></tr>
+          <tr><td style="background:#FCF8F4;border:1px solid #E9DFD7;border-radius:18px;padding:32px 28px;">
+            <h1 style="margin:0 0 10px;font-size:22px;line-height:1.25;font-weight:600;letter-spacing:-0.02em;">Confirm your new email</h1>
+            <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#5F6B66;">Confirm that you want to use {{ .NewEmail }} for your LinguABC account.</p>
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change&next=/" style="display:inline-block;background:#12392B;color:#FAF5EF;text-decoration:none;font-size:14px;font-weight:500;padding:12px 22px;border-radius:11px;">Confirm new email</a>
+            <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#8A938F;">If you didn't ask for this change, contact your centre straight away.</p>
+          </td></tr>
+          <tr><td style="padding:18px 4px 0;font-size:11px;color:#8A938F;">LinguABC · app.linguabc.xyz</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>
