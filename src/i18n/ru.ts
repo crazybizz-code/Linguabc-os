@@ -545,4 +545,10 @@ export const ru: Record<string, string> = {
   "Writing your assignment — this usually takes 10–30 seconds.": "Пишем задание — обычно это занимает 10–30 секунд.",
   "e.g. City transport": "например: Городской транспорт",
   "e.g. Matching headings, past perfect, Task 2 opinion essay": "например: Matching headings, past perfect, эссе Task 2",
+  "AI is not configured yet. Add an AI key in the hosting settings.": "ИИ ещё не настроен. Добавьте ключ ИИ в настройках хостинга.",
+  "AI credits have run out. Top up the AI account and try again.": "Кредиты ИИ закончились. Пополните счёт ИИ и попробуйте снова.",
+  "The AI key was rejected. Check the key in the hosting settings.": "Ключ ИИ отклонён. Проверьте ключ в настройках хостинга.",
+  "The AI took too long. Try a shorter document or fewer questions.": "ИИ отвечал слишком долго. Попробуйте документ короче или меньше вопросов.",
+  "Could not reach the AI service.": "Не удалось связаться с сервисом ИИ.",
+  "Something went wrong. Try again.": "Что-то пошло не так. Попробуйте снова.",
 };

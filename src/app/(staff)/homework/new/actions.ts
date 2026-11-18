@@ -12,7 +12,7 @@ const str = (v: FormDataEntryValue | null) => (typeof v === "string" ? v.trim() 
 const pick = <T extends string>(v: string, list: readonly T[], fallback: T): T => ((list as readonly string[]).includes(v) ? (v as T) : fallback);
 
 async function claim(kind: "generate" | "extract") {
-  if (!aiConfigured()) return "AI is not configured yet. Add GEMINI_API_KEY in the hosting settings.";
+  if (!aiConfigured()) return "AI is not configured yet. Add an AI key in the hosting settings.";
   const { supabase, workspace } = await getStaffContext();
   const { error } = await supabase.rpc("claim_ai_request", { p_center: workspace.centerId, p_kind: kind });
   if (error) return /AI limit/.test(error.message) ? error.message : "You don't have permission to do that.";

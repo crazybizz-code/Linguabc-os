@@ -545,4 +545,10 @@ export const uz: Record<string, string> = {
   "Writing your assignment — this usually takes 10–30 seconds.": "Vazifangiz yozilmoqda — odatda 10–30 soniya oladi.",
   "e.g. City transport": "masalan: Shahar transporti",
   "e.g. Matching headings, past perfect, Task 2 opinion essay": "masalan: Matching headings, past perfect, Task 2 opinion essay",
+  "AI is not configured yet. Add an AI key in the hosting settings.": "AI hali sozlanmagan. Hosting sozlamalariga AI kalitini qo'shing.",
+  "AI credits have run out. Top up the AI account and try again.": "AI krediti tugadi. AI hisobini to'ldirib, qayta urinib ko'ring.",
+  "The AI key was rejected. Check the key in the hosting settings.": "AI kaliti qabul qilinmadi. Hosting sozlamalaridagi kalitni tekshiring.",
+  "The AI took too long. Try a shorter document or fewer questions.": "AI juda uzoq ishladi. Qisqaroq hujjat yoki kamroq savol bilan urinib ko'ring.",
+  "Could not reach the AI service.": "AI xizmatiga ulanib bo'lmadi.",
+  "Something went wrong. Try again.": "Nimadir xato ketdi. Qayta urinib ko'ring.",
 };
