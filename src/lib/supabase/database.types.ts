@@ -1810,6 +1810,7 @@ export type Database = {
         Args: { p_center: string; p_due_at: string; p_group: string; p_instructions?: string; p_item: string }
         Returns: string
       }
+      my_homework_result: { Args: { p_homework: string }; Returns: Json }
       create_mock_session: {
         Args: {
           p_center: string

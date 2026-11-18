@@ -387,4 +387,28 @@ select tests.expect_count($$select * from assignment_keys$$, 0);
 select tests.expect_count($$select * from assignment_keys$$, 0);
 select tests.expect_fail(format($$select assign_library_item(%L, 'lib-1', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
 
+\echo '15. homework grading'
+:as_student
+select tests.assert(my_homework_result(:'hw_lib') is null, 'no key before submitting');
+select tests.assert(save_submission(:'hw_lib', '{"q1":0}', false) = 'in_progress', 'progress saved');
+select tests.assert((select score from submissions s join students st on st.id = s.student_id where s.homework_id = :'hw_lib' and st.id = :'st1') is null, 'no score while in progress');
+select tests.assert(save_submission(:'hw_lib', '{"q1":1}', true) = 'submitted', 'submitted');
+select tests.assert((select score from submissions where homework_id = :'hw_lib' and student_id = :'st1') = 100, 'auto-graded 100');
+select tests.assert((my_homework_result(:'hw_lib')->'key'->'q1'->>'answer') = '1', 'key visible after submitting');
+select tests.assert((select count(*) from activities where ref_id = :'hw_lib' and detail like '%100%%') = 1, 'score on timeline');
+select tests.expect_fail(format($$select save_submission(%L, '"x"', true)$$, :'hw_lib2'), 'must be an object');
+select save_submission(:'hw_lib2', '{"q1":3}', true);
+select tests.assert((select score from submissions where homework_id = :'hw_lib2' and student_id = :'st1') = 0, 'wrong answer scores 0');
+:as_student2
+select tests.assert(my_homework_result(:'hw_lib') is null, 'classmate cannot see another result');
+:as_parent
+select tests.assert(my_homework_result(:'hw_lib') is null, 'parent gets no key');
+select tests.assert((select score from submissions where homework_id = :'hw_lib' and student_id = :'st1') = 100, 'parent sees the score');
+:as_mentor
+select id as sub_lib from submissions where homework_id = :'hw_lib2' and student_id = :'st1' \gset
+select review_submission(:'sub_lib', 50, 'Re-read paragraph 2');
+select tests.assert((select status from submissions where id = :'sub_lib') = 'reviewed', 'mentor reviewed');
+:as_student
+select tests.assert((my_homework_result(:'hw_lib2')->>'feedback') = 'Re-read paragraph 2', 'student sees feedback');
+
 \echo 'ALL TESTS PASSED'

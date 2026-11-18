@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, ChevronLeft, ExternalLink } from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { Badge, Card, cn } from "@/components/ui/primitives";
-import { cleanArticleHtml, levelRange, type AnswerKey, type Question } from "@/lib/library/render";
+import { levelRange, type AnswerKey, type Question } from "@/lib/library/render";
+import { MaterialView } from "@/components/library/material";
 import { todayISO } from "@/lib/dates";
 import { AssignDialog } from "./assign";
 
 export const metadata = { title: "Library item" };
-type Line = { text: string; speaker?: string };
 
 export default async function LibraryItemPage({ params }: PageProps<"/homework/library/[id]">) {
   const { id } = await params;
@@ -21,7 +21,6 @@ export default async function LibraryItemPage({ params }: PageProps<"/homework/l
   if (!item) notFound();
   const questions = (item.questions ?? []) as Question[];
   const answers = (key?.answers ?? {}) as AnswerKey;
-  const transcript = (Array.isArray(item.transcript) ? item.transcript : []) as Line[];
   const due = new Date(`${todayISO()}T12:00:00Z`);
   due.setUTCDate(due.getUTCDate() + 3);
 
@@ -42,26 +41,7 @@ export default async function LibraryItemPage({ params }: PageProps<"/homework/l
 
       <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
         <Card className="p-6">
-          {item.kind === "podcast" && item.audio_url && (
-            <audio controls preload="none" src={item.audio_url} className="mb-5 w-full" />
-          )}
-          {item.kind === "article" && item.body_html && (
-            item.body_format === "html"
-              ? <div className="library-prose" dangerouslySetInnerHTML={{ __html: cleanArticleHtml(item.body_html) }} />
-              : <div className="library-prose whitespace-pre-line">{item.body_html}</div>
-          )}
-          {item.kind === "podcast" && transcript.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">{t("Transcript")}</h2>
-              {transcript.map((l, i) => (
-                <p key={i} className="text-[14px] leading-relaxed">{l.speaker && <span className="mr-1.5 font-semibold">{l.speaker}:</span>}{l.text}</p>
-              ))}
-            </div>
-          )}
-          <p className="mt-6 border-t border-border/60 pt-4 text-[11.5px] text-muted-foreground">
-            {[item.author, item.source_name, item.licence].filter(Boolean).join(" · ")}
-            {item.source_url && <> · <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">{t("Original")} <ExternalLink className="h-3 w-3" /></a></>}
-          </p>
+          <MaterialView item={item} t={t} />
         </Card>
         <div className="space-y-5">
           <Card className="p-5">

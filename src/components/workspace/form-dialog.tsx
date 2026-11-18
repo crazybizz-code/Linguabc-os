@@ -33,6 +33,7 @@ export function FormDialog({
   children,
   success,
   width,
+  subtle,
 }: {
   trigger: string;
   title: string;
@@ -43,13 +44,16 @@ export function FormDialog({
   /** Shown instead of the form after success; omit to close on success. */
   success?: (state: NonNullable<ActionState>) => ReactNode;
   width?: string;
+  /** Small outline trigger (e.g. inside a table row) instead of the primary "+" button. */
+  subtle?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState(0);
   return (
     <>
-      <button type="button" className={buttonPrimary} onClick={() => { setKey((k) => k + 1); setOpen(true); }}>
-        <Plus className="h-4 w-4" /> {trigger}
+      <button type="button" className={subtle ? "h-8 rounded-[9px] border border-border/80 px-3 text-[12px] font-medium text-[#17211D] hover:bg-white" : buttonPrimary}
+        onClick={() => { setKey((k) => k + 1); setOpen(true); }}>
+        {!subtle && <Plus className="h-4 w-4" />} {trigger}
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title={title} description={description} width={width}>
         <Inner key={key} action={action} submitLabel={submitLabel} success={success} onDone={() => setOpen(false)} onCancel={() => setOpen(false)}>

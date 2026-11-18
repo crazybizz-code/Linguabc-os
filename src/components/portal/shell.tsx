@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { CalendarCheck, Home, User, Wallet, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarCheck, Home, User, Wallet, type LucideIcon } from "lucide-react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/components/ui/primitives";
 import { useT } from "@/i18n/client";
 
-const ICONS: Record<string, LucideIcon> = { home: Home, attendance: CalendarCheck, schedule: CalendarCheck, payments: Wallet, profile: User };
+const ICONS: Record<string, LucideIcon> = { home: Home, homework: BookOpen, attendance: CalendarCheck, schedule: CalendarCheck, payments: Wallet, profile: User };
 
 /** Mobile-first frame shared by the parent and student portals. */
 export function PortalShell({

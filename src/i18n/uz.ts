@@ -477,4 +477,12 @@ export const uz: Record<string, string> = {
   "{n} items": "{n} ta material",
   "{n} min": "{n} daq",
   "{n} questions": "{n} ta savol",
+  "Edit review": "Bahoni o'zgartirish",
+  "Save review": "Bahoni saqlash",
+  "The score was calculated automatically. Adjust it if needed and leave a short note for the student.": "Ball avtomatik hisoblandi. Kerak bo'lsa o'zgartiring va o'quvchiga qisqa izoh qoldiring.",
+  "No answer": "Javob berilmagan",
+  "Correct:": "To'g'ri javob:",
+  "Score (%)": "Ball (%)",
+  "Feedback for the student": "O'quvchi uchun izoh",
+  "Enter a score from 0 to 100.": "0 dan 100 gacha ball kiriting.",
 };

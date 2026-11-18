@@ -477,4 +477,12 @@ export const ru: Record<string, string> = {
   "{n} items": "Материалов: {n}",
   "{n} min": "{n} мин",
   "{n} questions": "Вопросов: {n}",
+  "Edit review": "Изменить оценку",
+  "Save review": "Сохранить оценку",
+  "The score was calculated automatically. Adjust it if needed and leave a short note for the student.": "Балл рассчитан автоматически. При необходимости измените его и оставьте короткий комментарий ученику.",
+  "No answer": "Нет ответа",
+  "Correct:": "Правильно:",
+  "Score (%)": "Балл (%)",
+  "Feedback for the student": "Комментарий для ученика",
+  "Enter a score from 0 to 100.": "Введите балл от 0 до 100.",
 };
