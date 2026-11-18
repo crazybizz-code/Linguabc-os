@@ -323,4 +323,35 @@ select tests.assert(group_mentor_name(:'group1') = 'Mentor A', 'student sees own
 :as_ownerB
 select tests.assert(group_mentor_name(:'group1') is null, 'other centre sees nothing');
 
+\echo '13. mock sessions'
+:as_acad
+select create_mock_session(:'center_a', 'Full Mock', :'group1', now() + interval '2 days', :'m_mentor', :'room1') as ms2 \gset
+select tests.assert((select count(*) from mock_results where mock_session_id = :'ms2') = 2, 'active students become participants');
+select tests.expect_fail(format($$select create_mock_session(%L, 'Bad examiner', %L, now(), %L)$$, :'center_a', :'group1', :'m_mentor2'), 'examiner must be');
+select tests.expect_fail(format($$select create_mock_session(%L, 'No modules', %L, now(), null, null, '{}')$$, :'center_a', :'group1'), 'at least one');
+select tests.expect_fail(format($$select create_mock_session(%L, 'Vocab', %L, now(), null, null, '{vocabulary}')$$, :'center_a', :'group1'), 'at least one');
+:as_mentor
+select tests.expect_fail(format($$select create_mock_session(%L, 'Mentor mock', %L, now())$$, :'center_a', :'group1'), 'forbidden');
+select save_mock_results(:'ms2', jsonb_build_array(jsonb_build_object('student_id', :'st1', 'reading', 6.5, 'listening', 7)));
+select tests.assert((select status from mock_results where mock_session_id = :'ms2' and student_id = :'st1') = 'in_progress', 'partial result');
+select tests.assert((select status from mock_sessions where id = :'ms2') = 'in_progress', 'session in progress');
+select save_mock_results(:'ms2', jsonb_build_array(
+  jsonb_build_object('student_id', :'st1', 'reading', 6.5, 'listening', 7, 'writing', 6, 'speaking', 6.5),
+  jsonb_build_object('student_id', :'st2', 'reading', 5, 'absent', true)));
+select tests.assert((select status from mock_sessions where id = :'ms2') = 'completed', 'session completed');
+select tests.assert((select reading_band from mock_results where mock_session_id = :'ms2' and student_id = :'st2') is null, 'absent clears bands');
+select tests.assert((select count(*) from activities where ref_id = :'ms2' and student_id = :'st1') = 1, 'result on timeline');
+select tests.expect_fail(format($$select save_mock_results(%L, '[{"student_id":"%s","reading":6.3}]')$$, :'ms2', :'st1'), 'check');
+select tests.expect_fail(format($$select save_mock_results(%L, '[{"student_id":"%s","reading":6}]')$$, :'ms2', :'st3'), 'not in this session');
+:as_mentor2
+select tests.expect_fail(format($$select save_mock_results(%L, '[]')$$, :'ms2'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select save_mock_results(%L, '[]')$$, :'ms2'), 'forbidden');
+select tests.expect_fail(format($$select create_mock_session(%L, 'X', %L, now())$$, :'center_a', :'group1'), 'forbidden');
+:as_acad
+select create_mock_session(:'center_a', 'Listening check', :'group1', now(), null, null, '{listening}') as ms3 \gset
+select save_mock_results(:'ms3', jsonb_build_array(jsonb_build_object('student_id', :'st1', 'listening', 7.5, 'reading', 9)));
+select tests.assert((select status from mock_results where mock_session_id = :'ms3' and student_id = :'st1') = 'completed', 'single-module result completes');
+select tests.assert((select reading_band from mock_results where mock_session_id = :'ms3' and student_id = :'st1') is null, 'off-session module ignored');
+
 \echo 'ALL TESTS PASSED'

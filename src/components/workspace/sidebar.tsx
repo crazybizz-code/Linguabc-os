@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  ClipboardList,
   BarChart3,
   ClipboardCheck,
   Building2,
@@ -35,6 +36,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     title: "Operations",
     items: [
       { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+      { href: "/mocks", label: "Mocks", icon: ClipboardList },
       { href: "/payments", label: "Payments", icon: Wallet, adminOnly: true },
       { href: "/parents", label: "Parents", icon: HeartHandshake, soon: true, staffOnly: true },
     ],

@@ -236,3 +236,42 @@ export async function setLocale(locale: string) {
   await supabase.from("profiles").update({ locale }).eq("id", userId);
   revalidatePath("/", "layout");
 }
+
+// ------------------------------------------------------------------- mocks
+const MODULES = ["reading", "listening", "writing", "speaking"] as const;
+type Module = (typeof MODULES)[number];
+
+export async function createMockSession(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase, workspace } = await getStaffContext();
+  const date = str(form.get("date"));
+  const time = str(form.get("time")) || "09:00";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return { error: "Choose a date and time." };
+  const modules = form.getAll("module").map(String).filter((m): m is Module => (MODULES as readonly string[]).includes(m));
+  const { data, error } = await supabase.rpc("create_mock_session", {
+    p_center: workspace.centerId,
+    p_name: str(form.get("name")),
+    p_group: str(form.get("group_id")),
+    // Centre time (Asia/Tashkent, UTC+5, no DST)
+    p_scheduled_at: `${date}T${time}:00+05:00`,
+    p_examiner: optional(form.get("examiner_id")) ?? undefined,
+    p_room: optional(form.get("room_id")) ?? undefined,
+    p_modules: modules,
+    p_version: optional(form.get("version")) ?? undefined,
+  });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/mocks");
+  return { ok: true, id: data ?? undefined };
+}
+
+export type MockRow = { student_id: string; absent: boolean } & Partial<Record<Module, number | null>>;
+
+export async function saveMockResults(sessionId: string, rows: MockRow[]): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const ok = (v: unknown) => v == null || (typeof v === "number" && v >= 0 && v <= 9 && Number.isInteger(v * 2));
+  if (!rows.every((r) => MODULES.every((m) => ok(r[m])))) return { error: "Bands go from 0 to 9 in steps of 0.5." };
+  const { error } = await supabase.rpc("save_mock_results", { p_session: sessionId, p_records: rows });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/mocks", "layout");
+  revalidatePath("/students", "layout");
+  return { ok: true };
+}

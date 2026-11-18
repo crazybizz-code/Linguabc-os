@@ -1670,6 +1670,23 @@ export type Database = {
         Args: { p_center: string; p_period: string }
         Returns: number
       }
+      create_mock_session: {
+        Args: {
+          p_center: string
+          p_examiner?: string
+          p_group: string
+          p_modules?: Database["public"]["Enums"]["skill"][]
+          p_name: string
+          p_room?: string
+          p_scheduled_at: string
+          p_version?: string
+        }
+        Returns: string
+      }
+      save_mock_results: {
+        Args: { p_records: Json; p_session: string }
+        Returns: number
+      }
       group_mentor_name: { Args: { p_group: string }; Returns: string }
       generate_lessons: {
         Args: { p_from: string; p_group: string; p_to: string }
