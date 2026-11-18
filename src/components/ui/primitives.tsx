@@ -54,6 +54,7 @@ const TONES = {
   amber: "bg-[#FBEEDC] text-[#9A5B1E]",
   red: "bg-[#F8E1DE] text-[#B4483D]",
   neutral: "bg-[#EFE6DF] text-[#5F6B66]",
+  blue: "bg-[#E4ECF1] text-[#3E6378]",
   dark: "bg-[#12392B] text-[#FAF5EF]",
 } as const;
 export type Tone = keyof typeof TONES;
