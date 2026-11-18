@@ -11,10 +11,15 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 export default async function HomeworkPage({ searchParams }: PageProps<"/homework">) {
   const { tab } = await searchParams;
   const past = tab === "completed";
+  const mine = tab === "assignments";
   const { supabase, workspace, t, locale } = await getStaffContext();
   const L = intlLocale(locale);
   const nowIso = new Date().toISOString();
 
+  const { data: own } = mine
+    ? await supabase.from("assignments").select("id, title, skill, level, source, status, created_at").eq("center_id", workspace.centerId)
+        .in("source", ["upload", "ai"]).order("created_at", { ascending: false }).limit(100)
+    : { data: null };
   // RLS limits mentors to the groups they teach.
   let q = supabase.from("homework").select("id, due_at, note, assigned_at, groups(name), assignments(title, skill, content)")
     .eq("center_id", workspace.centerId);
@@ -35,7 +40,7 @@ export default async function HomeworkPage({ searchParams }: PageProps<"/homewor
 
   const tabs = (
     <div className="flex rounded-[11px] border border-border/70 bg-[#FCF8F4] p-1 text-[12.5px]">
-      {[["Assigned", "/homework", !past], ["Past due", "/homework?tab=completed", past], ["Library", "/homework/library", false]].map(([label, href, on]) => (
+      {[["Assigned", "/homework", !past && !mine], ["Past due", "/homework?tab=completed", past], ["Assignments", "/homework?tab=assignments", mine], ["Library", "/homework/library", false]].map(([label, href, on]) => (
         <Link key={label as string} href={href as string} className={cn("rounded-[8px] px-3 py-1.5", on ? "bg-[#F5ECE8] font-medium text-[#17211D]" : "text-muted-foreground")}>
           {t(label as string)}
         </Link>
@@ -51,6 +56,31 @@ export default async function HomeworkPage({ searchParams }: PageProps<"/homewor
         description={t("Assign, track and review work. Every submission updates the student's academic record.")}
         actions={<>{tabs}<Link href="/homework/new" className={buttonPrimary}><Plus className="h-4 w-4" /> {t("Create assignment")}</Link></>}
       />
+      {mine ? (
+        <Card className="overflow-hidden">
+          {!own?.length ? (
+            <EmptyState icon={BookOpen} title={t("No assignments of your own yet")} description={t("Upload a worksheet or create one with AI — it will be kept here to reuse.")}
+              action={<Link href="/homework/new" className={buttonPrimary}>{t("Create assignment")}</Link>} />
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {own.map((a) => (
+                <li key={a.id}>
+                  <Link href={`/homework/assignments/${a.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-white/60">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-medium">{a.title}</p>
+                      <p className="text-[11.5px] text-muted-foreground">{[t(a.source === "ai" ? "Created with AI" : "Uploaded worksheet"), t(cap(a.skill)), a.level].filter(Boolean).join(" · ")}</p>
+                    </div>
+                    <Badge tone={a.status === "approved" ? "green" : a.status === "pending_approval" ? "amber" : "neutral"}>
+                      {t(a.status === "approved" ? "Approved" : a.status === "pending_approval" ? "Waiting for approval" : "Draft")}
+                    </Badge>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ) : (
       <Card className="overflow-hidden">
         {!list?.length ? (
           <EmptyState icon={BookOpen} title={past ? t("Nothing past due yet") : t("No homework assigned")}
@@ -88,11 +118,12 @@ export default async function HomeworkPage({ searchParams }: PageProps<"/homewor
           </ul>
         )}
       </Card>
+      )}
       <div className="grid gap-3 md:grid-cols-3">
         {[
-          [Upload, "Upload your material", "PDF, DOCX or an existing worksheet.", "/homework/new"],
+          [Upload, "Upload your material", "PDF, DOCX or an existing worksheet.", "/homework/new/upload"],
           [Layers, "LinguABC library", "Curated articles and podcasts with ready questions.", "/homework/library"],
-          [Sparkles, "Create with AI", "Targeted practice on a specific sub-skill.", "/homework/new"],
+          [Sparkles, "Create with AI", "Targeted practice on a specific sub-skill.", "/homework/new/ai"],
         ].map(([Icon, title, desc, href]) => {
           const I = Icon as typeof Upload;
           return (

@@ -9,19 +9,27 @@ import type { AnswerKey, Question } from "@/lib/library/render";
 import { useT } from "@/i18n/client";
 
 export function ReviewDialog({ submissionId, student, questions, answers, keyed, score, feedback, reviewed }: {
-  submissionId: string; student: string; questions: Question[]; answers: Record<string, number>; keyed: AnswerKey;
+  submissionId: string; student: string; questions: Question[]; answers: Record<string, number | string>; keyed: AnswerKey;
   score: number | null; feedback: string | null; reviewed: boolean;
 }) {
   const t = useT();
   return (
     <FormDialog subtle trigger={reviewed ? t("Edit review") : t("Review")} title={student} submitLabel={t("Save review")} action={reviewSubmission}
-      description={t("The score was calculated automatically. Adjust it if needed and leave a short note for the student.")}>
+      description={questions.some((q) => q.type === "open") ? t("Multiple-choice answers were marked automatically. Read the written answers and set the final score.") : t("The score was calculated automatically. Adjust it if needed and leave a short note for the student.")}>
       <input type="hidden" name="submission_id" value={submissionId} />
       <ol className="max-h-[42vh] space-y-3 overflow-y-auto rounded-[12px] border border-border/70 bg-white/40 p-3">
         {questions.map((q, n) => {
           const mine = answers[q.id];
           const right = keyed[q.id]?.answer;
           const ok = mine != null && mine === right;
+          if (q.type === "open") return (
+            <li key={q.id} className="text-[12.5px]">
+              <p className="whitespace-pre-line font-medium">{n + 1}. {q.prompt}</p>
+              <div className="ml-0 mt-1 whitespace-pre-line rounded-[8px] bg-white/70 px-2.5 py-2 text-[#17211D]">
+                {typeof mine === "string" && mine.trim() ? mine : <span className="text-muted-foreground">{t("No answer")}</span>}
+              </div>
+            </li>
+          );
           return (
             <li key={q.id} className="text-[12.5px]">
               <p className="flex gap-1.5 font-medium">
@@ -29,7 +37,7 @@ export function ReviewDialog({ submissionId, student, questions, answers, keyed,
                 {n + 1}. {q.prompt}
               </p>
               <p className={cn("ml-5 mt-0.5", ok ? "text-[#3F6B4A]" : "text-[#B4483D]")}>
-                {mine == null ? t("No answer") : q.options?.[mine] ?? "—"}
+                {mine == null ? t("No answer") : typeof mine === "number" ? q.options?.[mine] ?? "—" : String(mine)}
               </p>
               {!ok && right != null && typeof right === "number" && <p className="ml-5 text-muted-foreground">{t("Correct:")} {q.options?.[right]}</p>}
             </li>

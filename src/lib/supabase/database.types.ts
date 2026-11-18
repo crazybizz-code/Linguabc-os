@@ -1811,6 +1811,24 @@ export type Database = {
         Returns: string
       }
       my_homework_result: { Args: { p_homework: string }; Returns: Json }
+      claim_ai_request: { Args: { p_center: string; p_kind: string }; Returns: undefined }
+      create_custom_assignment: {
+        Args: {
+          p_answers: Json
+          p_center: string
+          p_level: Database["public"]["Enums"]["cefr_level"]
+          p_passage: string
+          p_questions: Json
+          p_skill: Database["public"]["Enums"]["skill"]
+          p_source: Database["public"]["Enums"]["assignment_source"]
+          p_title: string
+        }
+        Returns: string
+      }
+      assign_assignment: {
+        Args: { p_assignment: string; p_due_at: string; p_group: string; p_note?: string }
+        Returns: string
+      }
       create_mock_session: {
         Args: {
           p_center: string

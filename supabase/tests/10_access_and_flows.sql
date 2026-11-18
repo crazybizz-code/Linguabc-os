@@ -411,4 +411,34 @@ select tests.assert((select status from submissions where id = :'sub_lib') = 're
 :as_student
 select tests.assert((my_homework_result(:'hw_lib2')->>'feedback') = 'Re-read paragraph 2', 'student sees feedback');
 
+\echo '16. custom assignments and AI limits'
+:as_mentor
+select create_custom_assignment(:'center_a', 'Essay practice', 'writing', 'B2', 'ai', 'Read this.',
+  '[{"id":"q1","type":"mc","prompt":"Pick one","options":["a","b","c"]},{"id":"q2","type":"open","prompt":"Write 150 words"}]',
+  '{"q1":{"answer":2}}') as ca1 \gset
+select tests.assert((select status from assignments where id = :'ca1') = 'pending_approval', 'mentor draft needs approval');
+select tests.expect_fail(format($$select assign_assignment(%L, %L, now() + interval '2 days')$$, :'ca1', :'group1'), 'approved first');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad', 'reading', 'B2', 'ai', null, '[{"id":"q1","type":"mc","prompt":"Pick","options":["a","b"]}]', '{"q1":{"answer":5}}')$$, :'center_a'), 'correct option');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad', 'reading', 'B2', 'ai', null, '[]', '{}')$$, :'center_a'), 'at least one');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad', 'reading', 'B2', 'ai', null, '[{"id":"q1","type":"mc","prompt":"Pick","options":["a",""]}]', '{"q1":{"answer":0}}')$$, :'center_a'), 'empty option');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad', 'reading', 'B2', 'library', null, '[{"id":"q1","type":"open","prompt":"Write"}]', '{}')$$, :'center_a'), 'unsupported');
+:as_acad
+select approve_assignment(:'ca1');
+select assign_assignment(:'ca1', :'group1', now() + interval '2 days', 'Plan first') as hw_c \gset
+select tests.assert((select note from homework where id = :'hw_c') = 'Plan first', 'note saved');
+select create_custom_assignment(:'center_a', 'Staff quiz', 'grammar', 'B1', 'upload', null, '[{"id":"q1","type":"mc","prompt":"Pick one","options":["x","y"]}]', '{"q1":{"answer":0}}') as ca2 \gset
+select tests.assert((select status from assignments where id = :'ca2') = 'approved', 'staff work is approved');
+:as_student
+select tests.assert((select content::text from assignments where id = :'ca1') not like '%"answer"%', 'no key in student view');
+select save_submission(:'hw_c', '{"q1":2,"q2":"My essay text"}', true);
+select tests.assert((select score from submissions where homework_id = :'hw_c' and student_id = :'st1') = 100, 'only mc auto-graded');
+select tests.expect_fail(format($$select save_submission(%L, %L, false)$$, :'hw_c', jsonb_build_object('q2', repeat('x', 100001))), 'too long');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Sneaky', 'reading', 'B2', 'ai', null, '[{"id":"q1","type":"open","prompt":"Write"}]', '{}')$$, :'center_a'), 'forbidden');
+select tests.expect_fail(format($$select claim_ai_request(%L, 'generate')$$, :'center_a'), 'forbidden');
+:as_mentor
+select claim_ai_request(:'center_a', 'generate') from generate_series(1, 20);
+select tests.expect_fail(format($$select claim_ai_request(%L, 'generate')$$, :'center_a'), '20 requests per hour');
+:as_ownerB
+select tests.expect_fail(format($$select claim_ai_request(%L, 'extract')$$, :'center_a'), 'forbidden');
+
 \echo 'ALL TESTS PASSED'

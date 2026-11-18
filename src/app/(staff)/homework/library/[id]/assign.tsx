@@ -4,13 +4,16 @@ import Link from "next/link";
 import { FieldLabel } from "@/components/ui/dialog";
 import { inputClass } from "@/components/ui/primitives";
 import { FormDialog } from "@/components/workspace/form-dialog";
-import { assignLibraryItem } from "../../../actions";
+import { assignLibraryItem, type ActionState } from "../../../actions";
 import { useT } from "@/i18n/client";
 
-export function AssignDialog({ itemId, groups, defaultDue }: { itemId: string; groups: { id: string; name: string }[]; defaultDue: string }) {
+export function AssignDialog({ itemId, groups, defaultDue, field = "item_id", action = assignLibraryItem }: {
+  itemId: string; groups: { id: string; name: string }[]; defaultDue: string;
+  field?: string; action?: (s: ActionState, f: FormData) => Promise<ActionState>;
+}) {
   const t = useT();
   return (
-    <FormDialog trigger={t("Assign to a group")} title={t("Assign to a group")} submitLabel={t("Assign")} action={assignLibraryItem} width="max-w-[520px]"
+    <FormDialog trigger={t("Assign to a group")} title={t("Assign to a group")} submitLabel={t("Assign")} action={action} width="max-w-[520px]"
       description={t("Everyone in the group gets it straight away in their student portal.")}
       success={(s) => (
         <div className="space-y-3 text-[13px]">
@@ -18,7 +21,7 @@ export function AssignDialog({ itemId, groups, defaultDue }: { itemId: string; g
           {s.id && <Link href={`/homework/${s.id}`} className="font-medium text-[#12392B] underline">{t("Track submissions")}</Link>}
         </div>
       )}>
-      <input type="hidden" name="item_id" value={itemId} />
+      <input type="hidden" name={field} value={itemId} />
       {!groups.length && <p className="rounded-[10px] bg-[#FBEEDC] px-3 py-2.5 text-[12.5px] text-[#9A5B1E]">{t("You don't have any active groups yet.")}</p>}
       <FieldLabel label={t("Group")}>
         <select name="group_id" required className={inputClass}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
