@@ -34,7 +34,7 @@ export function Dialog({
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className={`m-auto w-[calc(100%-2rem)] ${width} overflow-hidden rounded-[18px] border border-border/70 bg-[#FCF8F4] p-0 text-[#17211D] shadow-[0_30px_80px_-30px_rgba(23,33,29,0.45)] backdrop:bg-[#17211D]/55`}
+      className={`m-auto w-[calc(100%-2rem)] ${width} overflow-hidden text-left rounded-[18px] border border-border/70 bg-[#FCF8F4] p-0 text-[#17211D] shadow-[0_30px_80px_-30px_rgba(23,33,29,0.45)] backdrop:bg-[#17211D]/55`}
     >
       {open && (
         <div className="flex max-h-[88vh] flex-col">

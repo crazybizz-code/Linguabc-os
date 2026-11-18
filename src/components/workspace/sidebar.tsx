@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, cn } from "@/components/ui/primitives";
+import { useT } from "@/i18n/client";
 
 type Item = { href: string; label: string; icon: LucideIcon; soon?: boolean; adminOnly?: boolean; staffOnly?: boolean };
 const SECTIONS: { title: string; items: Item[] }[] = [
@@ -60,6 +61,7 @@ export function Sidebar({
   isStaff: boolean;
 }) {
   const pathname = usePathname();
+  const t = useT();
   const visible = (i: Item) => (!i.adminOnly || isAdmin) && (!i.staffOnly || isStaff);
 
   return (
@@ -75,7 +77,7 @@ export function Sidebar({
           </div>
         </div>
         <span className="mt-3 inline-block rounded-full bg-[#FCF8F4]/[0.1] px-2.5 py-1 text-[10.5px] text-[#C9DACF]">
-          {roleLabel} workspace
+          {t("{role} workspace", { role: roleLabel })}
         </span>
       </div>
 
@@ -85,7 +87,7 @@ export function Sidebar({
           if (!items.length) return null;
           return (
             <div key={s.title}>
-              <p className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#7E9A8B]">{s.title}</p>
+              <p className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#7E9A8B]">{t(s.title)}</p>
               <ul className="space-y-0.5">
                 {items.map((i) => {
                   const active = pathname === i.href || pathname.startsWith(i.href + "/");
@@ -93,8 +95,8 @@ export function Sidebar({
                   const inner = (
                     <>
                       <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
-                      <span className="flex-1">{i.label}</span>
-                      {i.soon && <span className="rounded-full bg-[#FCF8F4]/[0.08] px-1.5 py-0.5 text-[9.5px] text-[#8FAA9C]">Soon</span>}
+                      <span className="flex-1">{t(i.label)}</span>
+                      {i.soon && <span className="rounded-full bg-[#FCF8F4]/[0.08] px-1.5 py-0.5 text-[9.5px] text-[#8FAA9C]">{t("Soon")}</span>}
                     </>
                   );
                   const cls = cn(
@@ -116,7 +118,7 @@ export function Sidebar({
 
       <div className="border-t border-[#FCF8F4]/[0.1] pt-3">
         <span className="flex h-10 cursor-default items-center gap-3 rounded-[11px] px-3 text-[13.5px] text-[#C9DACF] opacity-60">
-          <Settings className="h-[17px] w-[17px]" strokeWidth={1.7} /> Settings
+          <Settings className="h-[17px] w-[17px]" strokeWidth={1.7} /> {t("Settings")}
         </span>
         <div className="mt-2 flex items-center gap-2.5 rounded-[12px] bg-[#FCF8F4]/[0.07] px-2.5 py-2">
           <Avatar name={name} size="sm" />
@@ -133,6 +135,7 @@ export function Sidebar({
 /** Compact nav for phones and tablets. */
 export function MobileNav({ isStaff }: { isStaff: boolean }) {
   const pathname = usePathname();
+  const t = useT();
   const items = SECTIONS.flatMap((s) => s.items).filter((i) => !i.soon && (!i.staffOnly || isStaff));
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto pb-1 lg:hidden">
@@ -147,7 +150,7 @@ export function MobileNav({ isStaff }: { isStaff: boolean }) {
               active ? "bg-[#12392B] text-[#FAF5EF]" : "bg-[#FCF8F4] text-[#3B4A42]",
             )}
           >
-            {i.label}
+            {t(i.label)}
           </Link>
         );
       })}

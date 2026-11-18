@@ -5,10 +5,10 @@ import { monthStartISO } from "@/lib/dates";
 import { Card, PageHeader, cn } from "@/components/ui/primitives";
 import { PaymentsTable, type InvoiceRow } from "./payments-table";
 import { RunBilling } from "./run-billing";
+import { intlLocale } from "@/i18n";
 
 export const metadata = { title: "Payments" };
 
-const label = (period: string) => new Date(`${period}T00:00:00Z`).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 const shift = (period: string, n: number) => {
   const d = new Date(`${period}T00:00:00Z`);
   d.setUTCMonth(d.getUTCMonth() + n);
@@ -17,7 +17,9 @@ const shift = (period: string, n: number) => {
 const short = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n));
 
 export default async function PaymentsPage({ searchParams }: PageProps<"/payments">) {
-  const { supabase, workspace, isAdmin } = await getStaffContext();
+  const { supabase, workspace, isAdmin, t, locale } = await getStaffContext();
+  const label = (p: string) => new Date(`${p}T00:00:00Z`).toLocaleString(intlLocale(locale), { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthOnly = (p: string) => new Date(`${p}T00:00:00Z`).toLocaleString(intlLocale(locale), { month: "long", timeZone: "UTC" });
   if (!isAdmin) redirect("/dashboard");
   const { month } = await searchParams;
   const current = monthStartISO();
@@ -63,19 +65,19 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
   const countBy = (s: string[]) => rows.filter((r) => s.includes(r.status)).length;
 
   const kpis = [
-    { label: "Collected this month", value: short(collected), hint: `${monthPayments.filter((p) => p.kind === "payment").length} payments`, red: false },
-    { label: "Pending", value: short(sumBy(["pending"])), hint: `${countBy(["pending"])} students`, red: false },
-    { label: "Overdue", value: short(sumBy(["overdue"])), hint: `${countBy(["overdue"])} students`, red: countBy(["overdue"]) > 0 },
-    { label: "Partial", value: short(sumBy(["partial"])), hint: `${countBy(["partial"])} partly paid`, red: false },
+    { label: t("Collected this month"), value: short(collected), hint: t("{n} payments", { n: monthPayments.filter((p) => p.kind === "payment").length }), red: false },
+    { label: t("Pending"), value: short(sumBy(["pending"])), hint: t("{n} students", { n: countBy(["pending"]) }), red: false },
+    { label: t("Overdue"), value: short(sumBy(["overdue"])), hint: t("{n} students", { n: countBy(["overdue"]) }), red: countBy(["overdue"]) > 0 },
+    { label: t("Partial"), value: short(sumBy(["partial"])), hint: t("{n} partly paid", { n: countBy(["partial"]) }), red: false },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Administrative operations"
-        title="Payments"
-        description="Student tuition — who has paid, who hasn't, and what to do about it."
-        actions={<RunBilling period={period} label={label(period).split(" ")[0]} />}
+        eyebrow={t("Administrative operations")}
+        title={t("Payments")}
+        description={t("Student tuition — who has paid, who hasn't, and what to do about it.")}
+        actions={<RunBilling period={period} label={monthOnly(period)} />}
       />
       <Card className="grid grid-cols-2 divide-border/60 xl:grid-cols-4 xl:divide-x">
         {kpis.map((k) => (
@@ -93,7 +95,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
           <Link href={`/payments?month=${shift(period, -1)}`} className="rounded-[8px] border border-border/80 px-2.5 py-1 hover:bg-white">←</Link>
           <span className="min-w-[120px] text-center font-medium">{label(period)}</span>
           <Link href={`/payments?month=${nextMonth}`} className="rounded-[8px] border border-border/80 px-2.5 py-1 hover:bg-white">→</Link>
-          {period !== current && <Link href="/payments" className="ml-2 text-[#12392B] hover:underline">This month</Link>}
+          {period !== current && <Link href="/payments" className="ml-2 text-[#12392B] hover:underline">{t("This month")}</Link>}
         </div>
         <PaymentsTable rows={rows} periodLabel={label(period)} />
       </Card>

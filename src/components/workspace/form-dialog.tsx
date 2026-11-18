@@ -6,6 +6,7 @@ import { Loader2, Plus } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { buttonPrimary } from "@/components/ui/primitives";
 import type { ActionState } from "@/app/(staff)/actions";
+import { useT } from "@/i18n/client";
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -75,17 +76,18 @@ function Inner({
   children: ReactNode;
 }) {
   const [state, formAction] = useActionState(action, undefined);
+  const t = useT();
   useEffect(() => {
     if (state?.ok && !success) onDone();
   }, [state, success, onDone]);
   if (state?.ok && success) return <>{success(state)}</>;
   return (
     <form action={formAction}>
-      <FormError message={state?.error} />
+      <FormError message={state?.error ? t(state.error) : undefined} />
       <div className="space-y-4">{children}</div>
       <div className="mt-6 flex justify-end gap-2 border-t border-border/60 pt-4">
         <button type="button" onClick={onCancel} className="h-10 rounded-[11px] px-4 text-[13px] text-[#3B4A42] hover:bg-[#EFE6DF]">
-          Cancel
+          {t("Cancel")}
         </button>
         <Submit label={submitLabel} />
       </div>

@@ -192,7 +192,8 @@ export async function saveAttendance(lessonId: string, marks: Record<string, str
 }
 
 // ---------------------------------------------------------------- payments
-const METHODS = ["cash", "card", "bank_transfer", "click", "payme", "uzum"] as const;
+// Click and Payme are V2 (online payments); they cannot be recorded yet.
+const METHODS = ["cash", "card", "bank_transfer", "uzum"] as const;
 
 export async function recordPayment(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase } = await getStaffContext();
@@ -226,4 +227,12 @@ export async function runMonthlyInvoices(_: ActionState, form: FormData): Promis
   if (error) return { error: friendly(error.message) };
   revalidatePath("/payments");
   return { ok: true, link: String(data ?? 0) };
+}
+
+// ---------------------------------------------------------------- language
+export async function setLocale(locale: string) {
+  const { supabase, userId, workspace } = await getStaffContext();
+  if (workspace.role !== "owner" || !["en", "uz", "ru"].includes(locale)) return;
+  await supabase.from("profiles").update({ locale }).eq("id", userId);
+  revalidatePath("/", "layout");
 }
