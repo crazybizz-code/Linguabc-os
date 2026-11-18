@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  ClipboardCheck,
   Building2,
   HeartHandshake,
   LayoutGrid,
@@ -32,7 +33,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Operations",
     items: [
-      { href: "/payments", label: "Payments", icon: Wallet, soon: true, adminOnly: true },
+      { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+      { href: "/payments", label: "Payments", icon: Wallet, adminOnly: true },
       { href: "/parents", label: "Parents", icon: HeartHandshake, soon: true, staffOnly: true },
     ],
   },
@@ -61,7 +63,7 @@ export function Sidebar({
   const visible = (i: Item) => (!i.adminOnly || isAdmin) && (!i.staffOnly || isStaff);
 
   return (
-    <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-[248px] shrink-0 flex-col rounded-[22px] bg-[#12392B] px-3.5 py-5 text-[#FAF5EF] lg:flex">
+    <aside className="sticky top-4 hidden print:!hidden h-[calc(100vh-2rem)] w-[248px] shrink-0 flex-col rounded-[22px] bg-[#12392B] px-3.5 py-5 text-[#FAF5EF] lg:flex">
       <div className="px-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-[#FCF8F4]/[0.12]">

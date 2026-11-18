@@ -3,7 +3,7 @@ import { ArrowUpRight, BarChart3, Building2, Check, GraduationCap, Layers, Targe
 import { getStaffContext } from "@/lib/auth/current";
 import { ROLE_LABEL } from "@/lib/auth/workspace";
 import { monthStartISO } from "@/lib/dates";
-import { Card, PageHeader, Progress, StatCard, buttonPrimary, buttonSecondary, formatUZS } from "@/components/ui/primitives";
+import { Card, PageHeader, Progress, StatCard, buttonPrimary, buttonSecondary, formatUZS, prettyNumbers } from "@/components/ui/primitives";
 
 export const metadata = { title: "Overview" };
 
@@ -177,7 +177,7 @@ export default async function OverviewPage() {
                       <p className="text-[13px] font-medium">{a.title}</p>
                       <p className="text-[12px] text-muted-foreground">
                         {a.students?.full_name}
-                        {a.detail ? ` · ${a.detail}` : ""}
+                        {a.detail ? ` · ${prettyNumbers(a.detail)}` : ""}
                       </p>
                     </div>
                   </div>

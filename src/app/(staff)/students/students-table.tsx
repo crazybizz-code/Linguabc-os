@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Users } from "lucide-react";
 import { Avatar, Badge, EmptyState, cn, inputClass, type Tone } from "@/components/ui/primitives";
 
@@ -33,6 +34,7 @@ function ago(iso: string | null) {
 }
 
 export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showPayment: boolean }) {
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [f, setF] = useState({ branch: "", group: "", status: "", payment: "" });
   const uniq = (k: keyof StudentRow) => [...new Set(rows.map((r) => String(r[k] ?? "")).filter((x) => x && x !== "—"))].sort();
@@ -84,7 +86,7 @@ export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showP
           </thead>
           <tbody className="divide-y divide-border/50">
             {filtered.map((r) => (
-              <tr key={r.id} className="text-[12.5px] hover:bg-white/50">
+              <tr key={r.id} onClick={() => router.push(`/students/${r.id}`)} className="cursor-pointer text-[12.5px] hover:bg-white/50">
                 <td className="py-3 pl-5 pr-4">
                   <div className="flex items-center gap-3">
                     <Avatar name={r.name} size="sm" />

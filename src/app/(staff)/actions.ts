@@ -146,3 +146,84 @@ export async function inviteStaff(_: ActionState, form: FormData): Promise<Actio
   revalidatePath("/staff");
   return { ok: true, link: `${siteUrl()}/join?code=${data?.[0]?.invite_code}` };
 }
+
+// ---------------------------------------------------------- student logins
+export async function inviteStudentLogin(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase, workspace } = await getStaffContext();
+  const studentId = str(form.get("student_id"));
+  const { data: s } = await supabase.from("students").select("full_name, email, phone").eq("id", studentId).single();
+  if (!s) return { error: "Student not found." };
+  const { data, error } = await supabase.rpc("invite_member", {
+    p_center: workspace.centerId, p_role: "student", p_full_name: s.full_name,
+    p_email: s.email ?? undefined, p_phone: s.phone ?? undefined, p_student: studentId,
+  });
+  if (error) return { error: friendly(error.message) };
+  // No revalidate here: the page refreshes when the link dialog is closed.
+  return { ok: true, link: `${siteUrl()}/join?code=${data?.[0]?.invite_code}` };
+}
+
+export async function inviteParentLogin(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase, workspace } = await getStaffContext();
+  const guardianId = str(form.get("guardian_id"));
+  const { data: g } = await supabase.from("guardians").select("full_name, phone, student_id").eq("id", guardianId).single();
+  if (!g) return { error: "Parent not found." };
+  const { data, error } = await supabase.rpc("invite_member", {
+    p_center: workspace.centerId, p_role: "parent", p_full_name: g.full_name,
+    p_phone: g.phone ?? undefined, p_guardian: guardianId,
+  });
+  if (error) return { error: friendly(error.message) };
+  return { ok: true, link: `${siteUrl()}/join?code=${data?.[0]?.invite_code}` };
+}
+
+// -------------------------------------------------------------- attendance
+const ATT = ["present", "late", "absent", "excused"] as const;
+
+export async function saveAttendance(lessonId: string, marks: Record<string, string>): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const records = Object.entries(marks)
+    .filter(([, status]) => (ATT as readonly string[]).includes(status))
+    .map(([student_id, status]) => ({ student_id, status }));
+  if (!records.length) return { error: "Mark at least one student." };
+  const { error } = await supabase.rpc("mark_attendance", { p_lesson: lessonId, p_records: records });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/attendance");
+  revalidatePath("/students", "layout");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------- payments
+const METHODS = ["cash", "card", "bank_transfer", "click", "payme", "uzum"] as const;
+
+export async function recordPayment(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const amount = money(form.get("amount"));
+  const method = str(form.get("method"));
+  if (!amount || amount <= 0) return { error: "Enter the amount received." };
+  if (!(METHODS as readonly string[]).includes(method)) return { error: "Choose how it was paid." };
+  const { data, error } = await supabase.rpc("record_payment", {
+    p_invoice: str(form.get("invoice_id")),
+    p_amount: amount,
+    p_method: method as (typeof METHODS)[number],
+    p_note: optional(form.get("note")) ?? undefined,
+  });
+  if (error) {
+    if (/exceeds the remaining balance/i.test(error.message)) {
+      const rest = error.message.match(/balance (\d+)/)?.[1];
+      return { error: `That's more than what is owed${rest ? ` (${Number(rest).toLocaleString("en-US")} UZS)` : ""}.` };
+    }
+    return { error: friendly(error.message) };
+  }
+  revalidatePath("/payments");
+  revalidatePath("/students", "layout");
+  revalidatePath("/dashboard");
+  return { ok: true, id: data?.[0]?.payment_id, link: data?.[0]?.receipt_no };
+}
+
+export async function runMonthlyInvoices(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase, workspace } = await getStaffContext();
+  const period = str(form.get("period"));
+  const { data, error } = await supabase.rpc("generate_invoices", { p_center: workspace.centerId, p_period: period });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/payments");
+  return { ok: true, link: String(data ?? 0) };
+}
