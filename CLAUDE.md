@@ -4,7 +4,15 @@
 
 **What it is:** a multi-tenant platform for language learning centres in Uzbekistan (IELTS-focused). One deployment serves many centres. Staff run operations and teaching; students and parents get their own portals.
 
-**Direction now:** finishing V1 (target: 15 January). Next up are AI listening sections with audio (Fish Audio), then online mocks, then settings, Excel import, the parents page and reports. Details: `docs/V1-ROADMAP.md`.
+**Direction now:** finishing V1, due **15 January 2027**. Still to build:
+- AI listening sections with audio (Fish Audio)
+- online mocks
+- online parent payments through at least one real provider
+- basic progress
+- basic notifications
+- settings, Excel import, the parents page, reports
+
+Before launch, two security blockers must be fixed (see `docs/SECURITY.md`). Details: `docs/V1-ROADMAP.md`.
 
 ## Stack
 - Next.js 16.4 (App Router, `src/proxy.ts` instead of middleware), React 19.3, Tailwind 4, TypeScript, zod

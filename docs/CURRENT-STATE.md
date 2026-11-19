@@ -43,23 +43,32 @@ In `qa-q-centre`, acting as the QA mentor and then the QA student under RLS:
 
 These are the page's conditions for showing the deck.
 
+**Cue cards, visual check: passed (2026-11-19).** The owner checked the deck in the browser on that QA homework.
+
 ## Not yet verified
-- **Visual check of the cue cards:** the deck rendering in the browser, flip, hear, Again/Got it, start over. It needs someone to sign in as `qa.q.student@linguabc.test`.
 - **AI keys in Vercel:** whether `OPENROUTER_API_KEY` or `GEMINI_API_KEY` is set in production. Earlier AI checks used mock servers.
 - **Phone sign-in key:** whether `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) is set in Vercel. Phone sign-in needs it.
 - **Domain:** whether `app.linguabc.xyz` is attached to the Vercel project as the production domain. The auth email config says it's the Site URL.
 - **Custom SMTP** in the Supabase dashboard.
-- **README.md is out of date:** it lists migrations only up to 0008 and an `app/(workspace)/` folder that is now `app/(portal)/`.
 
 ## Blockers and open items
-- **`qa-q-centre` is still in production**, waiting for the visual cue-card check. It holds:
-  - 3 users: `qa.q.owner`, `qa.q.mentor`, `qa.q.student` (`@linguabc.test`)
-  - 1 student, 1 group, 2 assignments, 2 homework, 2 submissions
+**Pre-launch security blockers** (must be fixed before V1 goes live; see `SECURITY.md`):
+- Unused invite codes never expire.
+- Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 
-  On 2026-11-19 the mentor and student accounts were given a temporary password for that check. Delete the centre and all three users once the check is done.
-- No staging environment, so all QA happens on production.
+**QA centre still in production.** `qa-q-centre` hasn't been deleted; it was still there on 2026-11-19, after the cue-card check passed. It holds:
+- 3 users: `qa.q.owner`, `qa.q.mentor`, `qa.q.student` (`@linguabc.test`). The mentor and student accounts were given a temporary password for the visual check.
+- 1 student, 1 group, 2 assignments, 2 homework, 2 submissions
+
+**Open decisions**
+- Where Fish Audio / listening audio is stored. Nothing has been chosen yet.
+- Which online payment provider comes first.
+- Where payments, progress and notifications fit in the V1 order.
+
+**Environment:** there's no staging, so all QA happens on production.
+
+**Documentation debt:** `README.md` is out of date. It lists migrations only up to 0008 and an `app/(workspace)/` folder that is now `app/(portal)/`. It hasn't been edited yet.
 
 ## Exact next task
-1. Owner signs in as the QA student and checks the cue cards on homework `ba78020f-…`.
-2. Delete `qa-q-centre` with all its rows and the users `qa.q.%@linguabc.test`. Look at the rows first, and leave every other centre alone.
-3. Start **week 2: Fish Audio integration and AI-generated listening sections with audio.** Decide on audio storage first (see `V1-ROADMAP.md`).
+1. Delete `qa-q-centre` with all its rows and the users `qa.q.%@linguabc.test`. Look at the rows first, and leave every other centre alone.
+2. Start **week 2: Fish Audio integration and AI-generated listening sections with audio.** Decide on audio storage first (see `ARCHITECTURE.md` → Storage).

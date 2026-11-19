@@ -69,6 +69,7 @@ Other rules the database enforces:
 - Uploaded worksheets (PDF, DOCX, TXT, PNG/JPG/WEBP, up to 4 MB, PDFs up to 12 pages) are read in the server action and sent inline to the AI provider. They aren't kept.
 - Library audio (`library_items.audio_url`) and assignment `audio_url` are external URLs.
 - Cue-card progress is kept only in the browser's `localStorage`.
+- **Open decision: where listening audio from Fish Audio is stored.** Nothing has been chosen. Options include a Supabase Storage bucket (public or signed URLs, scoped by centre) or provider-hosted URLs. Choose before building the listening feature and record the choice here.
 
 ## Roles and permissions
 - RLS helpers in `app` (0002):
@@ -103,8 +104,9 @@ Other rules the database enforces:
 | Supabase service role | Server only: phone sign-in, register phone check | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` |
 | SMTP for auth email | Configured in the Supabase dashboard (sender domain `linguabc.xyz`) | Outside the repo |
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
-| Click / Payme | Not integrated (V2). The `provider_txn_id` unique index is ready for idempotent webhooks. | — |
-| Fish Audio | Not integrated (planned for V1) | — |
+| Click / Payme / Uzum online | Not integrated. **V1 needs at least one real provider** (decided 2026-11-19); which one is undecided. The UI and server still refuse Click and Payme as "V2" (PR #7). The `provider_txn_id` unique index is ready for idempotent webhooks. | — |
+| Fish Audio | Not integrated (planned for V1). Audio storage is undecided (see Storage). | — |
+| Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 needs basic product-triggered notifications. | — |
 
 ## Deployment
 - **Vercel project** `linguabc-os` (team `crazybizz-codes-projects`), region `fra1`.

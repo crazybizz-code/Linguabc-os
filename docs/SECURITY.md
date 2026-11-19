@@ -2,6 +2,12 @@
 
 The database is the security boundary. The Next.js app reads and writes with the signed-in user's session. `src/proxy.ts` only refreshes the session and redirects signed-out visitors, and the UI hides things only for convenience.
 
+## Pre-launch blockers
+Confirmed by the owner on 2026-11-19. Both must be fixed before V1 goes live.
+
+1. **Unused invite codes never expire.** A pending invite stays redeemable until it's used or its membership is changed. Fix: give codes an expiry, check it in `accept_invite`, and let staff reissue a code.
+2. **Answer keys are visible too widely.** `assignment_keys` can be read and written by staff and by **every mentor in the centre** (`app.has_role(center_id, '{mentor}')`), not only the mentor of the group the work is set for. Fix: limit mentor access to assignments they created, or that are set for groups they teach. Add a test where a mentor from a different group gets nothing.
+
 ## Tenant isolation
 - Every business row has `center_id`.
 - Child tables reference parents with composite `(id, center_id)` foreign keys, so a row can't point into another centre even by mistake.
@@ -31,7 +37,7 @@ The database is the security boundary. The Next.js app reads and writes with the
 A few specific rules:
 - **Mentor drafts:** AI and upload drafts from a mentor need approval by a manager.
 - **Mocks:** results can be saved by staff or the session's examiner. The examiner must be a manager or the group's own mentor.
-- **Answer keys** (`assignment_keys`) can be read and written by staff and by **any mentor in the centre**, not only the group's mentor. Students never get the key until they submit, and then only through `my_homework_result`.
+- **Answer keys** (`assignment_keys`) can be read and written by staff and by **any mentor in the centre**, not only the group's mentor. This is a pre-launch blocker (see above). Students never get the key until they submit, and then only through `my_homework_result`.
 - **Marking** happens in Postgres. The browser never sees the key while the student is working, and it never computes marks.
 
 ## Student 360 privacy
@@ -49,7 +55,7 @@ A few specific rules:
 
 ## Invite security
 - **Codes:** 6 random bytes as 12 hex characters (`gen_random_bytes`), single-use. Redeeming one sets `invite_code = null` and binds the membership to the signed-in user.
-- **No expiry:** invite codes don't expire in the database. A pending invite stays redeemable until it's used or the membership is changed.
+- **No expiry:** invite codes don't expire in the database. A pending invite stays redeemable until it's used or the membership is changed. This is a pre-launch blocker (see above).
 - **Issuing:** only owner or admin can issue invites, and only the owner can invite owners or admins.
   - A student invite must point to an existing student without a login.
   - A parent invite must point to an existing guardian without a login.
@@ -60,8 +66,15 @@ A few specific rules:
 - Append-only ledger: payments can't be updated or deleted, even by the owner. Refunds are new rows, and only the owner can make them.
 - Receipt numbers are sequential per centre, advanced only inside `record_payment`. Overpaying is refused.
 - `(method, provider_txn_id)` is unique, so provider retries are idempotent.
-- No card data is stored. Click and Payme are refused by the server until V2.
+- No card data is stored. Click and Payme are still refused by the server, a leftover of the earlier V2 decision.
 - Owner, admin, the student and their parents can read payments. Nobody else can.
+
+**Online parent payments (V1, not built yet).** The flow is Parent app → Pay now → provider → payment verified → records updated. Rules for the integration:
+- A payment counts only after the **server verifies it with the provider**, through the provider's signature or callback check. A browser redirect or any value sent by the client is never proof of payment.
+- Verified payments are written through `record_payment`, with the provider's transaction id in `provider_txn_id`. Retries then don't create duplicates, and the append-only ledger and receipt numbering still apply.
+- The parent pays only invoices of their own linked children. The amount comes from the invoice on the server, never from the client.
+- Card details are entered on the provider's page and never reach LinguABC.
+- Provider keys and secrets are server-only environment variables.
 
 ## File uploads
 - Worksheet uploads are a server action, open to staff and mentors (the role is checked in the database by `claim_ai_request`):
@@ -71,7 +84,7 @@ A few specific rules:
 - The prompt tells the model to ignore instructions inside the file. The mentor edits every draft before saving, and `check_questions` validates the structure in the database.
 - AI limits are enforced in the database: 20 requests per user per hour and 200 per centre per day. Every request is logged in `ai_requests`.
 - Library HTML is sanitised with `sanitize-html`: links get `rel="noopener noreferrer"` and iframes are sandboxed.
-- There's no Supabase Storage yet. When audio storage arrives (Fish Audio), the bucket needs RLS-equivalent policies scoped by centre.
+- There's no Supabase Storage yet. Where Fish Audio / listening audio will be stored is **undecided**. Whatever is chosen has to keep each centre's files separate, the way RLS does for rows.
 
 ## Secrets
 - Server only: `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`.

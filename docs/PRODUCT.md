@@ -1,6 +1,6 @@
 # Product
 
-> Sources: merged PRs #1–#17, the code, and the owner's handoff notes (Nov 2026). Anything marked **(to confirm)** is not written down in the repo yet.
+> Sources: merged PRs #1–#17, the code, and product decisions the owner confirmed on 2026-11-19. Anything marked **(to confirm)** is still open.
 
 ## Vision
 LinguABC OS is a B2B platform sold to language learning centres. The app calls itself "the operating system behind a well-run learning centre". One deployment hosts many centres, and each is isolated from the others. The first market is Uzbekistan: UZS currency, Asia/Tashkent time, Uzbek and Russian interface, and local payment methods (Click, Payme, Uzum). The teaching side centres on IELTS preparation.
@@ -57,19 +57,37 @@ Admins, academic managers and mentors use the staff workspace in English. This w
 - mock sessions with manual band entry
 - homework: library, upload and AI, auto-marking, IELTS question types, vocabulary cue cards
 
-**Still to do for V1** (from the owner's plan):
-1. AI-generated listening sections with audio (Fish Audio)
-2. Online mocks: reading and listening taken in the app
-3. Settings
-4. Excel import
-5. Parents page (staff side; "Soon" in the sidebar)
-6. Reports ("Soon" in the sidebar)
+**Still to do for V1** (due 15 January 2027):
+1. **Listening with audio:** AI-generated listening sections, with audio from Fish Audio.
+2. **Online mocks:** reading and listening taken in the app.
+3. **Online parent payments,** through at least one real payment provider.
+   - Flow: Parent app → **Pay now** → provider → payment verified → the student's invoice and payment records are updated.
+   - More providers can come later.
+4. **Basic progress:**
+   - Student 360 academic and administrative history
+   - homework completion and results
+   - mock history and results
+   - attendance history
+   - basic academic progress and trends
+5. **Basic notifications** triggered by the product for attendance, payments, homework, mock sessions and schedule changes.
+6. **Settings:** "Soon" in the sidebar.
+7. **Excel import.**
+8. **Parents page:** the staff side; "Soon" in the sidebar.
+9. **Reports:** "Soon" in the sidebar.
+
+Two security issues also have to be fixed before launch. See `SECURITY.md` → Pre-launch blockers.
+
+**The code is behind these decisions in two places:**
+- Click and Payme still show "Soon", the server refuses them, and the code comments still call online payments V2 (PR #7). Bringing online payments into V1 means changing that.
+- The `notifications` table and its channel enum (`in_app`, `sms`, `telegram`, `push`) exist from 0001, but no code writes to or reads from them yet.
 
 ## Out of scope for V1
-- **Online payments (Click, Payme):** planned for V2. They show as "Soon" in the UI and the server refuses them (PR #7).
+- **Payment providers beyond the first.** V1 needs at least one; the rest can follow.
+- **Advanced adaptive intelligence** in progress. V1 progress is history and basic trends.
+- **SMS, Telegram and push notifications.** None is built yet, so they can come after V1.
 - **Translated staff workspace** for admins, academic managers and mentors: they stay in English (PR #7).
 
 **(to confirm)**
-- Notifications over SMS, Telegram or push: the `notifications` table and channel enum exist, but no code uses them, and their V1 status isn't written down.
-- "Progress" is in the sidebar as "Soon", but it isn't in the V1 plan.
+- Which provider comes first: Click, Payme or Uzum.
+- Which channel basic notifications use in V1. In-app is the only one that needs no outside integration.
 - No other exclusions are recorded.
