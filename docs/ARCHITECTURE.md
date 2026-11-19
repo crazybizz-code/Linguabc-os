@@ -65,11 +65,21 @@ Other rules the database enforces:
 - Private helpers live in schema `app`, which isn't exposed through the API.
 
 ## Storage
-- **Supabase Storage isn't used.** There are no buckets or storage calls in the code.
+**As built today**
+- **Supabase Storage isn't used yet.** There are no buckets or storage calls in the code.
 - Uploaded worksheets (PDF, DOCX, TXT, PNG/JPG/WEBP, up to 4 MB, PDFs up to 12 pages) are read in the server action and sent inline to the AI provider. They aren't kept.
 - Library audio (`library_items.audio_url`) and assignment `audio_url` are external URLs.
 - Cue-card progress is kept only in the browser's `localStorage`.
-- **Open decision: where listening audio from Fish Audio is stored.** Nothing has been chosen. Options include a Supabase Storage bucket (public or signed URLs, scoped by centre) or provider-hosted URLs. Choose before building the listening feature and record the choice here.
+
+**Listening audio (decided 2026-11-19, not built yet)**
+- Generated listening audio (Fish Audio) is kept in a **private** Supabase Storage bucket, `listening-audio`. The bucket is never public, and no file is reachable through a public URL.
+- Object paths:
+  - `shared/generated/<listening-set-id>/...`: audio for shared (library) listening sets, the same for every centre
+  - `centres/<center_id>/generated/<listening-set-id>/...`: audio a centre generated for its own material; the first path segment after `centres/` is the owning centre
+- The database stores only the **stable object path** and the metadata the app needs (for example duration, format, size, voice and a content hash). It never stores a signed URL: signed URLs expire, and a stored one would leak access.
+- **Playback:** the server checks that the person may see the listening material, then creates a short-lived signed URL for that one object and gives it to the player. Students never get a path they could sign themselves, nor a long-lived link.
+- **Generation happens once:** the audio is generated with Fish Audio, validated (format, size, duration), uploaded to storage once, and its path is recorded. Playback reads the stored file; it never calls Fish Audio again. Generating again is an explicit staff action, not a side effect of playing.
+- Centre isolation applies to files as it does to rows: a centre's audio is readable only by people who can see that centre's material.
 
 ## Roles and permissions
 - RLS helpers in `app` (0002):
@@ -105,7 +115,7 @@ Other rules the database enforces:
 | SMTP for auth email | Configured in the Supabase dashboard (sender domain `linguabc.xyz`) | Outside the repo |
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
 | Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
-| Fish Audio | Not integrated (planned for V1). Audio storage is undecided (see Storage). | — |
+| Fish Audio | Not integrated (planned for V1). Audio goes to the private `listening-audio` bucket (see Storage). | — |
 | Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 uses the `in_app` channel only; `sms`, `telegram` and `push` delivery come later. | — |
 
 ## Deployment
