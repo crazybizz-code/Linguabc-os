@@ -22,7 +22,9 @@ import {
 import { Avatar, cn } from "@/components/ui/primitives";
 import { useT } from "@/i18n/client";
 
-type Item = { href: string; label: string; icon: LucideIcon; soon?: boolean; adminOnly?: boolean; staffOnly?: boolean };
+// ownerHidden: day-to-day teaching operations. The owner runs the business
+// (branches, groups, payments, staff, reports); admins and mentors run classes.
+type Item = { href: string; label: string; icon: LucideIcon; soon?: boolean; adminOnly?: boolean; staffOnly?: boolean; ownerHidden?: boolean };
 const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Centre",
@@ -30,15 +32,15 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { href: "/dashboard", label: "Overview", icon: LayoutGrid },
       { href: "/branches", label: "Branches", icon: Building2, staffOnly: true },
       { href: "/groups", label: "Groups", icon: Layers },
-      { href: "/students", label: "Students", icon: Users },
+      { ownerHidden: true, href: "/students", label: "Students", icon: Users },
     ],
   },
   {
     title: "Operations",
     items: [
-      { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
-      { href: "/homework", label: "Homework", icon: BookOpen },
-      { href: "/mocks", label: "Mocks", icon: ClipboardList },
+      { ownerHidden: true, href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+      { ownerHidden: true, href: "/homework", label: "Homework", icon: BookOpen },
+      { ownerHidden: true, href: "/mocks", label: "Mocks", icon: ClipboardList },
       { href: "/payments", label: "Payments", icon: Wallet, adminOnly: true },
       { href: "/parents", label: "Parents", icon: HeartHandshake, soon: true, staffOnly: true },
     ],
@@ -58,15 +60,17 @@ export function Sidebar({
   roleLabel,
   isAdmin,
   isStaff,
+  isOwner,
 }: {
   name: string;
   roleLabel: string;
   isAdmin: boolean;
   isStaff: boolean;
+  isOwner: boolean;
 }) {
   const pathname = usePathname();
   const t = useT();
-  const visible = (i: Item) => (!i.adminOnly || isAdmin) && (!i.staffOnly || isStaff);
+  const visible = (i: Item) => (!i.adminOnly || isAdmin) && (!i.staffOnly || isStaff) && !(i.ownerHidden && isOwner);
 
   return (
     <aside className="sticky top-4 hidden print:!hidden h-[calc(100vh-2rem)] w-[248px] shrink-0 flex-col rounded-[22px] bg-[#12392B] px-3.5 py-5 text-[#FAF5EF] lg:flex">
@@ -137,10 +141,10 @@ export function Sidebar({
 }
 
 /** Compact nav for phones and tablets. */
-export function MobileNav({ isStaff }: { isStaff: boolean }) {
+export function MobileNav({ isStaff, isAdmin, isOwner }: { isStaff: boolean; isAdmin: boolean; isOwner: boolean }) {
   const pathname = usePathname();
   const t = useT();
-  const items = SECTIONS.flatMap((s) => s.items).filter((i) => !i.soon && (!i.staffOnly || isStaff));
+  const items = SECTIONS.flatMap((s) => s.items).filter((i) => !i.soon && (!i.staffOnly || isStaff) && (!i.adminOnly || isAdmin) && !(i.ownerHidden && isOwner));
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto pb-1 lg:hidden">
       {items.map((i) => {

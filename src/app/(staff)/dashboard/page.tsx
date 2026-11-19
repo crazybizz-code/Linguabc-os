@@ -21,7 +21,7 @@ export default async function OverviewPage() {
   const center = workspace.centerId;
   const monthStart = monthStartISO();
 
-  const [branches, students, groups, mentors, courses, mocks, scores, activities, invoices] = await Promise.all([
+  const [branches, students, groups, mentors, courses, mocks, scores, activities, invoices, managers] = await Promise.all([
     supabase.from("branches").select("id, name").eq("center_id", center).eq("status", "active").order("name"),
     supabase.from("student_overview").select("id, branch_id, status, attendance_pct, joined_on").eq("center_id", center),
     supabase.from("group_overview").select("id, branch_id, mentor_id, capacity, student_count").eq("center_id", center).eq("status", "active"),
@@ -33,6 +33,7 @@ export default async function OverviewPage() {
     isAdmin
       ? supabase.from("invoice_balances").select("amount, paid, balance, payment_status").eq("center_id", center).eq("period", monthStart)
       : Promise.resolve({ data: null }),
+    supabase.from("memberships").select("id").eq("center_id", center).in("role", ["admin", "academic_manager"]).neq("status", "suspended"),
   ]);
 
   const st = students.data ?? [];
@@ -56,7 +57,9 @@ export default async function OverviewPage() {
     { done: (courses.data ?? []).length > 0, label: t("Create a course"), href: "/groups?tab=courses" },
     { done: (mentors.data ?? []).length > 0, label: t("Invite mentors"), href: "/staff" },
     { done: gr.length > 0, label: t("Create a group with its weekly schedule"), href: "/groups" },
-    { done: st.length > 0, label: t("Add students"), href: "/students" },
+    workspace.role === "owner"
+      ? { done: (managers.data ?? []).length > 0, label: t("Invite an administrator to enrol students"), href: "/staff" }
+      : { done: st.length > 0, label: t("Add students"), href: "/students" },
   ];
   const setupLeft = setup.filter((s) => !s.done).length;
 
@@ -79,9 +82,15 @@ export default async function OverviewPage() {
               <Link href="/branches" className={buttonSecondary}>
                 <Building2 className="h-4 w-4" strokeWidth={1.8} /> {t("Branches")}
               </Link>
-              <Link href="/students" className={buttonPrimary}>
-                {t("Students")} <ArrowUpRight className="h-4 w-4" />
-              </Link>
+              {workspace.role === "owner" ? (
+                <Link href="/payments" className={buttonPrimary}>
+                  {t("Payments")} <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <Link href="/students" className={buttonPrimary}>
+                  {t("Students")} <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              )}
             </>
           )
         }
