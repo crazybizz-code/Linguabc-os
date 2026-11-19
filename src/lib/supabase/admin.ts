@@ -5,7 +5,8 @@ import { SUPABASE_URL } from "@/lib/supabase/config";
 
 /**
  * Service-role client. Bypasses RLS — use only for the narrow server-side
- * jobs that need it (phone → email lookup at sign-in). Never import from
+ * jobs that need it (phone → email lookup at sign-in; the private
+ * listening-audio bucket, after the database has checked the caller). Never import from
  * client code; "server-only" makes that a build error.
  */
 export function createAdminClient() {

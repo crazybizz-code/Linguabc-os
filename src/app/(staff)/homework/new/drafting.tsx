@@ -11,6 +11,7 @@ import { draftFromUpload, draftWithAI, saveDraft } from "./actions";
 import { emptyQuestion, type Draft, type DraftGroup, type DraftQuestion } from "@/lib/ai/draft";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "./question-editor";
 import type { QuestionType } from "@/lib/questions";
+import { SCRIPT_MAX } from "@/lib/audio/script";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const SKILLS = ["reading", "listening", "writing", "speaking", "vocabulary", "grammar"];
@@ -137,8 +138,11 @@ function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "
             </select>
           </FieldLabel>
         </div>
-        <FieldLabel label={t("Text for students")} hint={t("Optional — the passage, dialogue or instructions students read first.")}>
-          <textarea value={d.passage} rows={8} maxLength={30000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
+        <FieldLabel label={d.skill === "listening" ? t("Audio script") : t("Text for students")}
+          hint={d.skill === "listening"
+            ? t("Students hear this as audio and see the text only after they submit. Start each speaker's line with their name, e.g. “Anna: …”.")
+            : t("Optional — the passage, dialogue or instructions students read first.")}>
+          <textarea value={d.passage} rows={8} maxLength={d.skill === "listening" ? SCRIPT_MAX : 30000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
         </FieldLabel>
       </Card>
 

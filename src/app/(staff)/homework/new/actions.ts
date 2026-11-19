@@ -108,13 +108,17 @@ export async function saveDraft(draft: Draft, source: "upload" | "ai"): Promise<
     .filter((g) => used.has(g.id))
     .map((g) => ({ id: g.id, instructions: g.instructions.trim(), options: g.options.map((o) => o.trim()).filter(Boolean) }));
 
+  const listening = draft.skill === "listening";
   const { data, error } = await supabase.rpc("create_custom_assignment", {
     p_center: workspace.centerId,
     p_title: draft.title,
     p_skill: pick<Skill>(draft.skill, SKILLS, "reading"),
     p_level: pick<Level>(draft.level, LEVELS, "B1"),
     p_source: source,
-    p_passage: draft.passage ?? "",
+    // Listening: the text is the audio script. It is kept apart from what students can read
+    // and shown to them only after they submit.
+    p_passage: listening ? "" : draft.passage ?? "",
+    ...(listening && draft.passage?.trim() ? { p_script: draft.passage.trim() } : {}),
     p_questions: questions,
     p_answers: answers,
     p_groups: groups,

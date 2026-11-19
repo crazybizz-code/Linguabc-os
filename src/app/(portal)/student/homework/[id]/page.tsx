@@ -10,6 +10,8 @@ import { QuestionList } from "@/components/questions/question-list";
 import { content, type AnswerKey, type Answers, type Marks } from "@/lib/questions";
 import { intlLocale } from "@/i18n";
 import { Quiz } from "./quiz";
+import { ListeningPlayer } from "@/components/listening/player";
+import { signAudio } from "@/lib/audio/storage";
 
 export const metadata = { title: "Homework" };
 
@@ -17,19 +19,23 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
   const { id } = await params;
   const ctx = await getPortalContext("student");
   const { supabase, t } = ctx;
-  const { data: h } = await supabase.from("homework").select("id, due_at, note, assignments(title, content, library_item_id)").eq("id", id).maybeSingle();
+  const { data: h } = await supabase.from("homework").select("id, due_at, note, assignments(id, title, skill, content, library_item_id)").eq("id", id).maybeSingle();
   if (!h) notFound();
   const me = ctx.children[0];
-  const [{ data: item }, { data: sub }, { data: result }] = await Promise.all([
+  const listening = h.assignments?.skill === "listening" && !h.assignments.library_item_id;
+  const [{ data: item }, { data: sub }, { data: result }, { data: audioPath }] = await Promise.all([
     h.assignments?.library_item_id
       ? supabase.from("library_items").select("kind, title, body_html, body_format, audio_url, transcript, author, source_name, licence, source_url, vocabulary").eq("id", h.assignments.library_item_id).maybeSingle()
       : Promise.resolve({ data: null }),
     me ? supabase.from("submissions").select("status, answers").eq("homework_id", id).eq("student_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.rpc("my_homework_result", { p_homework: id }),
+    // The database checks the student may see this work; the server then signs a short-lived link.
+    listening && h.assignments ? supabase.rpc("listening_audio_path", { p_assignment: h.assignments.id }) : Promise.resolve({ data: null }),
   ]);
+  const audioSrc = await signAudio(audioPath);
   const body = content(h.assignments?.content);
   const questions = body.questions ?? [];
-  const res = result as { status: string; score: number | null; feedback: string | null; answers: Answers; key: AnswerKey | null; marks: Marks } | null;
+  const res = result as { status: string; score: number | null; feedback: string | null; answers: Answers; key: AnswerKey | null; marks: Marks; transcript?: string } | null;
   const vocab = (Array.isArray(item?.vocabulary) ? item.vocabulary : []) as VocabWord[];
   const due = new Date(h.due_at);
   const late = due.getTime() < Date.parse(new Date().toISOString());
@@ -54,6 +60,8 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
       )}
 
       {item && <PortalCard><MaterialView item={item} t={t} /></PortalCard>}
+      {audioSrc && <PortalCard><ListeningPlayer src={audioSrc} /></PortalCard>}
+      {listening && audioPath && !audioSrc && <PortalCard><p className="text-[13px] text-muted-foreground">{t("The audio could not be loaded. Refresh the page to try again.")}</p></PortalCard>}
       {!item && body.audio_url && <PortalCard><audio controls preload="none" src={body.audio_url} className="w-full" /></PortalCard>}
       {!item && body.passage && <PortalCard><div className="library-prose whitespace-pre-line">{body.passage}</div></PortalCard>}
 
@@ -63,6 +71,9 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
             <PortalCard icon={Layers} title={t("Words from this text")}>
               <CueCards deckId={String(h.assignments?.library_item_id)} words={vocab} />
             </PortalCard>
+          )}
+          {res.transcript && (
+            <PortalCard title={t("Transcript")}><div className="library-prose whitespace-pre-line">{res.transcript}</div></PortalCard>
           )}
           <PortalCard title={t("Answers")}>
             <QuestionList questions={questions} groups={body.groups} answers={res.answers}

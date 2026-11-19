@@ -56,8 +56,9 @@ Both must be fixed before V1 goes live. Details in `SECURITY.md`.
 
 ## Known dependencies
 **Fish Audio**
-- Needs an API key and account. None is configured, and no code exists yet.
-- **Where the audio is stored is an open decision.** Supabase Storage isn't used at all today, and existing audio is external URLs. Choose (bucket, access rules, signed or public URLs) before building.
+- The API key is set in Vercel (`FISH_AUDIO_API_KEY`, the owner confirmed 2026-11-19). Model: `s2.1-pro-free` (Fish Audio's free S2.1 Pro), which is also the model to use for enriching the library, creating mocks and creating homework.
+- Storage is decided and built: the private bucket `listening-audio` with signed playback links (0017, `ARCHITECTURE.md` → Storage).
+- Voices aren't chosen yet. Until `FISH_AUDIO_VOICES` is set, the model's default voice reads every speaker.
 
 **Click payments**
 - Needs a Click merchant account and credentials, and a way to test against it (a sandbox, if Click offers one).

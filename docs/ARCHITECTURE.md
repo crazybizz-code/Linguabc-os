@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0016):
+Migrations live in `supabase/migrations/` (0001–0017):
 
 | # | Adds |
 |---|---|
@@ -58,6 +58,7 @@ Migrations live in `supabase/migrations/` (0001–0016):
 | 0014 | `create_custom_assignment`, `ai_requests`, AI limits |
 | 0015 | AI usage accounting: model, tokens, cost |
 | 0016 | IELTS question types and per-question marks (`grade_one`, `mark_map`, `grade_answers`, `submission_marks`, `check_questions`) |
+| 0017 | Listening audio: private bucket `listening-audio`, `listening_sets`, `begin/finish/fail_listening_audio`, `listening_audio_path`, transcript in `my_homework_result`, audio limits |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -65,13 +66,12 @@ Other rules the database enforces:
 - Private helpers live in schema `app`, which isn't exposed through the API.
 
 ## Storage
-**As built today**
-- **Supabase Storage isn't used yet.** There are no buckets or storage calls in the code.
+**Other files**
 - Uploaded worksheets (PDF, DOCX, TXT, PNG/JPG/WEBP, up to 4 MB, PDFs up to 12 pages) are read in the server action and sent inline to the AI provider. They aren't kept.
 - Library audio (`library_items.audio_url`) and assignment `audio_url` are external URLs.
 - Cue-card progress is kept only in the browser's `localStorage`.
 
-**Listening audio (decided 2026-11-19, not built yet)**
+**Listening audio (decided 2026-11-19; built in 0017)**
 - Generated listening audio (Fish Audio) is kept in a **private** Supabase Storage bucket, `listening-audio`. The bucket is never public, and no file is reachable through a public URL.
 - Object paths:
   - `shared/generated/<listening-set-id>/...`: audio for shared (library) listening sets, the same for every centre
@@ -80,6 +80,13 @@ Other rules the database enforces:
 - **Playback:** the server checks that the person may see the listening material, then creates a short-lived signed URL for that one object and gives it to the player. Students never get a path they could sign themselves, nor a long-lived link.
 - **Generation happens once:** the audio is generated with Fish Audio, validated (format, size, duration), uploaded to storage once, and its path is recorded. Playback reads the stored file; it never calls Fish Audio again. Generating again is an explicit staff action, not a side effect of playing.
 - Centre isolation applies to files as it does to rows: a centre's audio is readable only by people who can see that centre's material.
+- V1 builds only the centre path. `shared/generated/...` is reserved for library listening sets, added once there is a way to fill the library with them.
+- How it's built:
+  - `listening_sets` (0017): one per listening assignment, holding the script, the status (`draft → generating → ready | failed`), the object path, a content hash, bytes, duration, model and voices.
+  - `src/lib/audio/fish.ts` reads the script one speaker turn at a time ("Name: …" lines), each in its speaker's voice, as 64 kbps MP3. `src/lib/audio/mp3.ts` checks every clip, joins them with short pauses and measures the result.
+  - The content hash covers the script, model, voices and settings, so the same audio is never generated twice. "Generate again" asks for a fresh take.
+  - Playback links are signed for 1 hour (`src/lib/audio/storage.ts`).
+  - A listening assignment with a script can't be set as homework until its audio is ready (`assign_assignment`).
 
 ## Roles and permissions
 - RLS helpers in `app` (0002):
@@ -100,6 +107,7 @@ Other rules the database enforces:
   - Postgres marks against the key on submit. Going over the word limit, or choosing more options than asked, scores zero.
   - `open` answers are scored by the mentor.
   - Students get the key only through `my_homework_result`, after they submit.
+- **Listening:** an AI or uploaded listening draft keeps its text as the audio script, not as a passage students read. Staff (or the mentor who wrote it) generate the audio on the assignment page; students play it from a signed link and see the script after submitting.
 - **AI drafting:** `src/lib/ai/`. Text from uploaded files is extracted, and instructions inside the file are ignored.
   - Limits, enforced in the database: 20 requests per user per hour and 200 per centre per day.
   - Every request is recorded in `ai_requests` (model, tokens, cost).
@@ -115,7 +123,7 @@ Other rules the database enforces:
 | SMTP for auth email | Configured in the Supabase dashboard (sender domain `linguabc.xyz`) | Outside the repo |
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
 | Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
-| Fish Audio | Not integrated (planned for V1). Audio goes to the private `listening-audio` bucket (see Storage). | — |
+| Fish Audio | Text-to-speech for listening scripts (`src/lib/audio/fish.ts`), model `s2.1-pro-free`. The same model is meant for library listening, mocks and homework. Audio goes to the private `listening-audio` bucket (see Storage). | `FISH_AUDIO_API_KEY` (set in Vercel), `FISH_AUDIO_MODEL`, `FISH_AUDIO_VOICES` (voice ids, one per speaker), `FISH_AUDIO_BASE_URL` (testing only) |
 | Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 uses the `in_app` channel only; `sms`, `telegram` and `push` delivery come later. | — |
 
 ## Deployment

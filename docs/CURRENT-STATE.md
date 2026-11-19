@@ -10,7 +10,9 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
   - #17 IELTS engine and cue cards
   - #16 Settings marked "Soon"
   - #15 Frankfurt region, loading states, owner menu
-- No feature work is in progress, and there are no open feature PRs.
+- **In progress: Week 2, Fish Audio / AI listening**, on branch `claude/optimistic-mccarthy-d1hduu` (not merged, no PR yet).
+  - Migration `0017_listening_audio.sql`, `src/lib/audio/` (Fish client, MP3 checks, storage), the generate button and player on the assignment page, the student player and transcript after submitting.
+  - **0017 is not applied to production.** It needs the owner's go-ahead.
 - Old feature branches are still on the remote: `feat/*`, `fix/*`, `docs/*`, `backend/v1-schema`, `frontend/auth`, `chore/env-defaults`. They're all merged.
 
 ## Production
@@ -32,6 +34,7 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 - The Vercel preview and production builds succeeded.
 
 **SQL suite**
+- On the Week 2 branch (2026-11-19, local Postgres 16): all 18 sections passed, including the new "18. listening audio".
 - `supabase/tests/run.sh` has 17 sections, the last being "17. IELTS question types". All passed on the machine where #17 was written.
 - They weren't re-run on 2026-11-19: the current Windows machine has no local Postgres.
 
@@ -51,9 +54,12 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 - Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 
 **Open decisions**
-- Where Fish Audio / listening audio is stored. Nothing has been chosen yet.
+- Fish Audio voices (`FISH_AUDIO_VOICES`). Until they're set, one default voice reads every speaker.
 
 **Settled on 2026-11-19:**
+- Listening audio lives in the private Supabase Storage bucket `listening-audio`, played through 1-hour signed links (`ARCHITECTURE.md` → Storage). V1 builds only centre audio; shared library audio comes later.
+- Fish Audio model `s2.1-pro-free`, through the API key now set in Vercel. The same model is to be used for library enrichment, mocks and homework.
+- Audio limits: 10 generations per user per hour, 30 per centre per day.
 - Click is the first payment provider.
 - V1 notifications are in-app.
 - The V1 build order is in `V1-ROADMAP.md`.
@@ -63,6 +69,8 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 **Documentation debt:** `README.md` is out of date. It lists migrations only up to 0008 and an `app/(workspace)/` folder that is now `app/(portal)/`. It hasn't been edited yet.
 
 ## Exact next task
-**Week 2: Fish Audio / AI listening.** Don't start until the owner says go.
-1. Settle the open decision on where listening audio is stored (see `ARCHITECTURE.md` → Storage). Record the choice there.
-2. Then build the Fish Audio integration and AI-generated listening sections with audio.
+**Week 2: Fish Audio / AI listening, finishing.**
+1. Owner reviews the branch; open a PR into `main`.
+2. With the owner's go-ahead, apply `0017` to production.
+3. QA in a `qa-*` centre with the real Fish Audio key: generate one short listening, play it as a student, check another centre is refused. Then delete the centre, its users and its `centres/<id>/` folder in the bucket.
+4. Choose voices and set `FISH_AUDIO_VOICES` in Vercel.

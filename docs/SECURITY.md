@@ -84,13 +84,21 @@ A few specific rules:
 - The prompt tells the model to ignore instructions inside the file. The mentor edits every draft before saving, and `check_questions` validates the structure in the database.
 - AI limits are enforced in the database: 20 requests per user per hour and 200 per centre per day. Every request is logged in `ai_requests`.
 - Library HTML is sanitised with `sanitize-html`: links get `rel="noopener noreferrer"` and iframes are sandboxed.
-- There's no Supabase Storage yet. Where Fish Audio / listening audio will be stored is **undecided**. Whatever is chosen has to keep each centre's files separate, the way RLS does for rows.
+- **Listening audio (0017)** is kept in the private bucket `listening-audio` (see `ARCHITECTURE.md` → Storage):
+  - There are no `storage.objects` policies for `anon` or `authenticated`, so the Storage API refuses every direct list, read and upload. Only the server touches the bucket, with the service role.
+  - The server uses the service role only after a database function has checked the caller: `begin_listening_audio` / `finish_listening_audio` for writes (staff, or the mentor who wrote the work), `listening_audio_path` for playback (the same rule as reading the assignment).
+  - Paths are built in the database (`centres/<center_id>/generated/<set_id>/<hash>.mp3`) and re-checked before anything is recorded. Nothing from the browser becomes a path.
+  - Playback links are signed for 1 hour and never stored. Someone could pass a live link on until it expires; that's accepted.
+  - The script is the transcript. It lives in `listening_sets`, which students and parents can't read, and comes back through `my_homework_result` only after the student submits.
+  - Audio limits, on top of the AI limits: 10 generations per user per hour and 30 per centre per day.
+  - Only the script text is sent to Fish Audio, never student data.
+  - Deleting a centre cascades its rows but **not** its files. QA cleanup must also delete `centres/<qa-centre-id>/` from the bucket.
 
 ## Secrets
-- Server only: `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`.
+- Server only: `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `FISH_AUDIO_API_KEY`.
   - Never prefix them with `NEXT_PUBLIC_`.
   - Never commit them. `.env*` is gitignored, and only `.env.example` is committed.
-- The service-role client (`src/lib/supabase/admin.ts`) is used only in `app/(auth)/actions.ts`, to resolve phone → email and check a phone at registration. Don't widen its use. It bypasses RLS.
+- The service-role client (`src/lib/supabase/admin.ts`) is used only in `app/(auth)/actions.ts`, to resolve phone → email and check a phone at registration, and in `src/lib/audio/storage.ts`, for the listening-audio bucket after the database has checked the caller. Don't widen its use. It bypasses RLS.
 - The Supabase URL and publishable key are public by design and committed as defaults.
 
 ## Production QA rules

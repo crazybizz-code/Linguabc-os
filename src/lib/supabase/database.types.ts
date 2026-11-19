@@ -989,6 +989,77 @@ export type Database = {
         }
         Relationships: []
       }
+      listening_sets: {
+        Row: {
+          assignment_id: string
+          audio_bytes: number | null
+          audio_hash: string | null
+          audio_path: string | null
+          center_id: string
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          model: string | null
+          pending_hash: string | null
+          script: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          voices: string[]
+        }
+        Insert: {
+          assignment_id: string
+          audio_bytes?: number | null
+          audio_hash?: string | null
+          audio_path?: string | null
+          center_id: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          model?: string | null
+          pending_hash?: string | null
+          script: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          voices?: string[]
+        }
+        Update: {
+          assignment_id?: string
+          audio_bytes?: number | null
+          audio_hash?: string | null
+          audio_path?: string | null
+          center_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          model?: string | null
+          pending_hash?: string | null
+          script?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          voices?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listening_sets_assignment_id_center_id_fkey"
+            columns: ["assignment_id", "center_id"]
+            isOneToOne: true
+            referencedRelation: "assignments"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           branch_id: string | null
@@ -1868,9 +1939,17 @@ export type Database = {
           p_skill: Database["public"]["Enums"]["skill"]
           p_source: Database["public"]["Enums"]["assignment_source"]
           p_title: string
+          p_script?: string
         }
         Returns: string
       }
+      begin_listening_audio: { Args: { p_set: string; p_hash: string }; Returns: Json }
+      finish_listening_audio: {
+        Args: { p_set: string; p_path: string; p_bytes: number; p_duration_ms: number; p_model: string; p_voices: string[] }
+        Returns: string | null
+      }
+      fail_listening_audio: { Args: { p_set: string; p_error: string }; Returns: undefined }
+      listening_audio_path: { Args: { p_assignment: string }; Returns: string | null }
       assign_assignment: {
         Args: { p_assignment: string; p_due_at: string; p_group: string; p_note?: string }
         Returns: string

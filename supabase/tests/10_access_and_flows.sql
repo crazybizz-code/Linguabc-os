@@ -524,4 +524,89 @@ select tests.assert((submission_marks(:'sub_i')->'q1'->>'earned') = '1', 'mentor
 :as_ownerB
 select tests.expect_fail(format($$select submission_marks(%L)$$, :'sub_i'), 'forbidden');
 
+\echo '18. listening audio'
+:as_superuser
+select tests.assert((select not public from storage.buckets where id = 'listening-audio'), 'audio bucket is private');
+:as_mentor2
+select create_custom_assignment(:'center_a', 'Airport dialogue', 'listening', 'B1', 'ai', null,
+  '[{"id":"q1","type":"tfng","prompt":"The flight is late."}]', '{"q1":{"answer":"true"}}', '[]', null,
+  'Anna: Hello, is the flight to Tashkent on time?
+Agent: I am afraid it is delayed by an hour.') as la1 \gset
+select id as ls1 from listening_sets where assignment_id = :'la1' \gset
+select tests.assert((select status from listening_sets where id = :'ls1') = 'draft', 'script saved as a draft set');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Script on reading', 'reading', 'B1', 'ai', null,
+  '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"true"}}', '[]', null, 'A long enough script for reading work.')$$, :'center_a'), 'Only listening');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Short script', 'listening', 'B1', 'ai', null,
+  '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"true"}}', '[]', null, 'Hi.')$$, :'center_a'), 'too short');
+select tests.expect_fail(format($$update listening_sets set audio_path = 'x' where id = %L$$, :'ls1'), 'permission denied');
+:as_superuser
+select tests.assert((select content::text from assignments where id = :'la1') not like '%Tashkent%', 'script is not in the assignment content');
+:as_student
+select tests.expect_count('select * from listening_sets', 0);
+select tests.expect_fail(format($$select begin_listening_audio(%L, %L)$$, :'ls1', repeat('a', 64)), 'forbidden');
+select tests.expect_fail(format($$select listening_audio_path(%L)$$, :'la1'), 'forbidden');
+:as_ownerB
+select tests.expect_count('select * from listening_sets', 0);
+select tests.expect_fail(format($$select begin_listening_audio(%L, %L)$$, :'ls1', repeat('a', 64)), 'forbidden');
+select tests.expect_fail(format($$select listening_audio_path(%L)$$, :'la1'), 'forbidden');
+:as_mentor
+-- another mentor of the centre may read it but not generate for someone else's work
+select tests.expect_count(format('select * from listening_sets where id = %L', :'ls1'), 1);
+select tests.expect_fail(format($$select begin_listening_audio(%L, %L)$$, :'ls1', repeat('a', 64)), 'forbidden');
+:as_acad
+select approve_assignment(:'la1');
+select tests.expect_fail(format($$select assign_assignment(%L, %L, now() + interval '3 days')$$, :'la1', :'group1'), 'Generate the audio');
+
+-- generate: lock, refuse a second run, record only the expected stored object
+:as_mentor2
+select tests.expect_fail(format($$select begin_listening_audio(%L, 'nothex')$$, :'ls1'), 'invalid audio hash');
+select begin_listening_audio(:'ls1', repeat('a', 64))->>'path' as lp1 \gset
+select tests.assert(:'lp1' = format('centres/%s/generated/%s/%s.mp3', :'center_a', :'ls1', repeat('a', 64)), 'path is scoped to the centre and set');
+select tests.expect_fail(format($$select begin_listening_audio(%L, %L)$$, :'ls1', repeat('a', 64)), 'already being generated');
+select tests.expect_fail(format($$select finish_listening_audio(%L, %L, 480000, 30000, 's2.1-pro-free', '{v1}')$$, :'ls1', :'lp1'), 'not stored');
+select tests.expect_fail(format($$select finish_listening_audio(%L, %L, 480000, 30000, 's2.1-pro-free', '{v1}')$$, :'ls1',
+  format('centres/%s/generated/%s/%s.mp3', :'center_b', :'ls1', repeat('a', 64))), 'unexpected audio path');
+:as_superuser
+insert into storage.objects (bucket_id, name) values ('listening-audio', :'lp1');
+:as_mentor2
+select tests.expect_fail(format($$select finish_listening_audio(%L, %L, 0, 30000, 's2.1-pro-free', '{v1}')$$, :'ls1', :'lp1'), 'invalid audio size');
+select tests.assert(finish_listening_audio(:'ls1', :'lp1', 480000, 30000, 's2.1-pro-free', '{v1,v2}') is null, 'first audio replaces nothing');
+select tests.assert((select status = 'ready' and audio_path = :'lp1' and duration_ms = 30000 from listening_sets where id = :'ls1'), 'audio recorded');
+select tests.assert((begin_listening_audio(:'ls1', repeat('a', 64))->>'skip')::boolean, 'same content is not generated twice');
+
+-- playback: whoever may read the work gets the path, nobody else
+:as_acad
+select assign_assignment(:'la1', :'group1', now() + interval '3 days') as hw_l \gset
+:as_student
+select tests.assert(listening_audio_path(:'la1') = :'lp1', 'student of the group gets the audio path');
+select tests.expect_count('select * from listening_sets', 0);
+select tests.assert((select content::text from assignments where id = :'la1') not like '%Tashkent%', 'no transcript before submitting');
+select tests.assert(my_homework_result(:'hw_l') is null, 'no result before submitting');
+select save_submission(:'hw_l', '{"q1":"true"}', true);
+select tests.assert(my_homework_result(:'hw_l')->>'transcript' like '%Tashkent%', 'transcript after submitting');
+:as_parent
+select tests.assert(listening_audio_path(:'la1') = :'lp1', 'parent of a student in the group gets it too');
+:as_ownerB
+select tests.expect_fail(format($$select listening_audio_path(%L)$$, :'la1'), 'forbidden');
+:as_anon
+select tests.expect_fail(format($$select listening_audio_path(%L)$$, :'la1'), 'permission denied');
+
+-- regenerate: a failure keeps the old audio; success hands back the old path to delete
+:as_mentor2
+select begin_listening_audio(:'ls1', repeat('b', 64))->>'path' as lp2 \gset
+select fail_listening_audio(:'ls1', 'Fish Audio timed out');
+select tests.assert((select status = 'ready' and audio_path = :'lp1' from listening_sets where id = :'ls1'), 'failed retry keeps the old audio');
+select begin_listening_audio(:'ls1', repeat('b', 64));
+:as_superuser
+insert into storage.objects (bucket_id, name) values ('listening-audio', :'lp2');
+:as_mentor2
+select tests.assert(finish_listening_audio(:'ls1', :'lp2', 500000, 31000, 's2.1-pro-free', '{v1,v2}') = :'lp1', 'old path returned for deletion');
+:as_student
+select tests.assert(listening_audio_path(:'la1') = :'lp2', 'playback follows the new audio');
+
+-- audio limits
+:as_acad
+select claim_ai_request(:'center_a', 'tts') from generate_series(1, 10);
+select tests.expect_fail(format($$select claim_ai_request(%L, 'tts')$$, :'center_a'), '10 audio generations per hour');
+
 \echo 'ALL TESTS PASSED'
