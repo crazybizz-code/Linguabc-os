@@ -26,7 +26,9 @@
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
 - [x] Cue cards checked on a library-based homework: the data path under RLS, and the owner's visual check in the browser (2026-11-19)
-- [ ] Delete the QA centre `qa-q-centre` and its users `qa.q.%@linguabc.test`
+- [x] QA centre `qa-q-centre` and its users `qa.q.%@linguabc.test` deleted (2026-11-19)
+
+The milestone is complete. Next: Fish Audio / AI listening.
 
 ## Remaining V1 work, in order
 The owner confirmed this order on 2026-11-19.

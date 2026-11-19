@@ -105,4 +105,8 @@ A few specific rules:
   ```
 - AI agents don't type passwords into the production site. The owner signs in for visual checks.
 - Before deleting, list exactly what will be removed. Delete only the agreed QA centre, and only after the owner confirms.
+- **How to delete a QA centre:** deleting the `centers` row alone fails, because cascades run into `NO ACTION` membership foreign keys.
+  - In one transaction, delete the centre's rows children-first: submissions → homework → keys → assignments → … → memberships. Then delete the centre, then its auth users (profiles cascade).
+  - Fingerprint the other centres before and after, and roll back if anything changed.
+  - `audit_log` is append-only and keeps its rows. That's by design.
 - Don't apply migrations, deploy, or change live data unless asked.
