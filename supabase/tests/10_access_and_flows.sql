@@ -453,4 +453,75 @@ select finish_ai_request(:'ai1', 'x', 1, 1, 9, false);
 :as_superuser
 select tests.assert((select ok from ai_requests where id = :'ai1'), 'other users cannot overwrite usage');
 
+\echo '17. IELTS question types'
+:as_acad
+select create_custom_assignment(:'center_a', 'IELTS mixed set', 'reading', 'B2', 'ai',
+  'Paragraph A ... Paragraph B ...',
+  $q$[
+    {"id":"q1","type":"mc","prompt":"Pick one","options":["alpha","beta","gamma"]},
+    {"id":"q2","type":"multi","prompt":"Pick TWO","options":["a","b","c","d","e"]},
+    {"id":"q3","type":"tfng","prompt":"The writer agrees."},
+    {"id":"q4","type":"ynng","prompt":"The claim is supported."},
+    {"id":"q5","type":"gap","prompt":"It opened in ____","max_words":2},
+    {"id":"q6","type":"headings","group":"g1","prompt":"Paragraph A"},
+    {"id":"q7","type":"headings","group":"g1","prompt":"Paragraph B"},
+    {"id":"q8","type":"open","prompt":"Write 150 words about the text."}
+  ]$q$::jsonb,
+  $k$ {"q1":{"answer":1},"q2":{"answer":[0,3]},"q3":{"answer":"false"},"q4":{"answer":"not_given"},
+       "q5":{"accepted":["1897","in 1897"]},"q6":{"answer":2},"q7":{"answer":0},"q8":{}} $k$::jsonb,
+  $g$[{"id":"g1","instructions":"Choose the correct heading","options":["i Growth","ii Decline","iii Reform"]}]$g$::jsonb) as ca3 \gset
+select assign_assignment(:'ca3', :'group1', now() + interval '3 days') as hw_i \gset
+
+-- everything right: 9 marks (multi counts 2)
+:as_student
+select save_submission(:'hw_i', $a$ {"q1":1,"q2":[3,0],"q3":"false","q4":"not_given","q5":" In 1897. ","q6":2,"q7":0,"q8":"my essay"} $a$::jsonb, true);
+select tests.assert((select score from submissions where homework_id = :'hw_i' and student_id = :'st1') = 100, 'all types graded correct');
+select tests.assert((my_homework_result(:'hw_i')->'marks'->'q2'->>'total') = '2', 'multi is worth two marks');
+select tests.assert((my_homework_result(:'hw_i')->'marks'->>'q8') is null, 'open is not auto-marked');
+
+-- partial and wrong answers
+:as_acad
+select create_custom_assignment(:'center_a', 'IELTS second set', 'reading', 'B2', 'ai', null,
+  $q$[{"id":"q1","type":"multi","prompt":"Pick TWO","options":["a","b","c","d"]},
+      {"id":"q2","type":"gap","prompt":"____","max_words":1},
+      {"id":"q3","type":"tfng","prompt":"X"}]$q$::jsonb,
+  $k$ {"q1":{"answer":[0,2]},"q2":{"accepted":["whale"]},"q3":{"answer":"not_given"}} $k$::jsonb) as ca4 \gset
+select assign_assignment(:'ca4', :'group1', now() + interval '3 days') as hw_j \gset
+:as_student
+-- one of two multi right, gap over the word limit, tfng wrong -> 1 of 4 marks
+select save_submission(:'hw_j', $a$ {"q1":[0,1],"q2":"a blue whale","q3":"true"} $a$::jsonb, true);
+select tests.assert((select score from submissions where homework_id = :'hw_j' and student_id = :'st1') = 25, 'partial multi, word limit and wrong tfng');
+select tests.assert((my_homework_result(:'hw_j')->'marks'->'q1'->>'earned') = '1', 'one of two selections earned');
+select tests.assert((my_homework_result(:'hw_j')->'marks'->'q2'->>'earned') = '0', 'over the word limit is wrong');
+
+-- selecting more than asked earns nothing
+:as_acad
+select create_custom_assignment(:'center_a', 'IELTS third set', 'reading', 'B2', 'ai', null,
+  $q$[{"id":"q1","type":"multi","prompt":"Pick TWO","options":["a","b","c","d"]}]$q$::jsonb,
+  $k$ {"q1":{"answer":[0,2]}} $k$::jsonb) as ca5 \gset
+select assign_assignment(:'ca5', :'group1', now() + interval '3 days') as hw_k \gset
+:as_student
+select save_submission(:'hw_k', '{"q1":[0,1,2,3]}', true);
+select tests.assert((select score from submissions where homework_id = :'hw_k' and student_id = :'st1') = 0, 'choosing everything scores nothing');
+
+-- validation
+:as_acad
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad multi', 'reading', 'B2', 'ai', null,
+  '[{"id":"q1","type":"multi","prompt":"p","options":["a","b"]}]', '{"q1":{"answer":[0,1]}}')$$, :'center_a'), 'every option correct');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad tfng', 'reading', 'B2', 'ai', null,
+  '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"maybe"}}')$$, :'center_a'), 'correct answer for question');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad gap', 'reading', 'B2', 'ai', null,
+  '[{"id":"q1","type":"gap","prompt":"p","max_words":1}]', '{"q1":{"accepted":["two words here"]}}')$$, :'center_a'), 'longer than its own word limit');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'No group', 'reading', 'B2', 'ai', null,
+  '[{"id":"q1","type":"headings","group":"gX","prompt":"p"}]', '{"q1":{"answer":0}}')$$, :'center_a'), 'group that does not exist');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Bad audio', 'listening', 'B2', 'ai', null,
+  '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"true"}}', '[]', 'http://x.mp3')$$, :'center_a'), 'must be https');
+
+-- mentor review sees the same marks
+:as_mentor
+select id as sub_i from submissions where homework_id = :'hw_j' and student_id = :'st1' \gset
+select tests.assert((submission_marks(:'sub_i')->'q1'->>'earned') = '1', 'mentor sees the marks');
+:as_ownerB
+select tests.expect_fail(format($$select submission_marks(%L)$$, :'sub_i'), 'forbidden');
+
 \echo 'ALL TESTS PASSED'

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, Layers } from "lucide-react";
 import { getPortalContext } from "@/lib/portal/context";
 import { PortalCard } from "@/components/portal/cards";
-import { Badge, cn } from "@/components/ui/primitives";
+import { Badge } from "@/components/ui/primitives";
 import { MaterialView } from "@/components/library/material";
-import type { AnswerKey, Question } from "@/lib/library/render";
+import { CueCards, type VocabWord } from "@/components/library/cue-cards";
+import { QuestionList } from "@/components/questions/question-list";
+import { content, type AnswerKey, type Answers, type Marks } from "@/lib/questions";
 import { intlLocale } from "@/i18n";
 import { Quiz } from "./quiz";
 
@@ -20,14 +22,15 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
   const me = ctx.children[0];
   const [{ data: item }, { data: sub }, { data: result }] = await Promise.all([
     h.assignments?.library_item_id
-      ? supabase.from("library_items").select("kind, title, body_html, body_format, audio_url, transcript, author, source_name, licence, source_url").eq("id", h.assignments.library_item_id).maybeSingle()
+      ? supabase.from("library_items").select("kind, title, body_html, body_format, audio_url, transcript, author, source_name, licence, source_url, vocabulary").eq("id", h.assignments.library_item_id).maybeSingle()
       : Promise.resolve({ data: null }),
     me ? supabase.from("submissions").select("status, answers").eq("homework_id", id).eq("student_id", me.id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.rpc("my_homework_result", { p_homework: id }),
   ]);
-  const content = (h.assignments?.content ?? {}) as { questions?: Question[]; passage?: string | null };
-  const questions = content.questions ?? [];
-  const res = result as { status: string; score: number | null; feedback: string | null; answers: Record<string, number | string>; key: AnswerKey | null } | null;
+  const body = content(h.assignments?.content);
+  const questions = body.questions ?? [];
+  const res = result as { status: string; score: number | null; feedback: string | null; answers: Answers; key: AnswerKey | null; marks: Marks } | null;
+  const vocab = (Array.isArray(item?.vocabulary) ? item.vocabulary : []) as VocabWord[];
   const due = new Date(h.due_at);
   const late = due.getTime() < Date.parse(new Date().toISOString());
 
@@ -51,41 +54,23 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
       )}
 
       {item && <PortalCard><MaterialView item={item} t={t} /></PortalCard>}
-      {!item && content.passage && <PortalCard><div className="library-prose whitespace-pre-line">{content.passage}</div></PortalCard>}
+      {!item && body.audio_url && <PortalCard><audio controls preload="none" src={body.audio_url} className="w-full" /></PortalCard>}
+      {!item && body.passage && <PortalCard><div className="library-prose whitespace-pre-line">{body.passage}</div></PortalCard>}
 
       {res ? (
-        <PortalCard title={t("Answers")}>
-          <ol className="space-y-4">
-            {questions.map((q, n) => {
-              const mine = res.answers?.[q.id];
-              const right = res.key?.[q.id];
-              return (
-                <li key={q.id} className="text-[13.5px]">
-                  <p className="whitespace-pre-line font-medium">{n + 1}. {q.prompt}</p>
-                  {q.type === "open" ? (
-                    <div className="mt-1.5 whitespace-pre-line rounded-[9px] bg-white/60 px-3 py-2 text-[13px]">{typeof mine === "string" && mine.trim() ? mine : <span className="text-muted-foreground">{t("No answer")}</span>}</div>
-                  ) : (
-                  <ul className="mt-1.5 space-y-1">
-                    {(q.options ?? []).map((o, i) => {
-                      const correct = right?.answer === i;
-                      const wrongPick = mine === i && !correct;
-                      return (
-                        <li key={i} className={cn("flex gap-2 rounded-[9px] px-2.5 py-1.5", correct ? "bg-[#E7EFE4] text-[#2F5A3B]" : wrongPick ? "bg-[#F8E1DE] text-[#B4483D]" : "text-[#3B4A42]")}>
-                          <span className="w-4 shrink-0">{correct ? <Check className="mt-0.5 h-3.5 w-3.5" /> : wrongPick ? <X className="mt-0.5 h-3.5 w-3.5" /> : null}</span>
-                          <span>{o}{mine === i && <span className="ml-1 text-[11px] opacity-70">({t("your answer")})</span>}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  )}
-                  {right?.explanation && <p className="mt-1.5 text-[12px] text-muted-foreground">{right.explanation}</p>}
-                </li>
-              );
-            })}
-          </ol>
-        </PortalCard>
+        <>
+          {vocab.length > 0 && (
+            <PortalCard icon={Layers} title={t("Words from this text")}>
+              <CueCards deckId={String(h.assignments?.library_item_id)} words={vocab} />
+            </PortalCard>
+          )}
+          <PortalCard title={t("Answers")}>
+            <QuestionList questions={questions} groups={body.groups} answers={res.answers}
+              answerKey={res.key ?? {}} marks={res.marks} t={t} showMine />
+          </PortalCard>
+        </>
       ) : (
-        <Quiz homeworkId={h.id} questions={questions} initial={(sub?.answers ?? {}) as Record<string, number | string>} />
+        <Quiz homeworkId={h.id} questions={questions} groups={body.groups} initial={(sub?.answers ?? {}) as Answers} />
       )}
     </>
   );

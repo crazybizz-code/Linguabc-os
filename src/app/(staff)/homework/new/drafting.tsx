@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Sparkles, Trash2, Upload } from "lucide-react";
+import { Loader2, Plus, Sparkles, Upload } from "lucide-react";
 import { FieldLabel } from "@/components/ui/dialog";
-import { buttonPrimary, Card, cn, inputClass } from "@/components/ui/primitives";
+import { buttonPrimary, Card, inputClass } from "@/components/ui/primitives";
 import { FormError } from "@/components/workspace/form-dialog";
 import { useT } from "@/i18n/client";
 import { draftFromUpload, draftWithAI, saveDraft } from "./actions";
-import type { Draft, DraftQuestion } from "@/lib/ai/assignment-draft";
+import { emptyQuestion, type Draft, type DraftGroup, type DraftQuestion } from "@/lib/ai/draft";
+import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "./question-editor";
+import type { QuestionType } from "@/lib/questions";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const SKILLS = ["reading", "listening", "writing", "speaking", "vocabulary", "grammar"];
@@ -94,8 +96,24 @@ function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "
   const [d, setD] = useState(initial);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
-  const setQ = (i: number, patch: Partial<DraftQuestion>) => setD((x) => ({ ...x, questions: x.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) }));
-  const missing = d.questions.findIndex((q) => q.type === "mc" && (q.answer == null || q.options.filter((o) => o.trim()).length < 2));
+
+  const setQ = (i: number, patch: Partial<DraftQuestion>) =>
+    setD((x) => ({ ...x, questions: x.questions.map((q, j) => (j === i ? { ...q, ...patch } : q)) }));
+  const setGroup = (id: string, patch: Partial<DraftGroup>) =>
+    setD((x) => ({ ...x, groups: x.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
+
+  const addQuestion = (type: QuestionType) =>
+    setD((x) => {
+      const q = emptyQuestion(`q${x.questions.length + 1}`, type);
+      if (type !== "matching" && type !== "headings") return { ...x, questions: [...x.questions, q] };
+      // Matching questions need a list; reuse the last one or start a new one.
+      const last = x.groups[x.groups.length - 1];
+      const group: DraftGroup = last ?? { id: `g${x.groups.length + 1}`, instructions: "", options: ["", "", ""] };
+      return { ...x, groups: last ? x.groups : [...x.groups, group], questions: [...x.questions, { ...q, group: group.id }] };
+    });
+
+  const problems = d.questions.map((q) => questionProblem(q, d.groups));
+  const firstProblem = problems.findIndex(Boolean);
 
   return (
     <div className="space-y-4">
@@ -104,13 +122,19 @@ function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "
           <h2 className="text-[15px] font-semibold">{t("Check the draft")}</h2>
           <button type="button" onClick={onRestart} className="text-[12.5px] text-muted-foreground underline">{t("Start again")}</button>
         </div>
-        <FieldLabel label={t("Title")}><input value={d.title} maxLength={200} onChange={(e) => setD({ ...d, title: e.target.value })} className={inputClass} /></FieldLabel>
+        <FieldLabel label={t("Title")}>
+          <input value={d.title} maxLength={200} onChange={(e) => setD({ ...d, title: e.target.value })} className={inputClass} />
+        </FieldLabel>
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldLabel label={t("Skill")}>
-            <select value={d.skill} onChange={(e) => setD({ ...d, skill: e.target.value as Draft["skill"] })} className={inputClass}>{SKILLS.map((s) => <option key={s} value={s}>{t(cap(s))}</option>)}</select>
+            <select value={d.skill} onChange={(e) => setD({ ...d, skill: e.target.value as Draft["skill"] })} className={inputClass}>
+              {SKILLS.map((x) => <option key={x} value={x}>{t(cap(x))}</option>)}
+            </select>
           </FieldLabel>
           <FieldLabel label={t("Level")}>
-            <select value={d.level} onChange={(e) => setD({ ...d, level: e.target.value as Draft["level"] })} className={inputClass}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</select>
+            <select value={d.level} onChange={(e) => setD({ ...d, level: e.target.value as Draft["level"] })} className={inputClass}>
+              {LEVELS.map((l) => <option key={l}>{l}</option>)}
+            </select>
           </FieldLabel>
         </div>
         <FieldLabel label={t("Text for students")} hint={t("Optional — the passage, dialogue or instructions students read first.")}>
@@ -119,52 +143,39 @@ function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "
       </Card>
 
       {d.questions.map((q, i) => (
-        <Card key={i} className="space-y-3 p-5">
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold text-[#5F6B66]">{i + 1}</span>
-            <select value={q.type} onChange={(e) => setQ(i, { type: e.target.value as DraftQuestion["type"], options: e.target.value === "mc" && q.options.length < 2 ? ["", "", "", ""] : q.options, answer: null })}
-              className="h-8 rounded-[8px] border border-border/80 bg-[#FCF8F4] px-2 text-[12px]">
-              <option value="mc">{t("Multiple choice")}</option>
-              <option value="open">{t("Open answer")}</option>
-            </select>
-            <button type="button" aria-label={t("Remove question")} onClick={() => setD({ ...d, questions: d.questions.filter((_, j) => j !== i) })}
-              className="ml-auto rounded-[8px] p-1.5 text-muted-foreground hover:bg-[#F8E1DE] hover:text-[#B4483D]"><Trash2 className="h-4 w-4" /></button>
-          </div>
-          <textarea value={q.prompt} rows={2} maxLength={2000} onChange={(e) => setQ(i, { prompt: e.target.value })} placeholder={t("Question")} className={area} />
-          {q.type === "mc" && (
-            <div className="space-y-2">
-              {q.options.map((o, k) => (
-                <div key={k} className="flex items-center gap-2">
-                  <input type="radio" name={`correct-${i}`} aria-label={t("Correct option")} checked={q.answer === k} onChange={() => setQ(i, { answer: k })} className="accent-[#12392B]" />
-                  <input value={o} maxLength={500} onChange={(e) => setQ(i, { options: q.options.map((x, m) => (m === k ? e.target.value : x)) })}
-                    className={cn(inputClass, "h-9", q.answer === k && "border-[#3F6B4A] bg-[#E7EFE4]/50")} />
-                  {q.options.length > 2 && (
-                    <button type="button" aria-label={t("Remove option")} onClick={() => setQ(i, { options: q.options.filter((_, m) => m !== k), answer: q.answer === k ? null : q.answer != null && q.answer > k ? q.answer - 1 : q.answer })}
-                      className="rounded-[8px] p-1 text-muted-foreground hover:text-[#B4483D]"><Trash2 className="h-3.5 w-3.5" /></button>
-                  )}
-                </div>
-              ))}
-              {q.options.length < 6 && <button type="button" onClick={() => setQ(i, { options: [...q.options, ""] })} className="text-[12px] font-medium text-[#12392B]">+ {t("Add option")}</button>}
-              <p className="text-[11px] text-muted-foreground">{t("Select the circle next to the correct option.")}</p>
-            </div>
-          )}
-          <input value={q.explanation} maxLength={1000} onChange={(e) => setQ(i, { explanation: e.target.value })} placeholder={t("Explanation (shown after submitting)")} className={cn(inputClass, "h-9 text-[12.5px]")} />
-        </Card>
+        <QuestionEditor key={i} q={q} n={i + 1} groups={d.groups}
+          onChange={(patch) => setQ(i, patch)}
+          onRemove={() => setD({ ...d, questions: d.questions.filter((_, j) => j !== i) })}
+          onGroupChange={setGroup} />
       ))}
 
-      <button type="button" onClick={() => setD({ ...d, questions: [...d.questions, { id: "", type: "mc", prompt: "", options: ["", "", "", ""], answer: null, explanation: "" }] })}
-        className="flex w-full items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-border py-3 text-[13px] font-medium text-[#3B4A42] hover:bg-white/60">
-        <Plus className="h-4 w-4" /> {t("Add question")}
-      </button>
+      <details className="rounded-[14px] border border-dashed border-border bg-white/40">
+        <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-[#3B4A42]">
+          <Plus className="mr-1 inline h-4 w-4" /> {t("Add question")}
+        </summary>
+        <div className="flex flex-wrap gap-2 px-4 pb-4">
+          {TYPE_ORDER.map((type) => (
+            <button key={type} type="button" onClick={() => addQuestion(type)}
+              className="h-9 rounded-[9px] border border-border/80 bg-[#FCF8F4] px-3 text-[12.5px] font-medium hover:bg-white">
+              {t(typeLabel(type))}
+            </button>
+          ))}
+        </div>
+      </details>
 
       <div className="sticky bottom-3 z-[5] flex flex-wrap items-center justify-end gap-3 rounded-[16px] border border-border/70 bg-[#FCF8F4]/95 p-3 backdrop-blur">
         {error && <span className="mr-auto text-[12.5px] text-[#B4483D]">{error}</span>}
-        {!error && missing >= 0 && <span className="mr-auto text-[12.5px] text-[#9A5B1E]">{t("Question {n} needs at least two options and a correct answer.", { n: missing + 1 })}</span>}
-        <button type="button" disabled={pending || missing >= 0 || d.questions.length === 0} className={buttonPrimary}
+        {!error && firstProblem >= 0 && (
+          <span className="mr-auto text-[12.5px] text-[#9A5B1E]">
+            {t("Question {n}")} {t(problems[firstProblem]!)}
+          </span>
+        )}
+        <button type="button" disabled={pending || firstProblem >= 0 || d.questions.length === 0} className={buttonPrimary}
           onClick={() => start(async () => {
             setError(undefined);
             const r = await saveDraft(d, source);
-            if (r.error) setError(t(r.error)); else router.push(`/homework/assignments/${r.id}`);
+            if (r.error) setError(t(r.error));
+            else router.push(`/homework/assignments/${r.id}`);
           })}>
           {pending && <Loader2 className="h-4 w-4 animate-spin" />} {t("Save assignment")}
         </button>

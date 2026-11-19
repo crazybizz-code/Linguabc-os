@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { Avatar, Badge, Card, type Tone } from "@/components/ui/primitives";
 import { intlLocale } from "@/i18n";
-import type { AnswerKey, Question } from "@/lib/library/render";
+import { content as parseContent, type AnswerKey, type Answers, type Marks } from "@/lib/questions";
 import { ReviewDialog } from "./review";
 
 export const metadata = { title: "Homework" };
@@ -23,11 +23,17 @@ export default async function HomeworkDetailPage({ params }: PageProps<"/homewor
     supabase.from("submissions").select("id, status, score, feedback, answers, submitted_at, students(full_name)").eq("homework_id", id),
     supabase.from("homework").select("assignments(assignment_keys(answers))").eq("id", id).maybeSingle(),
   ]);
-  const questions = ((h.assignments?.content as { questions?: Question[] } | null)?.questions ?? []);
+  const body = parseContent(h.assignments?.content);
+  const questions = body.questions ?? [];
   // PostgREST may embed the one-to-one key as an object or a one-element array.
   const keyEmbed = (keyRow?.assignments as { assignment_keys?: { answers: unknown } | { answers: unknown }[] | null } | null)?.assignment_keys;
   const keyed = ((Array.isArray(keyEmbed) ? keyEmbed[0]?.answers : keyEmbed?.answers) ?? {}) as AnswerKey;
   const rows = (subs ?? []).sort((a, b) => (a.students?.full_name ?? "").localeCompare(b.students?.full_name ?? ""));
+  // Marking lives in the database, so the review dialog asks it rather than guessing.
+  const graded = rows.filter((r) => r.status === "submitted" || r.status === "reviewed");
+  const marksBySub = new Map(
+    await Promise.all(graded.map(async (r) => [r.id, (await supabase.rpc("submission_marks", { p_submission: r.id })).data] as const)),
+  );
   const done = rows.filter((r) => r.status === "submitted" || r.status === "reviewed").length;
   const scores = rows.map((r) => r.score).filter((s): s is number => s != null).map(Number);
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
@@ -60,8 +66,8 @@ export default async function HomeworkDetailPage({ params }: PageProps<"/homewor
                   {r.score != null && <span className="w-12 text-right text-[13px] font-semibold tabular-nums">{Math.round(Number(r.score))}%</span>}
                   <Badge tone={r.status === "not_started" && overdue ? "red" : TONE[r.status]}>{t(r.status === "not_started" && overdue ? "Missed" : LABEL[r.status])}</Badge>
                   {(r.status === "submitted" || r.status === "reviewed") && (
-                    <ReviewDialog submissionId={r.id} student={r.students?.full_name ?? ""} questions={questions}
-                      answers={(r.answers ?? {}) as Record<string, number>} keyed={keyed}
+                    <ReviewDialog submissionId={r.id} student={r.students?.full_name ?? ""} questions={questions} groups={body.groups}
+                      answers={(r.answers ?? {}) as Answers} keyed={keyed} marks={(marksBySub.get(r.id) ?? {}) as Marks}
                       score={r.score != null ? Number(r.score) : null} feedback={r.feedback} reviewed={r.status === "reviewed"} />
                   )}
                 </li>

@@ -33,5 +33,4 @@ export function levelRange(min: string | null, max: string | null) {
   return max && max !== min ? `${min}–${max}` : min;
 }
 
-export type Question = { id: string; type: string; prompt: string; options?: string[] };
-export type AnswerKey = Record<string, { answer: number | string; explanation?: string | null }>;
+export type { Question, AnswerKey } from "@/lib/questions";
