@@ -555,4 +555,5 @@ export const ru: Record<string, string> = {
   "about ${avg} per draft": "примерно ${avg} за черновик",
   "This is too much for one assignment. Split the document or ask for fewer questions.": "Слишком много для одного задания. Разделите документ или попросите меньше вопросов.",
   "The PDF is longer than 12 pages. Upload only the pages with the exercise.": "PDF длиннее 12 страниц. Загрузите только страницы с упражнением.",
+  "Invite an administrator to enrol students": "Пригласите администратора для зачисления учеников",
 };

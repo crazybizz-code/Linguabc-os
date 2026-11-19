@@ -555,4 +555,5 @@ export const uz: Record<string, string> = {
   "about ${avg} per draft": "har biri taxminan ${avg}",
   "This is too much for one assignment. Split the document or ask for fewer questions.": "Bitta vazifa uchun juda ko'p. Hujjatni bo'ling yoki kamroq savol so'rang.",
   "The PDF is longer than 12 pages. Upload only the pages with the exercise.": "PDF 12 sahifadan uzun. Faqat mashq bor sahifalarni yuklang.",
+  "Invite an administrator to enrol students": "O'quvchilarni qo'shish uchun administrator taklif qiling",
 };
