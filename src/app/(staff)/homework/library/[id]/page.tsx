@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
-import { Badge, Card, cn } from "@/components/ui/primitives";
-import { levelRange, type AnswerKey, type Question } from "@/lib/library/render";
+import { Badge, Card } from "@/components/ui/primitives";
+import { levelRange } from "@/lib/library/render";
+import { QuestionList } from "@/components/questions/question-list";
+import type { AnswerKey, Question } from "@/lib/questions";
 import { MaterialView } from "@/components/library/material";
 import { todayISO } from "@/lib/dates";
 import { AssignDialog } from "./assign";
@@ -47,23 +49,7 @@ export default async function LibraryItemPage({ params }: PageProps<"/homework/l
           <Card className="p-5">
             <h2 className="text-[15px] font-semibold">{t("Questions")}</h2>
             <p className="mb-3 text-[12px] text-muted-foreground">{t("Correct answers are shown to staff only.")}</p>
-            <ol className="space-y-4">
-              {questions.map((q, n) => (
-                <li key={q.id} className="text-[13px]">
-                  <p className="font-medium">{n + 1}. {q.prompt}</p>
-                  <ul className="mt-1.5 space-y-1">
-                    {(q.options ?? []).map((o, i) => {
-                      const ok = answers[q.id]?.answer === i;
-                      return (
-                        <li key={i} className={cn("flex gap-2 rounded-[8px] px-2.5 py-1.5", ok ? "bg-[#E7EFE4] text-[#2F5A3B]" : "text-[#3B4A42]")}>
-                          <span className="w-4 shrink-0">{ok ? <Check className="mt-0.5 h-3.5 w-3.5" /> : String.fromCharCode(65 + i)}</span>{o}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </li>
-              ))}
-            </ol>
+            <QuestionList questions={questions} answerKey={answers} t={t} />
           </Card>
           {Array.isArray(item.vocabulary) && item.vocabulary.length > 0 && (
             <Card className="p-5">

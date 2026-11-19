@@ -1850,6 +1850,7 @@ export type Database = {
         Returns: string
       }
       my_homework_result: { Args: { p_homework: string }; Returns: Json }
+      submission_marks: { Args: { p_submission: string }; Returns: Json }
       claim_ai_request: { Args: { p_center: string; p_kind: string }; Returns: number }
       finish_ai_request: {
         Args: { p_completion: number; p_cost: number; p_id: number; p_model: string; p_ok: boolean; p_prompt: number }
@@ -1858,6 +1859,8 @@ export type Database = {
       create_custom_assignment: {
         Args: {
           p_answers: Json
+          p_audio_url?: string
+          p_groups?: Json
           p_center: string
           p_level: Database["public"]["Enums"]["cefr_level"]
           p_passage: string

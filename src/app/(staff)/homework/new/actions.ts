@@ -79,18 +79,45 @@ export async function draftFromUpload(form: FormData): Promise<DraftResult> {
   return withAi("extract", () => extractDraft({ file: part, skill, level }));
 }
 
-/** Save an edited draft as one of the centre's assignments. */
+/** Save an edited draft: questions go to the assignment, answers to the key. */
 export async function saveDraft(draft: Draft, source: "upload" | "ai"): Promise<{ id?: string; error?: string }> {
   const { supabase, workspace } = await getStaffContext();
   if (!["upload", "ai"].includes(source)) return { error: "Unsupported source." };
+
   const questions = draft.questions.map((q, i) => ({
-    id: `q${i + 1}`, type: q.type, prompt: q.prompt.trim(), ...(q.type === "mc" ? { options: q.options.map((o) => o.trim()) } : {}),
+    id: `q${i + 1}`,
+    type: q.type,
+    prompt: q.prompt.trim(),
+    ...(q.type === "mc" || q.type === "multi" ? { options: q.options.map((o) => o.trim()).filter(Boolean) } : {}),
+    ...(q.type === "matching" || q.type === "headings" ? { group: q.group } : {}),
+    ...(q.type === "gap" ? { max_words: q.max_words } : {}),
   }));
-  const answers = Object.fromEntries(draft.questions.map((q, i) => [`q${i + 1}`,
-    q.type === "mc" ? { answer: q.answer, explanation: q.explanation?.trim() || null } : { explanation: q.explanation?.trim() || null }]));
+
+  const answers = Object.fromEntries(draft.questions.map((q, i) => {
+    const id = `q${i + 1}`;
+    const explanation = q.explanation.trim() || null;
+    if (q.type === "multi") return [id, { answer: q.answers, explanation }];
+    if (q.type === "tfng" || q.type === "ynng") return [id, { answer: q.choice, explanation }];
+    if (q.type === "gap") return [id, { accepted: q.accepted.map((a) => a.trim()).filter(Boolean), explanation }];
+    if (q.type === "open") return [id, { explanation }];
+    return [id, { answer: q.answer, explanation }];
+  }));
+
+  const used = new Set(questions.map((q) => q.group).filter(Boolean));
+  const groups = draft.groups
+    .filter((g) => used.has(g.id))
+    .map((g) => ({ id: g.id, instructions: g.instructions.trim(), options: g.options.map((o) => o.trim()).filter(Boolean) }));
+
   const { data, error } = await supabase.rpc("create_custom_assignment", {
-    p_center: workspace.centerId, p_title: draft.title, p_skill: pick<Skill>(draft.skill, SKILLS, "reading"),
-    p_level: pick<Level>(draft.level, LEVELS, "B1"), p_source: source, p_passage: draft.passage ?? "", p_questions: questions, p_answers: answers,
+    p_center: workspace.centerId,
+    p_title: draft.title,
+    p_skill: pick<Skill>(draft.skill, SKILLS, "reading"),
+    p_level: pick<Level>(draft.level, LEVELS, "B1"),
+    p_source: source,
+    p_passage: draft.passage ?? "",
+    p_questions: questions,
+    p_answers: answers,
+    p_groups: groups,
   });
   if (error) return { error: /forbidden|permission/i.test(error.message) ? "You don't have permission to do that." : error.message };
   revalidatePath("/homework", "layout");

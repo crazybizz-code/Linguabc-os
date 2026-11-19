@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
-import { Badge, Card, cn, type Tone } from "@/components/ui/primitives";
-import type { AnswerKey, Question } from "@/lib/library/render";
+import { Badge, Card, type Tone } from "@/components/ui/primitives";
+import { QuestionList } from "@/components/questions/question-list";
+import { content as parseContent, type AnswerKey } from "@/lib/questions";
 import { todayISO } from "@/lib/dates";
 import { AssignDialog } from "../../library/[id]/assign";
 import { assignAssignment } from "../../../actions";
@@ -24,7 +25,7 @@ export default async function AssignmentPage({ params }: PageProps<"/homework/as
     supabase.from("groups").select("id, name").eq("center_id", workspace.centerId).eq("status", "active").order("name"),
   ]);
   if (!a) notFound();
-  const content = (a.content ?? {}) as { passage?: string | null; questions?: Question[] };
+  const body = parseContent(a.content);
   const answers = (key?.answers ?? {}) as AnswerKey;
   const due = new Date(`${todayISO()}T12:00:00Z`);
   due.setUTCDate(due.getUTCDate() + 3);
@@ -48,31 +49,14 @@ export default async function AssignmentPage({ params }: PageProps<"/homework/as
       )}
       <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
         <Card className="p-6">
-          {content.passage ? <div className="library-prose whitespace-pre-line">{content.passage}</div> : <p className="text-[13px] text-muted-foreground">{t("No text — questions only.")}</p>}
+          {body.audio_url && <audio controls preload="none" src={body.audio_url} className="mb-4 w-full" />}
+          {body.passage ? <div className="library-prose whitespace-pre-line">{body.passage}</div>
+            : !body.audio_url && <p className="text-[13px] text-muted-foreground">{t("No text — questions only.")}</p>}
         </Card>
         <Card className="p-5">
           <h2 className="text-[15px] font-semibold">{t("Questions")}</h2>
           <p className="mb-3 text-[12px] text-muted-foreground">{t("Correct answers are shown to staff only.")}</p>
-          <ol className="space-y-4">
-            {(content.questions ?? []).map((q, n) => (
-              <li key={q.id} className="text-[13px]">
-                <p className="whitespace-pre-line font-medium">{n + 1}. {q.prompt}</p>
-                {q.type === "open" ? <p className="mt-1 text-[12px] text-muted-foreground">{t("Open answer — graded by the mentor.")}</p> : (
-                  <ul className="mt-1.5 space-y-1">
-                    {(q.options ?? []).map((o, i) => {
-                      const ok = answers[q.id]?.answer === i;
-                      return (
-                        <li key={i} className={cn("flex gap-2 rounded-[8px] px-2.5 py-1.5", ok ? "bg-[#E7EFE4] text-[#2F5A3B]" : "text-[#3B4A42]")}>
-                          <span className="w-4 shrink-0">{ok ? <Check className="mt-0.5 h-3.5 w-3.5" /> : String.fromCharCode(65 + i)}</span>{o}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {answers[q.id]?.explanation && <p className="mt-1 text-[11.5px] text-muted-foreground">{answers[q.id]?.explanation}</p>}
-              </li>
-            ))}
-          </ol>
+          <QuestionList questions={body.questions ?? []} groups={body.groups} answerKey={answers} t={t} />
         </Card>
       </div>
     </div>
