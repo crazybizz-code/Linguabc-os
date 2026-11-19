@@ -594,4 +594,5 @@ export const ru: Record<string, string> = {
   "Got it": "Запомнил",
   "Pause": "Пауза",
   "{a} of {b}": "{a} из {b}",
+  "Invite an administrator to enrol students": "Пригласите администратора для зачисления учеников",
 };

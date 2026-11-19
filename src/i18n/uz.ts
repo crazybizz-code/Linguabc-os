@@ -594,4 +594,5 @@ export const uz: Record<string, string> = {
   "Got it": "Bildim",
   "Pause": "To'xtatish",
   "{a} of {b}": "{b} tadan {a} ta",
+  "Invite an administrator to enrol students": "O'quvchilarni qo'shish uchun administrator taklif qiling",
 };
