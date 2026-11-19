@@ -69,7 +69,7 @@ A few specific rules:
 - No card data is stored. Click and Payme are still refused by the server, a leftover of the earlier V2 decision.
 - Owner, admin, the student and their parents can read payments. Nobody else can.
 
-**Online parent payments (V1, not built yet).** The flow is Parent app → Pay now → provider → payment verified → records updated. Rules for the integration:
+**Online parent payments (V1, through Click; not built yet).** The flow is Parent app → Pay now → Click → payment verified → records updated. These rules apply to Click and to any provider added later:
 - A payment counts only after the **server verifies it with the provider**, through the provider's signature or callback check. A browser redirect or any value sent by the client is never proof of payment.
 - Verified payments are written through `record_payment`, with the provider's transaction id in `provider_txn_id`. Retries then don't create duplicates, and the append-only ledger and receipt numbering still apply.
 - The parent pays only invoices of their own linked children. The amount comes from the invoice on the server, never from the client.

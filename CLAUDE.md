@@ -4,13 +4,13 @@
 
 **What it is:** a multi-tenant platform for language learning centres in Uzbekistan (IELTS-focused). One deployment serves many centres. Staff run operations and teaching; students and parents get their own portals.
 
-**Direction now:** finishing V1, due **15 January 2027**. Still to build:
-- AI listening sections with audio (Fish Audio)
-- online mocks
-- online parent payments through at least one real provider
-- basic progress
-- basic notifications
-- settings, Excel import, the parents page, reports
+**Direction now:** finishing V1, due **15 January 2027**. Build order:
+1. Fish Audio / AI listening
+2. Mock engine
+3. Basic progress
+4. In-app notifications
+5. Click payments (designed so more providers can be added)
+6. Settings, reports and the rest of V1
 
 Before launch, two security blockers must be fixed (see `docs/SECURITY.md`). Details: `docs/V1-ROADMAP.md`.
 

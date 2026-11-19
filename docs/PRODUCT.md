@@ -57,23 +57,20 @@ Admins, academic managers and mentors use the staff workspace in English. This w
 - mock sessions with manual band entry
 - homework: library, upload and AI, auto-marking, IELTS question types, vocabulary cue cards
 
-**Still to do for V1** (due 15 January 2027):
-1. **Listening with audio:** AI-generated listening sections, with audio from Fish Audio.
-2. **Online mocks:** reading and listening taken in the app.
-3. **Online parent payments,** through at least one real payment provider.
-   - Flow: Parent app → **Pay now** → provider → payment verified → the student's invoice and payment records are updated.
-   - More providers can come later.
-4. **Basic progress:**
+**Still to do for V1** (due 15 January 2027), in build order:
+1. **Fish Audio / AI listening:** AI-generated listening sections, with audio from Fish Audio.
+2. **Mock engine:** online mocks, with reading and listening taken in the app.
+3. **Basic progress:**
    - Student 360 academic and administrative history
    - homework completion and results
    - mock history and results
    - attendance history
    - basic academic progress and trends
-5. **Basic notifications** triggered by the product for attendance, payments, homework, mock sessions and schedule changes.
-6. **Settings:** "Soon" in the sidebar.
-7. **Excel import.**
-8. **Parents page:** the staff side; "Soon" in the sidebar.
-9. **Reports:** "Soon" in the sidebar.
+4. **In-app notifications** triggered by the product for attendance, payments, homework, mock sessions and schedule changes.
+5. **Click payments for parents.**
+   - Flow: Parent app → **Pay now** → Click → payment verified → the student's invoice and payment records are updated.
+   - The payment model is designed so other providers (Payme, Uzum) can be added later without rewriting it.
+6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page and reports. Settings, the parents page and reports are "Soon" in the sidebar.
 
 Two security issues also have to be fixed before launch. See `SECURITY.md` → Pre-launch blockers.
 
@@ -82,12 +79,9 @@ Two security issues also have to be fixed before launch. See `SECURITY.md` → P
 - The `notifications` table and its channel enum (`in_app`, `sms`, `telegram`, `push`) exist from 0001, but no code writes to or reads from them yet.
 
 ## Out of scope for V1
-- **Payment providers beyond the first.** V1 needs at least one; the rest can follow.
+- **Payme, Uzum and other online payment providers.** V1 ships with Click only; the others come later.
 - **Advanced adaptive intelligence** in progress. V1 progress is history and basic trends.
-- **SMS, Telegram and push notifications.** None is built yet, so they can come after V1.
+- **Notification delivery by SMS, Telegram or push.** V1 notifications are in-app only.
 - **Translated staff workspace** for admins, academic managers and mentors: they stay in English (PR #7).
 
-**(to confirm)**
-- Which provider comes first: Click, Payme or Uzum.
-- Which channel basic notifications use in V1. In-app is the only one that needs no outside integration.
-- No other exclusions are recorded.
+No other exclusions are recorded.

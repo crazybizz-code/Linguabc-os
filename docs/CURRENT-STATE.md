@@ -62,8 +62,11 @@ These are the page's conditions for showing the deck.
 
 **Open decisions**
 - Where Fish Audio / listening audio is stored. Nothing has been chosen yet.
-- Which online payment provider comes first.
-- Where payments, progress and notifications fit in the V1 order.
+
+**Settled on 2026-11-19:**
+- Click is the first payment provider.
+- V1 notifications are in-app.
+- The V1 build order is in `V1-ROADMAP.md`.
 
 **Environment:** there's no staging, so all QA happens on production.
 

@@ -28,29 +28,24 @@
 - [x] Cue cards checked on a library-based homework: the data path under RLS, and the owner's visual check in the browser (2026-11-19)
 - [ ] Delete the QA centre `qa-q-centre` and its users `qa.q.%@linguabc.test`
 
-## Remaining V1 work
-The owner set the order for the first two and the "settings → reports" block. Where the newly added V1 items (payments, progress, notifications) fit in that order isn't decided yet **(to confirm)**.
+## Remaining V1 work, in order
+The owner confirmed this order on 2026-11-19.
 
-1. **Week 2: listening with audio.** Fish Audio integration; AI-generated listening sections with audio.
-2. **Online mocks:** reading and listening taken in the app. Today mocks are scheduled and band results are typed in by hand.
-3. **Settings:** "Soon" in the sidebar.
-4. **Excel import.**
-5. **Parents page:** the staff side; "Soon" in the sidebar.
-6. **Reports:** "Soon" in the sidebar.
+1. **Fish Audio / AI listening.** Fish Audio integration; AI-generated listening sections with audio.
+2. **Mock engine:** online mocks, with reading and listening taken in the app. Today mocks are scheduled and band results are typed in by hand.
+3. **Basic progress:**
+   - Student 360 academic and administrative history
+   - homework completion and results
+   - mock history and results
+   - attendance history
+   - basic trends
 
-Also in V1, position in the order not set:
-- **Online parent payments,** through at least one real provider.
-  - Flow: Parent app → Pay now → provider → payment verified → invoice and payment records updated.
-  - More providers can come later.
-- **Basic progress:**
-  - Student 360 academic and administrative history
-  - homework completion and results
-  - mock history and results
-  - attendance history
-  - basic trends
-
-  Advanced adaptive intelligence comes later.
-- **Basic notifications** triggered by the product for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push can come later.
+   Advanced adaptive intelligence comes later.
+4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
+5. **Click payments.**
+   - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.
+   - Design it so the provider is one part that can be swapped: Payme and Uzum must be addable later without rewriting the core payment model.
+6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page, reports, and whatever else V1 still needs.
 
 ### Pre-launch blockers (security)
 Both must be fixed before V1 goes live. Details in `SECURITY.md`.
@@ -62,13 +57,14 @@ Both must be fixed before V1 goes live. Details in `SECURITY.md`.
 - Needs an API key and account. None is configured, and no code exists yet.
 - **Where the audio is stored is an open decision.** Supabase Storage isn't used at all today, and existing audio is external URLs. Choose (bucket, access rules, signed or public URLs) before building.
 
-**Online payments**
-- Needs a merchant account and credentials from the chosen provider, and a way to test against it (a sandbox, if the provider offers one).
+**Click payments**
+- Needs a Click merchant account and credentials, and a way to test against it (a sandbox, if Click offers one).
+- The provider should sit behind a common interface (create a payment, verify a callback) so Payme and Uzum can be added later.
 - The payment is marked paid only after the server verifies it with the provider (signature or callback check). It's then written through `record_payment`, so the existing ledger rules apply.
 - The current "V2" refusal of Click and Payme in the UI and server has to change.
 
-**Notifications**
-- The `notifications` table exists but nothing writes to it. The triggers have to hook into the attendance, payment, homework, mock and schedule flows.
+**In-app notifications**
+- The `notifications` table (with the `in_app` channel) exists but nothing writes to it. The triggers have to hook into the attendance, payment, homework, mock and schedule flows.
 
 **AI**
 - Listening scripts and online-mock content build on the AI drafting pipeline (`src/lib/ai/`). That pipeline only works in production if `OPENROUTER_API_KEY` or `GEMINI_API_KEY` is set in Vercel, which isn't verified.

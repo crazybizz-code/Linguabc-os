@@ -104,9 +104,9 @@ Other rules the database enforces:
 | Supabase service role | Server only: phone sign-in, register phone check | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` |
 | SMTP for auth email | Configured in the Supabase dashboard (sender domain `linguabc.xyz`) | Outside the repo |
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
-| Click / Payme / Uzum online | Not integrated. **V1 needs at least one real provider** (decided 2026-11-19); which one is undecided. The UI and server still refuse Click and Payme as "V2" (PR #7). The `provider_txn_id` unique index is ready for idempotent webhooks. | — |
+| Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
 | Fish Audio | Not integrated (planned for V1). Audio storage is undecided (see Storage). | — |
-| Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 needs basic product-triggered notifications. | — |
+| Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 uses the `in_app` channel only; `sms`, `telegram` and `push` delivery come later. | — |
 
 ## Deployment
 - **Vercel project** `linguabc-os` (team `crazybizz-codes-projects`), region `fra1`.
