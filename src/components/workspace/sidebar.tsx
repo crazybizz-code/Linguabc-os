@@ -127,6 +127,7 @@ export function Sidebar({
       <div className="border-t border-[#FCF8F4]/[0.1] pt-3">
         <span className="flex h-10 cursor-default items-center gap-3 rounded-[11px] px-3 text-[13.5px] text-[#C9DACF] opacity-60">
           <Settings className="h-[17px] w-[17px]" strokeWidth={1.7} /> {t("Settings")}
+          <span className="ml-auto rounded-full bg-[#FCF8F4]/[0.08] px-2 py-0.5 text-[10px] text-[#7E9A8B]">{t("Soon")}</span>
         </span>
         <div className="mt-2 flex items-center gap-2.5 rounded-[12px] bg-[#FCF8F4]/[0.07] px-2.5 py-2">
           <Avatar name={name} size="sm" />
