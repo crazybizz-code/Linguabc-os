@@ -285,7 +285,8 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
                     </button>
                   </div>
                   <div className="select-text">
-                    <AnswerInput q={q} groups={sec.groups} value={answers[q.id]} onChange={(v) => set(q.id, v)} />
+                    <AnswerInput q={q} groups={sec.groups} value={answers[q.id]} onChange={(v) => set(q.id, v)}
+                      text={(t, k) => <Marked id={`t-${k}`} text={t} spans={hl.marks[`t-${k}`]} />} />
                   </div>
                 </div>
               ))}
