@@ -14,7 +14,9 @@ export function JoinForm({ code, defaultName, defaultEmail }: { code: string; de
       <form action={action} className="space-y-3.5">
         <input type="hidden" name="code" value={code} />
         <Field label="Your full name" name="full_name" defaultValue={defaultName} autoComplete="name" placeholder="Dilshod Karimov" required />
-        <Field label="Email" name="email" type="email" defaultValue={defaultEmail} autoComplete="email" placeholder="you@mail.uz" required />
+        <Field label="Phone number" name="phone" type="tel" autoComplete="tel" placeholder="+998 90 123 45 67" required />
+        <Field label="Email (optional)" name="email" type="email" defaultValue={defaultEmail} autoComplete="email" placeholder="you@mail.uz" />
+        <p className="-mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">You will log in with your phone number and password. Add an email only if you want to reset your password by email.</p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Password" name="password" type="password" autoComplete="new-password" placeholder="••••••••" required />
           <Field label="Confirm" name="confirm" type="password" autoComplete="new-password" placeholder="••••••••" required />

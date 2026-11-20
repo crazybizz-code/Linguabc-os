@@ -51,7 +51,7 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 ## Not yet verified
 Checked 2026-11-20. None of these can be seen from the agent's environment: the Supabase token can't read auth settings, and Vercel and `app.linguabc.xyz` are blocked by its network. The owner has to check them in the dashboards.
 - ~~AI keys in Vercel~~: **confirmed 2026-11-20.** OpenRouter is set: `ai_requests` shows a live `google/gemini-3.7-flash` call from the owner. Fish Audio is set too (a live `fish/s1` call).
-- ~~Phone sign-in key~~: **confirmed 2026-11-20** from the owner's screenshot of Vercel: `SUPABASE_SECRET_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are set for Production (marked sensitive). Values not seen. Phone sign-in still works only for accounts whose profile has a phone (owners today: `/join` does not ask for one).
+- ~~Phone sign-in key~~: **confirmed 2026-11-20** from the owner's screenshot of Vercel: `SUPABASE_SECRET_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are set for Production (marked sensitive). Values not seen. `/join` now asks for a phone (required) and an email (optional, owner's choice 2026-11-20); phone-only accounts are created confirmed on the server under `p<digits>@phone.linguabc.xyz` (never mailed) and sign in by phone. They can't reset a password by email yet: the centre has to help.
 - **Domain:** whether `app.linguabc.xyz` is attached to the Vercel project as the production domain. The auth email config says it's the Site URL.
 - **Custom SMTP** in the Supabase dashboard.
 
