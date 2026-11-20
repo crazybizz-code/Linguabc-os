@@ -22,6 +22,7 @@
 | #15 | 2026-11-19 | Frankfurt region, loading states, owner menu |
 | #16 | 2026-11-19 | Settings marked "Soon" |
 | #17 | 2026-11-19 | IELTS question types with database marking; vocabulary cue cards |
+| #20 | 2026-11-20 | Listening: Fish Audio recordings in a private bucket, voice per speaker |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
@@ -34,10 +35,11 @@ The milestone is complete.
 - [x] Storage decided: private Supabase bucket `listening-audio`, signed URLs (owner, 2026-11-20)
 - [x] Migration 0017, SQL test section 18 (passes locally)
 - [x] Fish Audio client, "Generate audio" in the listening draft editor, playback for staff and students, transcript after submitting
-- [ ] PR reviewed and merged
-- [ ] 0017 applied to production (owner's go-ahead needed)
+- [x] PR #20 merged (2026-11-20)
+- [x] 0017 applied to production (2026-11-20)
 - [x] `FISH_AUDIO_API_KEY` set in Vercel (owner, 2026-11-20); six voices chosen, defaults in code
-- [ ] Live check in a QA centre: generate, save, assign, play as the student, then delete the QA centre
+- [x] SQL check as each role on production, in one transaction that was rolled back (nothing left behind)
+- [ ] Owner's UI check: a real Fish Audio recording from the listening editor (first live call to Fish)
 
 ## Remaining V1 work, in order
 The owner confirmed this order on 2026-11-19.

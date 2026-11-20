@@ -10,7 +10,7 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
   - #17 IELTS engine and cue cards
   - #16 Settings marked "Soon"
   - #15 Frankfurt region, loading states, owner menu
-- **In progress:** Fish Audio / AI listening on branch `claude/fervent-mendel-iu86hg` (migration 0017, `src/lib/ai/fish.ts`, `src/lib/audio.ts`, listening editor and playback). Not merged, and 0017 is **not applied** to production.
+- **Merged 2026-11-20:** #20, Fish Audio / AI listening (migration 0017, `src/lib/ai/fish.ts`, `src/lib/audio.ts`, listening editor and playback).
 - Old feature branches are still on the remote: `feat/*`, `fix/*`, `docs/*`, `backend/v1-schema`, `frontend/auth`, `chore/env-defaults`. They're all merged.
 
 ## Production
@@ -27,6 +27,10 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 - Note: `finish_ai_request` takes token counts and cost from the caller. A mentor calling the RPC directly could under-report their own usage. The hourly and daily request limits still hold, so only the cost report is affected.
 
 ## Migrations applied to production
+`0017_listening_audio` applied on 2026-11-20. The `listening-audio` bucket and its 3 storage policies exist.
+
+**Listening SQL check on production (2026-11-20):** one transaction with throwaway QA users and a `qa-listening` centre, rolled back at the end, so nothing was left behind (verified by counts afterwards). All checks passed: the mentor can upload and outsiders and students can't; a student hears the audio only once it's set as homework, can't read the transcript or key before submitting, and gets the transcript and a 100% score after; an outsider can't hear it. Direct `DELETE` on `storage.objects` is blocked by Supabase (`storage.protect_delete`), so the delete policy is tested only in the local suite and through the Storage API.
+
 `0001`–`0015`, and `0016` applied as three parts: `0016_ielts_questions_part1`, `_part2` and `_part3`. The repo has a single `0016_ielts_questions.sql`, and the parts were applied from it.
 
 ## Tests known to pass
@@ -70,9 +74,5 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 **Documentation debt:** `README.md` is out of date. It lists migrations only up to 0008 and an `app/(workspace)/` folder that is now `app/(portal)/`. It hasn't been edited yet.
 
 ## Exact next task
-**Finish Fish Audio / AI listening** (checklist in `V1-ROADMAP.md`):
-1. Review and merge the listening PR.
-2. With the owner's go-ahead, apply `0017_listening_audio.sql` to production.
-3. Deploy (merging to `main` does it); the Fish key is already in Vercel.
-4. Live check in a throwaway `qa-*` centre: create a listening draft with AI, generate audio, save, assign, play it as the student, submit, see the script. Then delete the QA centre and its bucket folder.
-5. Then: the mock engine.
+1. **Owner's UI check of listening:** as a mentor, Homework → Create with AI → Listening → Generate audio. This is the first live Fish Audio call. If it fails, check the Vercel function logs for a "Fish Audio" line.
+2. Then: **the mock engine** (online mocks with reading and listening).
