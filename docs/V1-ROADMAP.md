@@ -31,6 +31,7 @@
 | #26 | 2026-11-20 | Exam: highlight gap-fill sentences and options |
 | #27 | 2026-11-20 | Mock lockdown: leaving ends the part with 0, staff notified (0020) |
 | #28 | 2026-11-20 | Live staff notifications (Realtime, toast); notice names the student and group (0021) |
+| #29 | 2026-11-20 | Basic progress: Student 360 tab, student and parent pages, staff overview |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
@@ -80,7 +81,7 @@ The owner confirmed this order on 2026-11-19.
    - basic trends
 
    Advanced adaptive intelligence comes later.
-   **Built on 2026-11-20 (PR pending):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
+   **Merged on 2026-11-20 (#29):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
 5. **Click payments.**
    - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.
