@@ -908,6 +908,62 @@ export type Database = {
           },
         ]
       }
+      library_test_keys: {
+        Row: { answers: Json; test_id: string; transcripts: Json }
+        Insert: { answers?: Json; test_id: string; transcripts?: Json }
+        Update: { answers?: Json; test_id?: string; transcripts?: Json }
+        Relationships: [
+          {
+            foreignKeyName: "library_test_keys_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: true
+            referencedRelation: "library_tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_tests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          level: Database["public"]["Enums"]["cefr_level"] | null
+          published_at: string | null
+          question_count: number
+          sections: Json
+          skill: Database["public"]["Enums"]["skill"]
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          level?: Database["public"]["Enums"]["cefr_level"] | null
+          published_at?: string | null
+          question_count?: number
+          sections?: Json
+          skill: Database["public"]["Enums"]["skill"]
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          level?: Database["public"]["Enums"]["cefr_level"] | null
+          published_at?: string | null
+          question_count?: number
+          sections?: Json
+          skill?: Database["public"]["Enums"]["skill"]
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       library_items: {
         Row: {
           attribution: string | null
@@ -1854,6 +1910,26 @@ export type Database = {
       }
       my_homework_result: { Args: { p_homework: string }; Returns: Json }
       submission_marks: { Args: { p_submission: string }; Returns: Json }
+      am_platform_admin: { Args: never; Returns: boolean }
+      claim_admin_ai_request: { Args: { p_kind: string }; Returns: number }
+      new_library_test: {
+        Args: { p_level?: Database["public"]["Enums"]["cefr_level"]; p_skill: Database["public"]["Enums"]["skill"]; p_title: string }
+        Returns: string
+      }
+      save_library_test: {
+        Args: {
+          p_answers: Json
+          p_id: string
+          p_level: Database["public"]["Enums"]["cefr_level"] | null
+          p_sections: Json
+          p_skill: Database["public"]["Enums"]["skill"]
+          p_title: string
+          p_transcripts?: Json
+        }
+        Returns: string
+      }
+      set_library_test_status: { Args: { p_id: string; p_status: string }; Returns: undefined }
+      delete_library_test: { Args: { p_id: string }; Returns: undefined }
       claim_ai_request: { Args: { p_center: string; p_kind: string }; Returns: number }
       finish_ai_request: {
         Args: { p_completion: number; p_cost: number; p_id: number; p_model: string; p_ok: boolean; p_prompt: number }

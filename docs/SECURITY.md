@@ -84,6 +84,7 @@ A few specific rules:
 - The prompt tells the model to ignore instructions inside the file. The mentor edits every draft before saving, and `check_questions` validates the structure in the database.
 - AI limits are enforced in the database: 20 requests per user per hour and 200 per centre per day. Every request is logged in `ai_requests`.
 - Library HTML is sanitised with `sanitize-html`: links get `rel="noopener noreferrer"` and iframes are sandboxed.
+- **Platform admins** (`platform_admins`) can be added only from SQL, as the database owner. They write the LinguABC library tests. Test keys and transcripts are readable by them alone, not by centre staff: anyone can register a centre, so staff-readable keys would leak mock answers.
 - **Storage:** listening audio is in the private `listening-audio` bucket, one folder per centre (`{center_id}/…`). Storage policies (0017) keep each centre's files apart: staff and mentors of that centre can upload and listen; students and parents can listen only to audio set as homework for their group. Playback uses 2-hour signed URLs. Transcripts sit with the answer key.
 
 ## Secrets

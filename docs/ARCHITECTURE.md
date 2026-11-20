@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0017):
+Migrations live in `supabase/migrations/` (0001–0018):
 
 | # | Adds |
 |---|---|
@@ -59,6 +59,7 @@ Migrations live in `supabase/migrations/` (0001–0017):
 | 0015 | AI usage accounting: model, tokens, cost |
 | 0016 | IELTS question types and per-question marks (`grade_one`, `mark_map`, `grade_answers`, `submission_marks`, `check_questions`) |
 | 0017 | Listening audio: private `listening-audio` bucket and its storage policies, `assignment_keys.transcript`, `create_custom_assignment(p_audio_path)`, transcript in `my_homework_result`, AI request kind `audio` |
+| 0018 | LinguABC library tests: `platform_admins`, `library_tests`, `library_test_keys` (admins only), private `library-audio` bucket, admin RPCs (`new_library_test`, `save_library_test`, `set_library_test_status`, `delete_library_test`, `claim_admin_ai_request`) |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -75,6 +76,18 @@ Other rules the database enforces:
 - Uploaded worksheets (PDF, DOCX, TXT, PNG/JPG/WEBP, up to 4 MB, PDFs up to 12 pages) are read in the server action and sent inline to the AI provider. They aren't kept.
 - Library audio (`library_items.audio_url`) and assignment `audio_url` are external URLs.
 - Cue-card progress is kept only in the browser's `localStorage`.
+
+## LinguABC library tests (0018)
+- **Full IELTS Academic tests** for every centre: reading (3 passages: 13 + 13 + 14 questions) and listening (4 recorded parts, 10 questions each). All are numbered q1..q40 across sections.
+- **Written by LinguABC** with AI drafts (`src/lib/ai/test-draft.ts`, one section per call in the official shape) and Fish Audio recordings. The content is original, so there is no third-party licence.
+- **Who can do what:**
+  - Platform admins (`platform_admins`; there's no UI or grant to change it) use `/admin/tests` to create, edit, record, publish and hide tests.
+  - Publishing checks the shape: 40 questions, 4 recorded parts or 3 passages.
+  - A published test is locked and must be unpublished to edit.
+- **Who sees what:**
+  - Staff and mentors of any centre see published tests and can listen to their audio, so they can choose one for a mock.
+  - **Keys and listening transcripts are for platform admins only.** Anyone can open a centre and become staff, so keys readable by every centre's staff would leak mock answers. Marking happens in the database.
+- **Usage:** admin AI and voice use goes into `ai_requests` with `center_id` null, capped at 120 requests per hour.
 
 ## Roles and permissions
 - RLS helpers in `app` (0002):

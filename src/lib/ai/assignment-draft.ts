@@ -7,7 +7,7 @@ import { emptyQuestion, LEVELS, type Draft, type DraftGroup, type DraftQuestion,
 
 const TYPES: QuestionType[] = ["mc", "multi", "tfng", "ynng", "gap", "matching", "headings", "open"];
 
-const SCHEMA = {
+export const SCHEMA = {
   type: "object",
   properties: {
     title: { type: "string" },
@@ -55,7 +55,7 @@ type RawQuestion = {
   type?: string; prompt?: string; group?: string; options?: string[]; answer?: number;
   answers?: number[]; choice?: string; accepted?: string[]; max_words?: number; explanation?: string; key?: string;
 };
-type Raw = { title?: string; level?: string; passage?: string; groups?: { id?: string; instructions?: string; options?: string[] }[]; questions?: RawQuestion[] };
+export type Raw = { title?: string; level?: string; passage?: string; groups?: { id?: string; instructions?: string; options?: string[] }[]; questions?: RawQuestion[] };
 
 const clean = (xs: unknown[] | undefined, max: number) => {
   const list = (xs ?? []).map((o) => String(o ?? "").trim()).filter(Boolean);
@@ -81,7 +81,7 @@ function keyIndex(key: string, options: string[], roman = false): number | null 
 const inRange = (i: number | null | undefined, n: number) => (i != null && Number.isInteger(i) && i >= 0 && i < n ? i : null);
 
 /** Bring whatever the model returned into a shape the editor and database accept. */
-function normalize(raw: Raw, skill: Skill, level: Level): Draft {
+export function normalize(raw: Raw, skill: Skill, level: Level): Draft {
   const groups: DraftGroup[] = (raw.groups ?? [])
     .map((g, i) => ({ id: String(g.id ?? `g${i + 1}`).slice(0, 40), instructions: String(g.instructions ?? "").trim().slice(0, 500), options: clean(g.options, 14) }))
     .filter((g) => g.instructions || g.options.length > 0)
@@ -143,7 +143,7 @@ function normalize(raw: Raw, skill: Skill, level: Level): Draft {
 }
 
 // Kept short on purpose: the system prompt is paid for on every request.
-const SYSTEM = `You write IELTS-style English homework for language-centre students.
+export const SYSTEM = `You write IELTS-style English homework for language-centre students.
 Question types and the fields each one needs:
 - mc: "options" (4), "answer" = index of the one correct option.
 - multi: "options" (5-7), "answers" = indices of the 2-3 correct ones.
