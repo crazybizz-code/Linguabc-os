@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { getPortalContext, pickChild, type PortalKind } from "@/lib/portal/context";
 import { loadSummary } from "@/lib/portal/summary";
+import { loadProgress } from "@/lib/progress";
+import { ProgressView } from "@/components/progress/progress-view";
 import { AttendanceView, ChildSwitcher, HomeView, PaymentsView } from "@/components/portal/views";
 import { PortalCard } from "@/components/portal/cards";
 import { ReceiptView } from "@/components/portal/receipt-view";
@@ -36,6 +38,17 @@ export async function PortalAttendance({ kind, searchParams }: { kind: PortalKin
     <>
       <ChildSwitcher ctx={ctx} current={child.id} base={`/${kind}/attendance`} />
       <AttendanceView ctx={ctx} s={await loadSummary(ctx, child.id)} />
+    </>
+  );
+}
+
+export async function PortalProgress({ kind, searchParams }: { kind: PortalKind; searchParams: SP }) {
+  const { ctx, child } = await setup(kind, searchParams);
+  if (!child) return <NoChild text={ctx.t("Nothing to show yet.")} />;
+  return (
+    <>
+      <ChildSwitcher ctx={ctx} current={child.id} base={`/${kind}/progress`} />
+      <ProgressView p={await loadProgress(ctx.supabase, child.id)} t={ctx.t} locale={intlLocale(ctx.locale)} familyView />
     </>
   );
 }

@@ -92,6 +92,19 @@ Other rules the database enforces:
   - **Keys and listening transcripts are for platform admins only.** Anyone can open a centre and become staff, so keys readable by every centre's staff would leak mock answers. Marking happens in the database.
 - **Usage:** admin AI and voice use goes into `ai_requests` with `center_id` null, capped at 120 requests per hour.
 
+## Progress (V1 step 3, basic)
+- `src/lib/progress.ts` (`loadProgress`) builds one learner's progress from tables the user can already read. RLS decides visibility, and families see a mock only once it's released. No new schema.
+  - Attendance by month (last 6, Tashkent time; late counts as attended, excused is left out).
+  - Homework set for the student's groups while they were enrolled: done, missed, on time, score, average by month and by skill.
+  - Completed mocks with L/R/W/S and overall, and the change since the previous mock.
+- `components/progress/` holds the shared `ProgressView` (stat tiles, charts, tables). It's used by Student 360 (`?tab=progress`), `/student/progress` and `/parent/progress` (with the child switcher).
+  - Charts are single-series SVG in the validated series colour `#2E7D4F`. Each mark has a tooltip and each chart has a table view.
+  - Charts measure their container, so text stays 11px on phones and desktops.
+- `/progress` (staff) lists every visible student, with a group filter and a flag:
+  - **At risk:** attendance below 75%.
+  - **Needs attention:** attendance below 85%, or less than 60% of homework done.
+  - Students who need attention are listed first.
+
 ## Roles and permissions
 - RLS helpers in `app` (0002):
   - `has_role`, `is_member`

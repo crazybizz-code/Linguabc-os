@@ -9,10 +9,12 @@ import { RecordPayment } from "../../payments/record-payment";
 import { inviteParentLogin, inviteStudentLogin } from "../../actions";
 import { LoginInvite } from "./login-invite";
 import { intlLocale } from "@/i18n";
+import { loadProgress } from "@/lib/progress";
+import { ProgressView } from "@/components/progress/progress-view";
 
 export const metadata = { title: "Student" };
 const TZ = "Asia/Tashkent";
-const TABS = ["overview", "attendance", "payments", "parent"] as const;
+const TABS = ["overview", "progress", "attendance", "payments", "parent"] as const;
 const PAY_TONE: Record<string, Tone> = { paid: "green", partial: "amber", pending: "amber", overdue: "red", void: "neutral" };
 const ATT_TONE: Record<string, Tone> = { present: "green", late: "amber", absent: "red", excused: "neutral" };
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -178,6 +180,8 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
           </div>
         </div>
       )}
+
+      {tab === "progress" && <ProgressView p={await loadProgress(supabase, id)} t={t} locale={L} />}
 
       {tab === "attendance" && (
         <Card className="overflow-hidden">

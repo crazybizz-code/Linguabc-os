@@ -80,6 +80,7 @@ The owner confirmed this order on 2026-11-19.
    - basic trends
 
    Advanced adaptive intelligence comes later.
+   **Built on 2026-11-20 (PR pending):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
 5. **Click payments.**
    - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.

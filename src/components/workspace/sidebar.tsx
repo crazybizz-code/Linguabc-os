@@ -49,7 +49,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Performance",
     items: [
-      { href: "/progress", label: "Progress", icon: TrendingUp, soon: true },
+      { href: "/progress", label: "Progress", icon: TrendingUp },
       { href: "/reports", label: "Reports", icon: BarChart3, soon: true, staffOnly: true },
       { href: "/staff", label: "Staff & mentors", icon: ShieldCheck, staffOnly: true },
     ],
