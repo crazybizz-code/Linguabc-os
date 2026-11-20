@@ -34,7 +34,7 @@ type Item = { href: string; label: string; icon: LucideIcon };
 type Section = { title: string; items: Item[] };
 type StaffRole = "owner" | "admin" | "academic_manager" | "mentor";
 
-const SOON = new Set(["/schedule", "/parents", "/notifications", "/reports", "/mentors", "/analytics", "/settings"]);
+const SOON = new Set(["/parents", "/reports", "/mentors", "/analytics", "/settings"]);
 
 const I = {
   overview: { href: "/dashboard", label: "Overview", icon: LayoutGrid },
@@ -177,13 +177,13 @@ export function Sidebar({ name, role, roleLabel, isPlatformAdmin = false }: {
             <Settings className="h-[17px] w-[17px]" strokeWidth={1.7} /> {t("Settings")}
           </Link>
         ))}
-        <div className="mt-2 flex items-center gap-2.5 rounded-[12px] bg-[#FCF8F4]/[0.07] px-2.5 py-2">
+        <Link href="/profile" className="mt-2 flex items-center gap-2.5 rounded-[12px] bg-[#FCF8F4]/[0.07] px-2.5 py-2 hover:bg-[#FCF8F4]/[0.12]">
           <Avatar name={name} size="sm" />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-[12.5px] font-medium">{name}</div>
             <div className="text-[10.5px] text-[#8FAA9C]">{roleLabel}</div>
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );

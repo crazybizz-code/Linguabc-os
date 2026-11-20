@@ -157,6 +157,23 @@ export async function reissueInvite(membershipId: string): Promise<{ link?: stri
   return { link: `${siteUrl()}/join?code=${data}`, expires: new Date(Date.now() + 14 * 86400_000).toISOString() };
 }
 
+/** Changes the signed-in person's password after checking the current one. */
+export async function changePassword(_: { ok?: boolean; error?: string } | undefined, form: FormData): Promise<{ ok?: boolean; error?: string }> {
+  const { supabase } = await getStaffContext();
+  const current = String(form.get("current") ?? "");
+  const password = String(form.get("password") ?? "");
+  if (password.length < 8) return { error: "Use at least 8 characters for your password." };
+  if (password !== String(form.get("confirm") ?? "")) return { error: "Passwords do not match." };
+  const { data } = await supabase.auth.getUser();
+  const email = data.user?.email;
+  if (!email) return { error: "Something went wrong. Try again." };
+  const { error: wrong } = await supabase.auth.signInWithPassword({ email, password: current });
+  if (wrong) return { error: "The current password is wrong." };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: "Something went wrong. Try again." };
+  return { ok: true };
+}
+
 /** Reminds a student's family about an unpaid fee (in-app), at most once a day. */
 export async function remindPayment(invoiceId: string): Promise<{ sent?: number; error?: string }> {
   const { supabase } = await getStaffContext();
