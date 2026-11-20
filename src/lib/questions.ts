@@ -148,13 +148,13 @@ export function splitGap(prompt: string): [string, string] | null {
 }
 
 /** Groups questions in order, starting a new block whenever the group changes. */
-export function blocksOf(questions: Question[], groups?: QuestionGroup[]) {
+export function blocksOf(questions: Question[], groups?: QuestionGroup[], start = 1) {
   const blocks: { group?: QuestionGroup; type: string; items: { q: Question; n: number }[] }[] = [];
   questions.forEach((q, i) => {
     const last = blocks[blocks.length - 1];
     const g = groupOf(groups, q.group);
-    if (last && last.group?.id === g?.id && (g || last.type === q.type)) last.items.push({ q, n: i + 1 });
-    else blocks.push({ group: g, type: q.type, items: [{ q, n: i + 1 }] });
+    if (last && last.group?.id === g?.id && (g || last.type === q.type)) last.items.push({ q, n: i + start });
+    else blocks.push({ group: g, type: q.type, items: [{ q, n: i + start }] });
   });
   return blocks;
 }

@@ -1115,8 +1115,41 @@ export type Database = {
           },
         ]
       }
+      mock_attempts: {
+        Row: {
+          answers: Json
+          band: number | null
+          center_id: string
+          deadline_at: string
+          focus_lost: number
+          id: string
+          marks: Json | null
+          mock_session_id: string
+          raw_score: number | null
+          skill: Database["public"]["Enums"]["skill"]
+          started_at: string
+          student_id: string
+          submitted_at: string | null
+          test_id: string
+          total: number | null
+        }
+        Insert: { center_id: string; deadline_at: string; mock_session_id: string; skill: Database["public"]["Enums"]["skill"]; student_id: string; test_id: string }
+        Update: { answers?: Json }
+        Relationships: [
+          {
+            foreignKeyName: "mock_attempts_student_id_center_id_fkey"
+            columns: ["student_id", "center_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "center_id"]
+          },
+        ]
+      }
       mock_results: {
         Row: {
+          listening_raw: number | null
+          reading_raw: number | null
+          released_at: string | null
           center_id: string
           id: string
           listening_band: number | null
@@ -1131,6 +1164,9 @@ export type Database = {
           writing_band: number | null
         }
         Insert: {
+          listening_raw?: number | null
+          reading_raw?: number | null
+          released_at?: string | null
           center_id: string
           id?: string
           listening_band?: number | null
@@ -1145,6 +1181,9 @@ export type Database = {
           writing_band?: number | null
         }
         Update: {
+          listening_raw?: number | null
+          reading_raw?: number | null
+          released_at?: string | null
           center_id?: string
           id?: string
           listening_band?: number | null
@@ -1184,6 +1223,8 @@ export type Database = {
       }
       mock_sessions: {
         Row: {
+          listening_test_id: string | null
+          reading_test_id: string | null
           center_id: string
           created_at: string
           examiner_id: string | null
@@ -1197,6 +1238,8 @@ export type Database = {
           version: string | null
         }
         Insert: {
+          listening_test_id?: string | null
+          reading_test_id?: string | null
           center_id: string
           created_at?: string
           examiner_id?: string | null
@@ -1210,6 +1253,8 @@ export type Database = {
           version?: string | null
         }
         Update: {
+          listening_test_id?: string | null
+          reading_test_id?: string | null
           center_id?: string
           created_at?: string
           examiner_id?: string | null
@@ -1739,6 +1784,9 @@ export type Database = {
       }
       mock_result_scores: {
         Row: {
+          listening_raw: number | null
+          reading_raw: number | null
+          released_at: string | null
           center_id: string | null
           id: string | null
           listening_band: number | null
@@ -1910,6 +1958,14 @@ export type Database = {
       }
       my_homework_result: { Args: { p_homework: string }; Returns: Json }
       submission_marks: { Args: { p_submission: string }; Returns: Json }
+      set_mock_tests: { Args: { p_listening?: string | null; p_reading?: string | null; p_session: string }; Returns: undefined }
+      close_expired_attempts: { Args: { p_session: string }; Returns: number }
+      release_mock_results: { Args: { p_session: string; p_students?: string[] }; Returns: number }
+      my_online_mocks: { Args: never; Returns: Json }
+      start_mock_module: { Args: { p_session: string; p_skill: Database["public"]["Enums"]["skill"] }; Returns: Json }
+      save_mock_answers: { Args: { p_answers: Json; p_attempt: string }; Returns: undefined }
+      submit_mock_module: { Args: { p_answers?: Json; p_attempt: string }; Returns: undefined }
+      report_mock_focus: { Args: { p_attempt: string }; Returns: undefined }
       am_platform_admin: { Args: never; Returns: boolean }
       claim_admin_ai_request: { Args: { p_kind: string }; Returns: number }
       new_library_test: {

@@ -8,7 +8,7 @@ import { saveMockResults, type MockRow } from "../../actions";
 import { useT } from "@/i18n/client";
 
 type Module = "reading" | "listening" | "writing" | "speaking";
-type Row = { student_id: string; name: string; absent: boolean } & Record<Module, number | null>;
+type Row = { student_id: string; name: string; absent: boolean; released: boolean; online?: string } & Record<Module, number | null>;
 const BANDS = Array.from({ length: 19 }, (_, i) => i / 2);
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
@@ -45,7 +45,12 @@ export function ResultsSheet({ sessionId, modules, initial, canEdit }: { session
             <li key={r.student_id} className={cn("flex flex-wrap items-center gap-x-4 gap-y-2.5 px-5 py-3", r.absent && "bg-[#F7F0EA]/60")}>
               <div className="flex min-w-[180px] flex-1 items-center gap-3">
                 <Avatar name={r.name} size="sm" />
-                <span className="text-[13.5px] font-medium">{r.name}</span>
+                <div className="leading-tight">
+                  <span className="text-[13.5px] font-medium">{r.name}</span>
+                  {(r.online || r.released) && (
+                    <p className="text-[11px] text-muted-foreground">{[r.online, r.released ? t("Sent to family") : null].filter(Boolean).join(" · ")}</p>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap items-end gap-1.5 sm:gap-2">
                 {modules.map((m) => (
@@ -53,7 +58,7 @@ export function ResultsSheet({ sessionId, modules, initial, canEdit }: { session
                     <span className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-[#5F6B66]">{t(cap(m))}</span>
                     <select
                       aria-label={`${r.name} ${t(cap(m))}`}
-                      disabled={!canEdit || r.absent}
+                      disabled={!canEdit || r.absent || r.released}
                       value={r[m] ?? ""}
                       onChange={(e) => update(r.student_id, { [m]: e.target.value === "" ? null : Number(e.target.value) })}
                       className="h-9 w-[62px] rounded-[9px] sm:w-[74px] border border-border/80 bg-[#FCF8F4] px-2 text-[13px] tabular-nums disabled:opacity-50"
@@ -69,7 +74,7 @@ export function ResultsSheet({ sessionId, modules, initial, canEdit }: { session
                     <span className="flex h-9 items-center text-[15px] font-semibold tabular-nums">{r.absent ? "—" : o?.toFixed(1) ?? "—"}</span>
                   </div>
                 )}
-                <button type="button" disabled={!canEdit} onClick={() => update(r.student_id, { absent: !r.absent })}
+                <button type="button" disabled={!canEdit || r.released} onClick={() => update(r.student_id, { absent: !r.absent })}
                   className={cn("h-9 rounded-[9px] border px-3 text-[12px] font-medium disabled:opacity-50",
                     r.absent ? "border-[#B4483D] bg-[#B4483D] text-white" : "border-border/80 text-[#3B4A42] hover:bg-white")}>
                   {t("Absent")}
@@ -86,7 +91,7 @@ export function ResultsSheet({ sessionId, modules, initial, canEdit }: { session
           <button type="button" disabled={pending} className={buttonPrimary}
             onClick={() => start(async () => {
               setError(undefined);
-              const payload: MockRow[] = rows.map(({ student_id, absent, reading, listening, writing, speaking }) => ({ student_id, absent, reading, listening, writing, speaking }));
+              const payload: MockRow[] = rows.filter((r) => !r.released).map(({ student_id, absent, reading, listening, writing, speaking }) => ({ student_id, absent, reading, listening, writing, speaking }));
               const res = await saveMockResults(sessionId, payload);
               if (res?.error) setError(t(res.error));
               else { setSaved(true); router.refresh(); }

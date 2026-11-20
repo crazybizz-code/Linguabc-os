@@ -276,6 +276,28 @@ export async function saveMockResults(sessionId: string, rows: MockRow[]): Promi
   return { ok: true };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Choose the library tests students take online in this session. */
+export async function setMockTests(sessionId: string, reading: string | null, listening: string | null): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const id = (v: string | null) => (v && UUID.test(v) ? v : null);
+  const { error } = await supabase.rpc("set_mock_tests", { p_session: sessionId, p_reading: id(reading), p_listening: id(listening) });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/mocks", "layout");
+  return { ok: true };
+}
+
+/** Send finished results to students and parents. */
+export async function releaseMockResults(sessionId: string): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const { data, error } = await supabase.rpc("release_mock_results", { p_session: sessionId });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/mocks", "layout");
+  revalidatePath("/students", "layout");
+  return data ? { ok: true } : { error: "No finished results to send yet." };
+}
+
 // ---------------------------------------------------------------- homework
 export async function assignLibraryItem(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase, workspace } = await getStaffContext();

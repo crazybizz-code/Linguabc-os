@@ -340,8 +340,17 @@ select save_mock_results(:'ms2', jsonb_build_array(
   jsonb_build_object('student_id', :'st2', 'reading', 5, 'absent', true)));
 select tests.assert((select status from mock_sessions where id = :'ms2') = 'completed', 'session completed');
 select tests.assert((select reading_band from mock_results where mock_session_id = :'ms2' and student_id = :'st2') is null, 'absent clears bands');
-select tests.assert((select count(*) from activities where ref_id = :'ms2' and student_id = :'st1') = 1, 'result on timeline');
-select tests.expect_fail(format($$select save_mock_results(%L, '[{"student_id":"%s","reading":6.3}]')$$, :'ms2', :'st1'), 'check');
+select tests.assert((select count(*) from activities where ref_id = :'ms2' and student_id = :'st1') = 0, 'not on timeline before release');
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'ms2'), 0);
+:as_mentor
+select tests.assert(release_mock_results(:'ms2') = 2, 'completed and absent results released');
+select tests.assert((select count(*) from activities where ref_id = :'ms2' and student_id = :'st1') = 1, 'result on timeline after release');
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'ms2'), 1);
+:as_mentor
+select save_mock_results(:'ms2', jsonb_build_array(jsonb_build_object('student_id', :'st1', 'reading', 5, 'listening', 5, 'writing', 5, 'speaking', 5)));
+select tests.assert((select reading_band from mock_results where mock_session_id = :'ms2' and student_id = :'st1') = 6.5, 'released results are final');
 select tests.expect_fail(format($$select save_mock_results(%L, '[{"student_id":"%s","reading":6}]')$$, :'ms2', :'st3'), 'not in this session');
 :as_mentor2
 select tests.expect_fail(format($$select save_mock_results(%L, '[]')$$, :'ms2'), 'forbidden');
@@ -353,6 +362,7 @@ select create_mock_session(:'center_a', 'Listening check', :'group1', now(), nul
 select save_mock_results(:'ms3', jsonb_build_array(jsonb_build_object('student_id', :'st1', 'listening', 7.5, 'reading', 9)));
 select tests.assert((select status from mock_results where mock_session_id = :'ms3' and student_id = :'st1') = 'completed', 'single-module result completes');
 select tests.assert((select reading_band from mock_results where mock_session_id = :'ms3' and student_id = :'st1') is null, 'off-session module ignored');
+select tests.expect_fail(format($$select save_mock_results(%L, '[{"student_id":"%s","listening":6.3}]')$$, :'ms3', :'st1'), 'check');
 
 \echo '14. library and answer keys'
 :as_superuser
@@ -656,5 +666,89 @@ select save_library_test(:'rt', 'reading', 'Reading Test 1', null, '[{"id":"s1",
 select tests.expect_fail(format($$select set_library_test_status(%L, 'published')$$, :'rt'), '40 questions');
 select delete_library_test(:'rt');
 select tests.expect_count(format('select * from library_tests where id = %L', :'rt'), 0);
+
+\echo '20. online mocks'
+:as_superuser
+select tests.assert(app.norm_answer('1.5 metres') = '1.5 metres', 'decimals keep their point');
+select tests.assert(app.norm_answer('£12.50') = '12.50', 'currency sign dropped, decimal kept');
+select tests.assert(app.norm_answer('50,000') = '50000', 'thousands separator dropped');
+select tests.assert(app.norm_answer('Paris.') = 'paris', 'full stop dropped');
+select tests.assert(app.word_count(app.norm_answer('1.5 metres')) = 2, '1.5 is one word');
+select tests.assert(app.academic_band('listening', 30, 40) = 7.0 and app.academic_band('reading', 30, 40) = 7.0, 'band 7 at 30');
+select tests.assert(app.academic_band('reading', 26, 40) = 6.0 and app.academic_band('listening', 26, 40) = 6.5, 'reading and listening tables differ');
+select tests.assert(app.academic_band('reading', 40, 40) = 9.0 and app.academic_band('reading', 0, 40) = 0, 'ends of the table');
+-- a published reading test (3 passages, 13 + 13 + 14 questions)
+:as_ownerA
+select new_library_test('reading', 'Reading Test 2', 'B2') as rt2 \gset
+select save_library_test(:'rt2', 'reading', 'Reading Test 2', 'B2',
+  (select jsonb_agg(jsonb_build_object('id', 's' || p, 'title', 'Passage ' || p, 'passage', repeat('Text of the passage. ', 40), 'groups', '[]'::jsonb,
+     'questions', (select jsonb_agg(jsonb_build_object('id', 'q' || n, 'type', 'tfng', 'prompt', 'S' || n) order by n)
+                   from generate_series(case p when 1 then 1 when 2 then 14 else 27 end, case p when 1 then 13 when 2 then 26 else 40 end) n)) order by p)
+   from generate_series(1, 3) p),
+  (select jsonb_object_agg('q' || n, jsonb_build_object('answer', 'true')) from generate_series(1, 40) n));
+select set_library_test_status(:'rt2', 'published');
+
+:as_acad
+select create_mock_session(:'center_a', 'Online mock', :'group1', now(), :'m_mentor') as ms4 \gset
+:as_student
+select tests.assert(jsonb_array_length(my_online_mocks()) = 0, 'no online mock before tests are chosen');
+select tests.expect_fail(format($$select start_mock_module(%L, 'reading')$$, :'ms4'), 'not chosen');
+:as_mentor2
+select tests.expect_fail(format($$select set_mock_tests(%L, %L, %L)$$, :'ms4', :'rt2', :'lt'), 'forbidden');
+:as_mentor
+select tests.expect_fail(format($$select set_mock_tests(%L, %L, null)$$, :'ms4', :'lt'), 'published reading test');
+select set_mock_tests(:'ms4', :'rt2', :'lt');
+:as_student
+select tests.assert(jsonb_array_length(my_online_mocks()->0->'modules') = 2, 'student sees the two online modules');
+select tests.expect_count(format($$select * from storage.objects where bucket_id = 'library-audio' and name like 'tests/%s/%%'$$, :'lt'), 0);
+select start_mock_module(:'ms4', 'reading') as r_start \gset
+select (:'r_start'::jsonb->>'attempt_id') as att_r \gset
+select tests.assert((:'r_start'::jsonb->'test')::text not like '%"answer"%' and (:'r_start'::jsonb->'test')::text not like '%accepted%', 'no key sent to the student');
+select tests.assert(jsonb_array_length(:'r_start'::jsonb->'test'->'sections') = 3, 'three passages sent');
+select tests.assert(((:'r_start'::jsonb->>'deadline_at')::timestamptz - (:'r_start'::jsonb->>'started_at')::timestamptz) = interval '60 minutes', 'reading has 60 minutes');
+select tests.assert((start_mock_module(:'ms4', 'reading')->>'attempt_id') = :'att_r', 'starting again resumes');
+select tests.expect_count('select * from mock_attempts', 0);
+select tests.expect_count('select * from library_tests', 0);
+select save_mock_answers(:'att_r', '{"q1":"false"}');
+select submit_mock_module(:'att_r', (select jsonb_object_agg('q' || n, 'true') from generate_series(1, 40) n));
+select tests.expect_fail(format($$select start_mock_module(%L, 'reading')$$, :'ms4'), 'already finished');
+select tests.expect_fail(format($$select save_mock_answers(%L, '{}')$$, :'att_r'), 'already submitted');
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'ms4'), 0);
+-- listening: audio opens with the attempt; answers after the deadline are ignored
+select start_mock_module(:'ms4', 'listening')->>'attempt_id' as att_l \gset
+select tests.expect_count(format($$select * from storage.objects where bucket_id = 'library-audio' and name like 'tests/%s/%%'$$, :'lt'), 4);
+select save_mock_answers(:'att_l', (select jsonb_object_agg('q' || n, 'true') from generate_series(1, 30) n));
+select report_mock_focus(:'att_l');
+:as_student2
+select tests.expect_fail(format($$select save_mock_answers(%L, '{}')$$, :'att_l'), 'forbidden');
+select report_mock_focus(:'att_l');
+:as_superuser
+update mock_attempts set deadline_at = now() - interval '2 minutes' where id = :'att_l';
+:as_student
+select tests.expect_count(format($$select * from storage.objects where bucket_id = 'library-audio' and name like 'tests/%s/%%'$$, :'lt'), 0);
+select tests.expect_fail(format($$select save_mock_answers(%L, '{}')$$, :'att_l'), 'Time is up');
+select submit_mock_module(:'att_l', (select jsonb_object_agg('q' || n, 'true') from generate_series(1, 40) n));
+:as_mentor
+select tests.assert((select raw_score from mock_attempts where id = :'att_r') = 40 and (select band from mock_attempts where id = :'att_r') = 9.0, 'reading 40/40 is band 9');
+select tests.assert((select raw_score from mock_attempts where id = :'att_l') = 30 and (select band from mock_attempts where id = :'att_l') = 7.0, 'late answers ignored: 30/40 is band 7');
+select tests.assert((select focus_lost from mock_attempts where id = :'att_l') = 1, 'focus loss counted once (only by the owner)');
+select tests.assert((select reading_band = 9 and listening_band = 7 and reading_raw = 40 from mock_results where mock_session_id = :'ms4' and student_id = :'st1'), 'bands written to the result');
+select tests.expect_fail(format($$select set_mock_tests(%L, null, %L)$$, :'ms4', :'lt'), 'already started');
+-- the mentor adds writing and speaking, marks the absent student, then releases
+select save_mock_results(:'ms4', jsonb_build_array(
+  jsonb_build_object('student_id', :'st1', 'reading', 9, 'listening', 7, 'writing', 6, 'speaking', 6.5),
+  jsonb_build_object('student_id', :'st2', 'absent', true)));
+select tests.assert((select status from mock_results where mock_session_id = :'ms4' and student_id = :'st1') = 'completed', 'complete after W/S');
+:as_ownerB
+select tests.expect_count(format('select * from mock_attempts where mock_session_id = %L', :'ms4'), 0);
+select tests.expect_fail(format($$select release_mock_results(%L)$$, :'ms4'), 'forbidden');
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'ms4'), 0);
+:as_mentor
+select tests.assert(release_mock_results(:'ms4') = 2, 'released');
+:as_student
+select tests.assert((select overall_band from mock_result_scores where mock_session_id = :'ms4') = 7.0, 'student sees the full result after release');
+:as_parent
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'ms4'), 1);
 
 \echo 'ALL TESTS PASSED'
