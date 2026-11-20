@@ -290,7 +290,7 @@ update notifications set read_at = now() where id = :'n1';
 select tests.assert((select read_at is not null from notifications where id = :'n1'), 'mark as read');
 select tests.expect_fail(format($$update notifications set title = 'x' where id = %L$$, :'n1'), 'only read_at');
 :as_student2
-select tests.expect_count('select * from notifications', 0);
+select tests.expect_count(format('select * from notifications where id = %L', :'n1'), 0);
 
 \echo '11. workspace RPCs'
 :as_admin
@@ -785,5 +785,48 @@ select tests.assert((select count(*) from notifications where data->>'kind' = 'm
 select tests.expect_count($$select * from notifications where data->>'kind' = 'mock_left'$$, 0);
 -- reading is a separate part and can still be taken
 select tests.assert((start_mock_module(:'ms5', 'reading')->>'attempt_id') is not null, 'other part still open');
+
+\echo '22. notifications for families and students'
+-- earlier sections already produced some: payments, homework, mocks
+:as_admin
+select generate_invoices(:'center_a', (date_trunc('month', now()) + interval '2 months')::date);
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment') >= 2, 'parent told about payments');
+select tests.assert((select count(*) from notifications where data->>'kind' = 'invoice') >= 1, 'parent told about invoices');
+select tests.assert((select count(*) from notifications where data->>'kind' = 'mock_released') >= 1, 'parent told about released mock results');
+select count(*) as par_att from notifications where data->>'kind' = 'attendance' \gset
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'homework_new') >= 1, 'student told about new homework');
+select tests.assert((select count(*) from notifications where data->>'kind' = 'mock_scheduled') >= 1, 'student told about scheduled mocks');
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment') >= 2, 'student told about payments');
+select count(*) as st_att from notifications where data->>'kind' = 'attendance' \gset
+-- absent: parents only
+:as_mentor
+select id as lesson_abs from lessons where group_id = :'group1' and starts_at < now() - interval '1 day' and id <> :'lesson_past' order by starts_at desc limit 1 \gset
+select mark_attendance(:'lesson_abs', format('[{"student_id":"%s","status":"absent"}]', :'st1')::jsonb);
+select tests.assert((select count(*) from notifications where data->>'kind' in ('attendance','payment','invoice','homework_new')) = 0, 'mentor gets no family notices');
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'attendance') = :par_att + 1, 'parent told about the absence');
+select tests.assert((select body from notifications where data->>'kind' = 'attendance' order by created_at desc limit 1) like 'Aziz Karimov was marked absent%', 'absence notice names the student');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'attendance') = :st_att, 'student not told about own absence');
+-- a cancelled lesson reaches students and parents of the group
+:as_admin
+select id as lesson_cxl from lessons where group_id = :'group1' and starts_at > now() + interval '1 day' and status = 'scheduled' order by starts_at limit 1 \gset
+update lessons set status = 'cancelled' where id = :'lesson_cxl';
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'lesson_cancelled') = 1, 'student told the lesson is cancelled');
+:as_student2
+select tests.assert((select count(*) from notifications where data->>'kind' = 'lesson_cancelled') = 1, 'classmate told too');
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'lesson_cancelled') = 1, 'parent told too');
+:as_ownerB
+select tests.expect_count($$select * from notifications where data->>'kind' = 'lesson_cancelled'$$, 0);
+-- marking read
+:as_student
+select mark_my_notifications_read(:'center_a');
+select tests.expect_count('select * from notifications where read_at is null', 0);
+:as_parent
+select tests.assert((select count(*) from notifications where read_at is null) > 0, 'others stay unread');
 
 \echo 'ALL TESTS PASSED'

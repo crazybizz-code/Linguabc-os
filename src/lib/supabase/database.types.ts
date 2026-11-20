@@ -1969,6 +1969,7 @@ export type Database = {
       submit_mock_module: { Args: { p_answers?: Json; p_attempt: string }; Returns: undefined }
       report_mock_focus: { Args: { p_attempt: string }; Returns: undefined }
       leave_mock_module: { Args: { p_attempt: string; p_reason: string }; Returns: undefined }
+      mark_my_notifications_read: { Args: { p_center: string }; Returns: undefined }
       am_platform_admin: { Args: never; Returns: boolean }
       claim_admin_ai_request: { Args: { p_kind: string }; Returns: number }
       new_library_test: {
