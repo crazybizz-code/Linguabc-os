@@ -11,6 +11,7 @@ export { splitScript };
  *   FISH_AUDIO_API_KEY   required
  *   FISH_AUDIO_VOICES    comma-separated voice (model) ids; defaults below
  *   FISH_AUDIO_MODEL     TTS model header (default "s1")
+ *   FISH_AUDIO_TEMPERATURE  sampling temperature, 0-1 (default 0.3)
  *   FISH_AUDIO_BASE_URL  only for local testing
  *
  * Each speaker in a "Name: words" script gets a voice (the mentor can pick),
@@ -71,10 +72,23 @@ function stripId3(buf: Buffer): Buffer {
   return buf.subarray(10 + size + (buf[5] & 0x10 ? 10 : 0));
 }
 
+/**
+ * Low sampling keeps a voice steady from one line to the next: every turn
+ * is a separate request, and at Fish's defaults (0.7) a speaker can sound
+ * noticeably different between lines. FISH_AUDIO_TEMPERATURE overrides it.
+ */
+function sampling() {
+  const t = Number(process.env.FISH_AUDIO_TEMPERATURE);
+  const temperature = Number.isFinite(t) && t > 0 && t <= 1 ? t : 0.3;
+  return { temperature, top_p: 0.5 };
+}
+
 async function tts(text: string, voice: string | undefined, model: string): Promise<Buffer> {
   const base = process.env.FISH_AUDIO_BASE_URL || "https://api.fish.audio";
-  const body = { text, format: "mp3", mp3_bitrate: 128, normalize: true, latency: "normal", ...(voice && { reference_id: voice }) };
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const plain = { text, format: "mp3", mp3_bitrate: 128, normalize: true, latency: "normal", ...(voice && { reference_id: voice }) };
+  let body: Record<string, unknown> = { ...plain, ...sampling() };
+  let tuned = true;
+  for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(`${base}/v1/tts`, {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model },
@@ -89,7 +103,9 @@ async function tts(text: string, voice: string | undefined, model: string): Prom
       return audio;
     }
     const detail = (await res.text().catch(() => "")).slice(0, 300);
-    if ((res.status === 429 || res.status >= 500) && attempt === 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+    // If this model rejects the sampling fields, speak without them.
+    if (tuned && (res.status === 400 || res.status === 422)) { console.warn("Fish Audio rejected sampling settings", detail); body = plain; tuned = false; continue; }
+    if ((res.status === 429 || res.status >= 500) && attempt < 2) { await new Promise((r) => setTimeout(r, 1500)); continue; }
     if (res.status === 401 || res.status === 403) { console.error("Fish Audio auth error", res.status, detail); throw new AiUnavailable("The voice service key was rejected. Check the key in the hosting settings."); }
     if (res.status === 402) throw new AiUnavailable("Voice credits have run out. Top up the Fish Audio account and try again.");
     if (res.status === 429) throw new AiUnavailable("The voice service is busy. Try again in a minute.");
