@@ -44,6 +44,7 @@ export const SPECS: Record<TestSkill, Spec[]> = {
 
 const PART_RULES = `This is one section of a full IELTS Academic test, not homework. Write it as the real exam does:
 - Original content only; never copy published tests.
+- Difficulty rises through the test: Part 1 / Passage 1 is the easiest, Part 4 / Passage 3 the hardest (denser language, abstract ideas, more paraphrase). Within this section, start with easier questions and end with harder ones.
 - Questions follow the order of the information in the text.
 - Each question is answerable from the text alone; distractors are plausible.
 - Listening: "passage" is the script to be recorded, one line per turn as "Name: words"; spell out anything a speaker spells ("That's S-M-I-T-H"). No stage directions except [short pause].`;

@@ -58,6 +58,13 @@ The owner confirmed this order on 2026-11-19.
    - **Content:** homework is made by the centre (AI or upload), and centres may also use LinguABC library tests. **Full mocks use LinguABC library tests only.** The mentor previews the library's full reading and listening tests and picks the one they like for the session.
    - **IELTS Academic** band tables for reading and listening (40 questions each).
    - **Content tool (PR A, built 2026-11-20):** LinguABC admins write full tests at `/admin/tests` (AI drafts each section, Fish records listening, admin edits and publishes). Migration 0018.
+   - **Easy to hard (owner, 2026-11-20):** every test rises in difficulty, from listening Part 1 to Part 4 and from reading Passage 1 to Passage 3, and within each section. The AI prompt requires it, and human-written tests follow it.
+   - **Full IELTS exam mode (owner, 2026-11-20):** students take mocks in a locked, full-screen screen that looks like the real computer-delivered IELTS:
+     - a header with the timer;
+     - the passage and questions side by side;
+     - a question navigator at the bottom;
+     - flag for review;
+     - no leaving the test. Leaving full screen or switching tabs is recorded and warned.
    - **Timed like the exam:** listening audio plays once with no pausing, then 2 minutes to check; reading is 60 minutes. Answers submit automatically when time runs out, and the deadline is enforced on the server.
 3. **Basic progress:**
    - Student 360 academic and administrative history

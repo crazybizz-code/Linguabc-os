@@ -75,7 +75,15 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Listening UI check passed (2026-11-20):** the owner created a B2 gap-fill listening (6 questions) with AI in Convora, and Fish Audio recorded the conversation. This was the first live Fish call.
 
-**Mock engine part A merged and live (2026-11-20):** #22. 0018 applied; the Convora owner's auth user is the only row in `platform_admins` (checked: `am_platform_admin()` returns true as that user). First listening test in progress (draft, Part 1 done). Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
+**Mock engine part A merged and live (2026-11-20):** #22. 0018 applied; the Convora owner's auth user is the only row in `platform_admins` (checked: `am_platform_admin()` returns true as that user). Library drafts on 2026-11-20:
+- **Listening Test 1:** Part 1 was written with AI and recorded by the owner. Parts 2–4 were written by Claude, are not recorded yet, and the owner records them in the editor.
+- **Reading Test 1:** written by Claude, 40 questions; all-correct answers score 40/40 in the database.
+
+Both are drafts waiting for the owner's review before publishing.
+
+**Known marking bug:** `app.norm_answer` strips the dot from decimals, so "1.5" becomes "1 5" (two words). A gap answer with a decimal can then break its word limit. Fix it in part B.
+
+ Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
 1. The owner writes the first listening and reading tests at `/admin/tests` and publishes them. This is the first live run of section drafting.
