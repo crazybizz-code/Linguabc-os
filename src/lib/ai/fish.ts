@@ -10,7 +10,7 @@ export { MAX_SCRIPT_CHARS, splitScript };
  *
  *   FISH_AUDIO_API_KEY   required
  *   FISH_AUDIO_VOICES    comma-separated voice (model) ids; defaults below
- *   FISH_AUDIO_MODEL     TTS model header (default "s1")
+ *   FISH_AUDIO_MODEL     TTS model header (default "s2.1-pro": s1 retires on 31 Dec 2026)
  *   FISH_AUDIO_PODCAST_MODEL  model for LinguABC library podcasts (default: FISH_AUDIO_MODEL)
  *   FISH_AUDIO_TEMPERATURE  sampling temperature, 0-1 (default 0.3)
  *   FISH_AUDIO_BASE_URL  only for local testing
@@ -19,6 +19,9 @@ export { MAX_SCRIPT_CHARS, splitScript };
  * turns are spoken one by one and the MP3 pieces are joined.
  */
 export const fishConfigured = () => Boolean(process.env.FISH_AUDIO_API_KEY);
+
+/** Fish retires s1 on 31 Dec 2026 and asks clients to switch to S2.1 Pro (same price). */
+const DEFAULT_MODEL = "s2.1-pro";
 
 /** Voices chosen by the owner on fish.audio (2026-11-20). Voice ids are public, not secrets. */
 const DEFAULT_VOICES: Voice[] = [
@@ -195,7 +198,7 @@ async function tts(text: string, voice: string | undefined, model: string): Prom
 /** Turns a listening script into one MP3, each speaker read by their voice. */
 export async function speakScript(script: string, chosen: Cast = {}, opts: { model?: string } = {}): Promise<Speech> {
   if (!fishConfigured()) throw new AiUnavailable("Audio is not configured yet. Add a Fish Audio key in the hosting settings.");
-  const model = opts.model || process.env.FISH_AUDIO_MODEL || "s1";
+  const model = opts.model || process.env.FISH_AUDIO_MODEL || DEFAULT_MODEL;
   const segments = splitScript(script);
   const spoken = segments.filter((s) => !s.pause);
   if (spoken.length === 0) throw new AiUnavailable("Write the script first.");
@@ -226,5 +229,5 @@ export async function speakScript(script: string, chosen: Cast = {}, opts: { mod
   };
 }
 
-/** The model LinguABC podcasts are recorded with (the owner chose S2.1 Pro; its id is set in the hosting settings). */
-export const podcastModel = () => process.env.FISH_AUDIO_PODCAST_MODEL || process.env.FISH_AUDIO_MODEL || "s1";
+/** The model LinguABC podcasts are recorded with (the owner chose S2.1 Pro). */
+export const podcastModel = () => process.env.FISH_AUDIO_PODCAST_MODEL || process.env.FISH_AUDIO_MODEL || DEFAULT_MODEL;
