@@ -93,7 +93,7 @@ export default async function GroupsPage({ searchParams }: PageProps<"/groups">)
             const tone = pct != null && pct < 85 ? "amber" : "green";
             return (
               <Card key={g.id} className="p-5">
-                <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{g.name}</h3>
+                <h3 className="text-[15px] font-semibold tracking-[-0.01em]"><Link href={`/groups/${g.id}`} className="hover:underline">{g.name}</Link></h3>
                 <p className="mt-0.5 text-[12px] text-muted-foreground">
                   {courseName.get(g.course_id!)} · {branchName.get(g.branch_id!)}
                 </p>
