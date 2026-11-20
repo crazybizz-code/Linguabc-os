@@ -30,6 +30,7 @@
 | #25 | 2026-11-20 | Exam: listening plays at start (fix found in QA); three-colour highlighting |
 | #26 | 2026-11-20 | Exam: highlight gap-fill sentences and options |
 | #27 | 2026-11-20 | Mock lockdown: leaving ends the part with 0, staff notified (0020) |
+| #28 | 2026-11-20 | Live staff notifications (Realtime, toast); notice names the student and group (0021) |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
