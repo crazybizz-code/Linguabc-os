@@ -40,8 +40,11 @@ const SCHEMA = {
           accepted: { type: "array", items: { type: "string" } },
           max_words: { type: "integer" },
           explanation: { type: "string" },
+          // Required, so the model never leaves a question without its answer
+          // (Gemini tends to drop optional fields). Parsed per type below.
+          key: { type: "string" },
         },
-        required: ["type", "prompt"],
+        required: ["type", "prompt", "key"],
       },
     },
   },
@@ -50,7 +53,7 @@ const SCHEMA = {
 
 type RawQuestion = {
   type?: string; prompt?: string; group?: string; options?: string[]; answer?: number;
-  answers?: number[]; choice?: string; accepted?: string[]; max_words?: number; explanation?: string;
+  answers?: number[]; choice?: string; accepted?: string[]; max_words?: number; explanation?: string; key?: string;
 };
 type Raw = { title?: string; level?: string; passage?: string; groups?: { id?: string; instructions?: string; options?: string[] }[]; questions?: RawQuestion[] };
 
@@ -59,6 +62,23 @@ const clean = (xs: unknown[] | undefined, max: number) => {
   return list.filter((o, i) => list.findIndex((x) => x.toLowerCase() === o.toLowerCase()) === i).slice(0, max);
 };
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const strip = (s: string) => s.trim().replace(/^["'“”‘’]+|["'“”‘’.]+$/g, "").trim();
+
+/** Option position from a key like "B", "2", "iii" or the option's own text. */
+function keyIndex(key: string, options: string[], roman = false): number | null {
+  const k = strip(key);
+  if (!k) return null;
+  const lower = k.toLowerCase();
+  const byText = options.findIndex((o) => o.trim().toLowerCase() === lower);
+  if (byText >= 0) return byText;
+  const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii", "xiii", "xiv"];
+  if (roman && ROMAN.includes(lower)) return ROMAN.indexOf(lower);
+  if (/^[A-Za-z]$/.test(k) && !roman) return k.toUpperCase().charCodeAt(0) - 65;
+  if (/^\d+$/.test(k)) return Number(k);
+  const prefix = /^([A-Za-z]|[ivx]{1,4}|\d{1,2})[.)]\s/.exec(k);
+  return prefix ? keyIndex(prefix[1], options, roman) : null;
+}
+const inRange = (i: number | null | undefined, n: number) => (i != null && Number.isInteger(i) && i >= 0 && i < n ? i : null);
 
 /** Bring whatever the model returned into a shape the editor and database accept. */
 function normalize(raw: Raw, skill: Skill, level: Level): Draft {
@@ -84,19 +104,27 @@ function normalize(raw: Raw, skill: Skill, level: Level): Draft {
     if ((type === "mc" || type === "multi") && options.length < 2) type = "open";
 
     const base = { ...emptyQuestion(id, type), prompt: prompt.slice(0, 2000), explanation, group, options };
+    const key = String(q.key ?? "");
     if (type === "mc") {
-      base.answer = Number.isInteger(q.answer) && q.answer! >= 0 && q.answer! < options.length ? q.answer! : null;
+      base.answer = inRange(q.answer, options.length) ?? inRange(keyIndex(key, options), options.length);
     } else if (type === "multi") {
-      base.answers = [...new Set((q.answers ?? []).filter((i) => Number.isInteger(i) && i >= 0 && i < options.length))].sort((a, b) => a - b);
+      const fromKey = key.split(/[,;&]|\band\b/).map((k) => keyIndex(k, options));
+      const picked = (q.answers?.length ? q.answers : fromKey).filter((i): i is number => inRange(i, options.length) != null);
+      base.answers = [...new Set(picked)].sort((a, b) => a - b);
       if (base.answers.length < 2 || base.answers.length >= options.length) base.answers = [];
     } else if (type === "tfng" || type === "ynng") {
       const allowed = type === "tfng" ? ["true", "false", "not_given"] : ["yes", "no", "not_given"];
-      base.choice = allowed.includes(q.choice ?? "") ? q.choice! : "";
+      const fromKey = strip(key).toLowerCase().replace(/[\s-]+/g, "_");
+      base.choice = allowed.includes(q.choice ?? "") ? q.choice! : allowed.includes(fromKey) ? fromKey : "";
     } else if (type === "matching" || type === "headings") {
-      base.answer = Number.isInteger(q.answer) && q.answer! >= 0 && q.answer! < pool.length ? q.answer! : null;
+      base.answer = inRange(q.answer, pool.length) ?? inRange(keyIndex(key, pool, type === "headings"), pool.length);
     } else if (type === "gap") {
-      base.max_words = Math.min(5, Math.max(1, q.max_words ?? 2));
-      base.accepted = clean(q.accepted, 6).filter((a) => words(a) <= base.max_words);
+      const fromKey = key.split(/\s*[|/;]\s*/).map(strip);
+      base.accepted = clean([...(q.accepted ?? []), ...fromKey].map((a) => strip(String(a ?? ""))), 6);
+      // A correct answer longer than the stated limit means the limit is wrong, not the answer.
+      const longest = Math.max(0, ...base.accepted.map(words));
+      base.max_words = Math.min(5, Math.max(1, q.max_words ?? 2, longest));
+      base.accepted = base.accepted.filter((a) => words(a) <= base.max_words);
       if (base.accepted.length === 0) base.accepted = [""];
     }
     questions.push(base);
@@ -123,6 +151,7 @@ Question types and the fields each one needs:
 - gap: a sentence with "____" where the answer goes, "max_words" (1-3), "accepted" = every wording a marker would accept, each within the limit.
 - matching / headings: "group" = the id of a group that holds the shared "options", "answer" = index into those options. Headings groups need 2-3 more options than questions.
 - open: writing or speaking tasks; full task in the prompt, no options.
+Every question also has "key", the correct answer as text: mc/matching/headings the letter or numeral of the right option (e.g. "B", "iii"); multi the letters joined by commas ("A, D"); tfng/ynng "true", "false", "not_given", "yes" or "no"; gap every accepted wording separated by " | " ("four | 4"); open "".
 Rules: natural English at the requested CEFR level; every answer must be findable in the passage; "explanation" is one sentence of at most 15 words; no harmful, sexual, discriminatory or political-campaign content.`;
 
 const passageWords = (level: Level) => (level <= "A2" ? "120-180" : level <= "B1" ? "180-260" : "260-380");
