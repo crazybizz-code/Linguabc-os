@@ -86,13 +86,12 @@ Both are drafts waiting for the owner's review before publishing.
  Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
-**Mock engine part B is built on the branch: not merged, and 0019 is not applied.**
-1. With the owner's go-ahead: apply 0019, then merge.
-2. The owner records listening Parts 2–4, reviews both library tests and publishes them.
-3. A live check in a throwaway `qa-*` centre, which the owner needs for the UI:
+**Mock engine part B is merged (#24), and 0019 is applied (2026-11-20).** Checked on production: `norm_answer('1.5 metres')` keeps the decimal, the view has `released_at`, and the security advisor shows nothing new.
+1. The owner records listening Parts 2–4, reviews both library tests and publishes them.
+2. A live check in a throwaway `qa-*` centre, which the owner needs for the UI:
    - a mock session with the published tests;
    - a QA student takes both modules in the exam screen;
    - the mentor adds W/S and sends the results;
    - the student sees them.
    Then delete the QA centre.
-4. Then V1 step 3: basic progress.
+3. Then V1 step 3: basic progress.
