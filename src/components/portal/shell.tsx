@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { BookOpen, CalendarCheck, ClipboardList, Home, User, Wallet, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarCheck, ClipboardList, Home, TrendingUp, User, Wallet, type LucideIcon } from "lucide-react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/components/ui/primitives";
 import { useT } from "@/i18n/client";
 
-const ICONS: Record<string, LucideIcon> = { home: Home, homework: BookOpen, mocks: ClipboardList, attendance: CalendarCheck, schedule: CalendarCheck, payments: Wallet, profile: User };
+const ICONS: Record<string, LucideIcon> = { home: Home, homework: BookOpen, mocks: ClipboardList, progress: TrendingUp, attendance: CalendarCheck, schedule: CalendarCheck, payments: Wallet, profile: User };
 
 /** Mobile-first frame shared by the parent and student portals. */
 export function PortalShell({
@@ -51,9 +51,9 @@ export function PortalShell({
             const active = i.href === base ? pathname === base : pathname.startsWith(i.href);
             return (
               <li key={i.key}>
-                <Link href={withChild(i.href)} className={cn("flex flex-col items-center gap-1 py-2.5 text-[11px]", active ? "font-medium text-[#12392B]" : "text-muted-foreground")}>
+                <Link href={withChild(i.href)} className={cn("flex flex-col items-center gap-1 py-2.5", items.length > 5 ? "text-[10px]" : "text-[11px]", active ? "font-medium text-[#12392B]" : "text-muted-foreground")}>
                   <Icon className="h-5 w-5" strokeWidth={active ? 2 : 1.7} />
-                  {t(i.label)}
+                  <span className="max-w-full truncate px-0.5">{t(i.label)}</span>
                 </Link>
               </li>
             );

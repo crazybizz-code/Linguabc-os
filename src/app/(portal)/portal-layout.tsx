@@ -6,6 +6,7 @@ import { getPortalContext, type PortalKind } from "@/lib/portal/context";
 const NAV: Record<PortalKind, { key: string; href: string; label: string }[]> = {
   parent: [
     { key: "home", href: "/parent", label: "Home" },
+    { key: "progress", href: "/parent/progress", label: "Progress" },
     { key: "attendance", href: "/parent/attendance", label: "Attendance" },
     { key: "payments", href: "/parent/payments", label: "Payments" },
     { key: "profile", href: "/parent/profile", label: "Profile" },
@@ -14,6 +15,7 @@ const NAV: Record<PortalKind, { key: string; href: string; label: string }[]> = 
     { key: "home", href: "/student", label: "Home" },
     { key: "homework", href: "/student/homework", label: "Homework" },
     { key: "mocks", href: "/student/mocks", label: "Mocks" },
+    { key: "progress", href: "/student/progress", label: "Progress" },
     { key: "schedule", href: "/student/schedule", label: "Schedule" },
     { key: "payments", href: "/student/payments", label: "Payments" },
     { key: "profile", href: "/student/profile", label: "Profile" },

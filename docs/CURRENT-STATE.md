@@ -86,13 +86,6 @@ Both are drafts waiting for the owner's review before publishing.
  Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
-**Mock engine part B is merged (#24), and 0019 is applied (2026-11-20).** Checked on production: `norm_answer('1.5 metres')` keeps the decimal, the view has `released_at`, and the security advisor shows nothing new.
-1. ~~The owner records listening Parts 2–4 and publishes both library tests.~~ Done on 2026-11-20: Listening Test 1 and Reading Test 1 are published.
-   **QA in progress:** centre `qa-mock` has users `qa.m.owner`, `qa.m.mentor` and `qa.m.student` (`@linguabc.test`, created by SQL) and session "QA Full Mock" with both tests. The first run found the listening playback bug fixed in #25. #26 (highlighting gap-fill and options) and #27 (lockdown, 0020 applied) followed. QA attempts were cleared after each merge so the run starts clean.
-2. A live check in a throwaway `qa-*` centre, which the owner needs for the UI:
-   - a mock session with the published tests;
-   - a QA student takes both modules in the exam screen;
-   - the mentor adds W/S and sends the results;
-   - the student sees them.
-   Then delete the QA centre.
-3. Then V1 step 3: basic progress.
+1. **V1 step 3, basic progress:** built on the branch (Student 360 Progress tab, `/student/progress`, `/parent/progress`, staff `/progress`). The owner's go-ahead is needed to merge. No migration.
+2. QA centre `qa-mock` is still live. Before deleting it, the reading module and sending results should be tried once (attempts are clean except listening, which was removed with 0). Delete only with the owner's OK, after listing what goes.
+3. Then V1 step 4: in-app notifications for attendance, payments, homework, mocks and schedule, for staff and families. The bell and the Realtime channel already exist.
