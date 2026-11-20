@@ -75,8 +75,24 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Listening UI check passed (2026-11-20):** the owner created a B2 gap-fill listening (6 questions) with AI in Convora, and Fish Audio recorded the conversation. This was the first live Fish call.
 
-**Mock engine part A merged and live (2026-11-20):** #22. 0018 applied; the Convora owner's auth user is the only row in `platform_admins` (checked: `am_platform_admin()` returns true as that user). No library tests yet.
+**Mock engine part A merged and live (2026-11-20):** #22. 0018 applied; the Convora owner's auth user is the only row in `platform_admins` (checked: `am_platform_admin()` returns true as that user). Library drafts on 2026-11-20:
+- **Listening Test 1:** Part 1 was written with AI and recorded by the owner. Parts 2–4 were written by Claude, are not recorded yet, and the owner records them in the editor.
+- **Reading Test 1:** written by Claude, 40 questions; all-correct answers score 40/40 in the database.
+
+Both are drafts waiting for the owner's review before publishing.
+
+**Known marking bug:** `app.norm_answer` strips the dot from decimals, so "1.5" becomes "1 5" (two words). A gap answer with a decimal can then break its word limit. Fix it in part B.
+
+ Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
-1. The owner writes the first listening and reading tests at `/admin/tests` and publishes them. This is the first live run of section drafting.
-2. Mock engine part B: mock sessions use a published test. Students take it timed in the app, marking and Academic bands happen in the database, results go to the mentor first, and the mentor adds writing and speaking and releases the full result.
+**Mock engine part B is built on the branch: not merged, and 0019 is not applied.**
+1. With the owner's go-ahead: apply 0019, then merge.
+2. The owner records listening Parts 2–4, reviews both library tests and publishes them.
+3. A live check in a throwaway `qa-*` centre, which the owner needs for the UI:
+   - a mock session with the published tests;
+   - a QA student takes both modules in the exam screen;
+   - the mentor adds W/S and sends the results;
+   - the student sees them.
+   Then delete the QA centre.
+4. Then V1 step 3: basic progress.

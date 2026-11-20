@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0018):
+Migrations live in `supabase/migrations/` (0001–0019):
 
 | # | Adds |
 |---|---|
@@ -60,6 +60,7 @@ Migrations live in `supabase/migrations/` (0001–0018):
 | 0016 | IELTS question types and per-question marks (`grade_one`, `mark_map`, `grade_answers`, `submission_marks`, `check_questions`) |
 | 0017 | Listening audio: private `listening-audio` bucket and its storage policies, `assignment_keys.transcript`, `create_custom_assignment(p_audio_path)`, transcript in `my_homework_result`, AI request kind `audio` |
 | 0018 | LinguABC library tests: `platform_admins`, `library_tests`, `library_test_keys` (admins only), private `library-audio` bucket, admin RPCs (`new_library_test`, `save_library_test`, `set_library_test_status`, `delete_library_test`, `claim_admin_ai_request`) |
+| 0019 | Online mocks: `mock_sessions.reading_test_id`/`listening_test_id`, `mock_attempts`, `mock_results.released_at` and raw scores, Academic band tables (`app.academic_band`), release before families see results, student RPCs (`my_online_mocks`, `start_mock_module`, `save_mock_answers`, `submit_mock_module`, `report_mock_focus`), staff RPCs (`set_mock_tests`, `close_expired_attempts`, `release_mock_results`), `norm_answer` keeps decimals |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -111,7 +112,13 @@ Other rules the database enforces:
 - **AI drafting:** `src/lib/ai/`. Text from uploaded files is extracted, and instructions inside the file are ignored.
   - Limits, enforced in the database: 20 requests per user per hour and 200 per centre per day.
   - Every request is recorded in `ai_requests` (model, tokens, cost).
-- **Mocks:** `mock_sessions` for a group, snapshotting its active students; `mock_results` with bands per module (0–9 in halves). The overall band comes from a view. Results are entered by hand; there's no online test-taking yet.
+- **Mocks:** `mock_sessions` for a group, snapshotting its active students; `mock_results` with bands per module (0–9 in halves). The overall band comes from a view.
+  - **Online (0019):** staff or the examiner pick a published LinguABC reading and/or listening test for the session.
+    - Students take it at `/exam/{session}/{skill}`: full screen, IELTS computer-delivered layout, autosave.
+    - The server sets the deadline: reading 60 minutes, listening 40 (the recording plays once, then 2 minutes to check).
+    - Leaving full screen or the tab is counted in `mock_attempts.focus_lost`.
+    - Marking: `mark_map` against the key, raw score out of 40, then the Academic band. Bands go into `mock_results`.
+  - **Release:** writing and speaking are entered by hand. Families and students see a result only after `release_mock_results`, which also writes the timeline entry. Released results can't be edited.
 - **Vocabulary cue cards:** `library_items.vocabulary` is shown as a flip deck on the student homework page, after submission, for library-based homework.
 
 ## Integrations

@@ -13,6 +13,7 @@ const NAV: Record<PortalKind, { key: string; href: string; label: string }[]> = 
   student: [
     { key: "home", href: "/student", label: "Home" },
     { key: "homework", href: "/student/homework", label: "Homework" },
+    { key: "mocks", href: "/student/mocks", label: "Mocks" },
     { key: "schedule", href: "/student/schedule", label: "Schedule" },
     { key: "payments", href: "/student/payments", label: "Payments" },
     { key: "profile", href: "/student/profile", label: "Profile" },

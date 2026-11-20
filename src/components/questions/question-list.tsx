@@ -12,7 +12,7 @@ import {
  * from comparing in the browser.
  */
 export function QuestionList({
-  questions, groups, answers, answerKey, marks, t, showMine,
+  questions, groups, answers, answerKey, marks, t, showMine, start = 1,
 }: {
   questions: Question[];
   groups?: QuestionGroup[];
@@ -23,10 +23,12 @@ export function QuestionList({
   t: T;
   /** Mark the student's own choice, not just the correct one. */
   showMine?: boolean;
+  /** Number of the first question (tests number across sections). */
+  start?: number;
 }) {
   return (
     <div className="space-y-5">
-      {blocksOf(questions, groups).map((block, bi) => {
+      {blocksOf(questions, groups, start).map((block, bi) => {
         return (
           <section key={bi} className="space-y-3">
             {block.group?.instructions && (
@@ -63,7 +65,7 @@ export function QuestionList({
                             {answerText(q, mine, groups) ?? <span className="text-muted-foreground">{t("No answer")}</span>}
                           </p>
                         )}
-                        {q.type === "gap" && (
+                        {q.type === "gap" && key && (
                           <p className="text-[12px] text-[#2F5A3B]">
                             {t("Accepted:")} {correctText(q, key, groups)}
                             <span className="ml-1.5 text-muted-foreground">({wordLimit(q)})</span>
