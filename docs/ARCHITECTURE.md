@@ -117,6 +117,7 @@ Other rules the database enforces:
     - Students take it at `/exam/{session}/{skill}`: full screen, IELTS computer-delivered layout, autosave.
     - The server sets the deadline: reading 60 minutes, listening 40 (the recording plays once, then 2 minutes to check).
     - Leaving full screen or the tab is counted in `mock_attempts.focus_lost`.
+    - Highlighting: select text in the passage, a question or its instructions, then pick light yellow, pink or blue (or clear). Highlights are stored as character ranges per block and kept in this browser's `localStorage` for the attempt.
     - Marking: `mark_map` against the key, raw score out of 40, then the Academic band. Bands go into `mock_results`.
   - **Release:** writing and speaking are entered by hand. Families and students see a result only after `release_mock_results`, which also writes the timeline entry. Released results can't be edited.
 - **Vocabulary cue cards:** `library_items.vocabulary` is shown as a flip deck on the student homework page, after submission, for library-based homework.
