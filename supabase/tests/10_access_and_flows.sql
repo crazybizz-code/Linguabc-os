@@ -751,4 +751,38 @@ select tests.assert((select overall_band from mock_result_scores where mock_sess
 :as_parent
 select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'ms4'), 1);
 
+\echo '21. mock lockdown'
+:as_acad
+select create_mock_session(:'center_a', 'Strict mock', :'group1', now(), :'m_mentor') as ms5 \gset
+:as_mentor
+select set_mock_tests(:'ms5', :'rt2', :'lt');
+select count(*) as n_before from notifications \gset
+:as_student
+select start_mock_module(:'ms5', 'listening')->>'attempt_id' as att_x \gset
+select save_mock_answers(:'att_x', (select jsonb_object_agg('q' || n, 'true') from generate_series(1, 40) n));
+:as_student2
+select tests.expect_fail(format($$select leave_mock_module(%L, 'left_page')$$, :'att_x'), 'forbidden');
+:as_student
+select leave_mock_module(:'att_x', 'left_fullscreen');
+select tests.expect_fail(format($$select start_mock_module(%L, 'listening')$$, :'ms5'), 'removed from this part');
+select tests.assert((select m->>'state' from jsonb_array_elements(my_online_mocks()) x, jsonb_array_elements(x->'modules') m
+                     where x->>'session_id' = :'ms5' and m->>'skill' = 'listening') = 'removed', 'portal shows removed');
+select tests.expect_fail(format($$select save_mock_answers(%L, '{}')$$, :'att_x'), 'already submitted');
+select leave_mock_module(:'att_x', 'left_page');
+:as_mentor
+select tests.assert((select raw_score = 0 and band = 0 and disqualify_reason = 'left_fullscreen' from mock_attempts where id = :'att_x'), 'left: scored 0 despite saved answers');
+select tests.assert((select listening_band = 0 from mock_results where mock_session_id = :'ms5' and student_id = :'st1'), 'listening band 0 on the result');
+select tests.assert((select count(*) from notifications) = :n_before + 1, 'examiner (group mentor) notified once');
+select tests.assert((select body from notifications order by created_at desc limit 1) like '%left the Listening test%left full screen%', 'notification explains what happened');
+:as_ownerA
+select tests.assert((select count(*) from notifications where data->>'kind' = 'mock_left') = 1, 'owner notified');
+:as_acad
+select tests.assert((select count(*) from notifications where data->>'kind' = 'mock_left') = 1, 'academic manager notified');
+:as_mentor2
+select tests.assert((select count(*) from notifications where data->>'kind' = 'mock_left') = 0, 'other mentors are not notified');
+:as_student
+select tests.expect_count($$select * from notifications where data->>'kind' = 'mock_left'$$, 0);
+-- reading is a separate part and can still be taken
+select tests.assert((start_mock_module(:'ms5', 'reading')->>'attempt_id') is not null, 'other part still open');
+
 \echo 'ALL TESTS PASSED'

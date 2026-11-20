@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0019):
+Migrations live in `supabase/migrations/` (0001–0020):
 
 | # | Adds |
 |---|---|
@@ -61,6 +61,7 @@ Migrations live in `supabase/migrations/` (0001–0019):
 | 0017 | Listening audio: private `listening-audio` bucket and its storage policies, `assignment_keys.transcript`, `create_custom_assignment(p_audio_path)`, transcript in `my_homework_result`, AI request kind `audio` |
 | 0018 | LinguABC library tests: `platform_admins`, `library_tests`, `library_test_keys` (admins only), private `library-audio` bucket, admin RPCs (`new_library_test`, `save_library_test`, `set_library_test_status`, `delete_library_test`, `claim_admin_ai_request`) |
 | 0019 | Online mocks: `mock_sessions.reading_test_id`/`listening_test_id`, `mock_attempts`, `mock_results.released_at` and raw scores, Academic band tables (`app.academic_band`), release before families see results, student RPCs (`my_online_mocks`, `start_mock_module`, `save_mock_answers`, `submit_mock_module`, `report_mock_focus`), staff RPCs (`set_mock_tests`, `close_expired_attempts`, `release_mock_results`), `norm_answer` keeps decimals |
+| 0020 | Mock lockdown: `leave_mock_module` ends a part with 0 when the student leaves the exam screen, `mock_attempts.disqualified_at`/`disqualify_reason`, in-app notifications to the session's staff (`app.notify_mock_staff`) |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -116,7 +117,11 @@ Other rules the database enforces:
   - **Online (0019):** staff or the examiner pick a published LinguABC reading and/or listening test for the session.
     - Students take it at `/exam/{session}/{skill}`: full screen, IELTS computer-delivered layout, autosave.
     - The server sets the deadline: reading 60 minutes, listening 40 (the recording plays once, then 2 minutes to check).
-    - Leaving full screen or the tab is counted in `mock_attempts.focus_lost`.
+    - **Lockdown (0020):** a big warning before starting, and a device without full screen can't start.
+      - Leaving full screen (Esc), the tab or app, or closing or reloading the page stops the audio at once and calls `leave_mock_module` (via `navigator.sendBeacon` to `/exam/leave`, with a server action as fallback).
+      - That part ends with raw 0 and band 0 and can't be restarted.
+      - Owner, admins, academic managers, the examiner and the group mentor get an in-app notification. The staff header bell checks for new ones every 20 seconds.
+      - Browsers can't block Esc, so leaving is detected, not prevented.
     - Highlighting: select text in the passage, a question or its instructions, then pick light yellow, pink or blue (or clear). Highlights are stored as character ranges per block and kept in this browser's `localStorage` for the attempt.
     - Marking: `mark_map` against the key, raw score out of 40, then the Academic band. Bands go into `mock_results`.
   - **Release:** writing and speaking are entered by hand. Families and students see a result only after `release_mock_results`, which also writes the timeline entry. Released results can't be edited.
@@ -132,7 +137,7 @@ Other rules the database enforces:
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
 | Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
 | Fish Audio | Text-to-speech for listening scripts (`src/lib/ai/fish.ts`). Scripts written as `Name: words` become a dialogue: the mentor picks a voice per speaker from six voices the owner chose (defaults in the code; one has an Indian accent), each turn is one request and the MP3s are joined. Voice titles come from Fish (`GET /model/{id}`, cached a day). Counted as AI requests (kind `audio`, UTF-8 bytes in `prompt_tokens`). | `FISH_AUDIO_API_KEY`, `FISH_AUDIO_VOICES` (comma-separated ids, optional), `FISH_AUDIO_MODEL` (default `s1`), `FISH_AUDIO_BASE_URL` |
-| Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 uses the `in_app` channel only; `sms`, `telegram` and `push` delivery come later. | — |
+| Notifications | In-app only so far: written for mock lockdown (0020) and shown by the staff header bell (`components/workspace/notification-bell.tsx`, polls every 20 s). The rest of V1 step 4 (attendance, payments, homework, schedule, and parents and students) is still to build. `sms`, `telegram` and `push` come later. | — |
 
 ## Deployment
 - **Vercel project** `linguabc-os` (team `crazybizz-codes-projects`), region `fra1`.

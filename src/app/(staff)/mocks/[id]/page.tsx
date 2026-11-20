@@ -26,13 +26,14 @@ export default async function MockSessionPage({ params }: PageProps<"/mocks/[id]
   const [results, examiner, attempts, tests] = await Promise.all([
     supabase.from("mock_result_scores").select("student_id, status, reading_band, listening_band, writing_band, speaking_band, overall_band, released_at, students(full_name)").eq("mock_session_id", id),
     s.examiner_id ? supabase.from("memberships").select("full_name").eq("id", s.examiner_id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from("mock_attempts").select("student_id, skill, raw_score, total, band, submitted_at, deadline_at, focus_lost").eq("mock_session_id", id),
+    supabase.from("mock_attempts").select("student_id, skill, raw_score, total, band, submitted_at, deadline_at, focus_lost, disqualify_reason").eq("mock_session_id", id),
     supabase.from("library_tests").select("id, title, skill, level").eq("status", "published").order("title"),
   ]);
   const online = new Map<string, string[]>();
   (attempts.data ?? []).forEach((a) => {
     const label = a.skill === "listening" ? "L" : "R";
-    const text = a.submitted_at ? `${label} ${a.raw_score}/${a.total}` : `${label} ${t("in progress")}`;
+    const text = a.disqualify_reason ? `${label} ${t("removed: left the test screen")}`
+      : a.submitted_at ? `${label} ${a.raw_score}/${a.total}` : `${label} ${t("in progress")}`;
     online.set(a.student_id, [...(online.get(a.student_id) ?? []), text + (a.focus_lost ? ` · ${t("left the screen {n}×", { n: a.focus_lost })}` : "")]);
   });
   const modules = ORDER.filter((m) => s.modules.includes(m));

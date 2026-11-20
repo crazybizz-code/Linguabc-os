@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/primitives";
 import { intlLocale } from "@/i18n";
 
 export const metadata = { title: "Mocks" };
-type Module = { skill: "reading" | "listening"; ready: boolean; state: "new" | "started" | "done" };
+type Module = { skill: "reading" | "listening"; ready: boolean; state: "new" | "started" | "done" | "removed" };
 type Mock = { session_id: string; name: string; scheduled_at: string; status: string; released: boolean; modules: Module[] };
 
 export default async function StudentMocks() {
@@ -39,7 +39,8 @@ export default async function StudentMocks() {
               {order.map((x) => (
                 <li key={x.skill} className="flex items-center justify-between gap-3 py-2.5">
                   <span className="text-[14px] font-medium">{t(x.skill === "listening" ? "Listening" : "Reading")}</span>
-                  {x.state === "done" ? <Badge tone="blue">{t("Submitted")}</Badge>
+                  {x.state === "removed" ? <Badge tone="red">{t("Removed (0)")}</Badge>
+                    : x.state === "done" ? <Badge tone="blue">{t("Submitted")}</Badge>
                     : !x.ready ? <span className="text-[12px] text-muted-foreground">{t("Test not ready")}</span>
                     : x.state === "started" || open ? (
                       <Link href={`/exam/${m.session_id}/${x.skill}`} className="rounded-[10px] bg-[#12392B] px-3.5 py-2 text-[12.5px] font-medium text-white">
@@ -49,7 +50,7 @@ export default async function StudentMocks() {
                 </li>
               ))}
             </ul>
-            {m.modules.every((x) => x.state === "done") && !m.released && (
+            {m.modules.every((x) => x.state === "done" || x.state === "removed") && !m.released && (
               <p className="mt-2 text-[12px] text-muted-foreground">{t("Your mentor will send the full result after marking writing and speaking.")}</p>
             )}
           </PortalCard>

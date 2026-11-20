@@ -50,8 +50,9 @@ export async function submitExam(attemptId: string, answers: Answers): Promise<{
   return error ? { error: friendly(error.message) } : {};
 }
 
-export async function reportFocus(attemptId: string): Promise<void> {
+/** The student left the exam screen: that part ends with 0 and staff are notified. */
+export async function leaveExam(attemptId: string, reason: "left_fullscreen" | "left_page"): Promise<void> {
   if (!UUID.test(attemptId)) return;
   const { supabase } = await getPortalContext("student");
-  await supabase.rpc("report_mock_focus", { p_attempt: attemptId });
+  await supabase.rpc("leave_mock_module", { p_attempt: attemptId, p_reason: reason });
 }

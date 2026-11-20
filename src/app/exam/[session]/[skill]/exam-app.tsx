@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Flag, Loader2, Maximize, Volume2 } from "luc
 import { AnswerInput } from "@/components/questions/answer-input";
 import { blocksOf, isAnswered, type Answers } from "@/lib/questions";
 import { cn } from "@/components/ui/primitives";
-import { reportFocus, saveExam, startExam, submitExam, type ExamStart } from "../../actions";
+import { leaveExam, saveExam, startExam, submitExam, type ExamStart } from "../../actions";
 import { Marked, useHighlights } from "./highlight";
 
 /**
@@ -15,7 +15,7 @@ import { Marked, useHighlights } from "./highlight";
  * Listening plays each part once, in order, with no pause or rewind,
  * then gives two minutes to check before submitting.
  */
-type Phase = "intro" | "loading" | "running" | "done";
+type Phase = "intro" | "loading" | "running" | "done" | "removed";
 const REVIEW_MS = 2 * 60_000;
 const fmt = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -31,7 +31,9 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
   const [part, setPart] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [offset, setOffset] = useState(0); // server clock - client clock
-  const [left, setLeft] = useState(false); // left full screen
+  const [gate, setGate] = useState(false); // running, but full screen not entered yet
+  const armed = useRef(false); // leaving now ends the test
+  const finished = useRef(false); // submitted or removed: leaving is expected
   const [confirming, setConfirming] = useState(false);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
   const [track, setTrack] = useState(-1); // listening: part being played
@@ -62,10 +64,11 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
   const submit = useCallback(async () => {
     if (!exam || submitting.current) return;
     submitting.current = true;
+    finished.current = true;
     setConfirming(false);
     player.current?.pause();
     const r = await submitExam(exam.attemptId, answersRef.current);
-    if (r.error) { setError(r.error); submitting.current = false; return; }
+    if (r.error) { setError(r.error); submitting.current = false; finished.current = false; return; }
     setPhase("done");
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }, [exam]);
@@ -91,21 +94,34 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     return () => clearTimeout(id);
   }, [answers, phase, exam, submit]);
 
-  // ---- lockdown: full screen, tab switches, copy and paste
+  // ---- lockdown: leaving full screen, the tab or the page ends this part with 0.
+  // Browsers always let Esc leave full screen, so leaving is detected, not prevented.
   useEffect(() => {
     if (phase !== "running" || !exam) return;
-    const report = () => { void reportFocus(exam.attemptId); };
-    const onFull = () => { if (!document.fullscreenElement) { setLeft(true); report(); } else setLeft(false); };
-    const onVisible = () => { if (document.hidden) { setLeft(true); report(); } };
+    const leave = (reason: "left_fullscreen" | "left_page") => {
+      if (!armed.current || finished.current) return;
+      finished.current = true;
+      player.current?.pause();
+      // A beacon still arrives if the page is closing; the action is the fallback.
+      const sent = navigator.sendBeacon?.("/exam/leave", new Blob([JSON.stringify({ attempt: exam.attemptId, reason })], { type: "application/json" }));
+      if (!sent) void leaveExam(exam.attemptId, reason);
+      setPhase("removed");
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+    const onFull = () => { if (!document.fullscreenElement) leave("left_fullscreen"); };
+    const onVisible = () => { if (document.hidden) leave("left_page"); };
+    const onHide = () => leave("left_page");
     const block = (e: Event) => e.preventDefault();
-    const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const onUnload = (e: BeforeUnloadEvent) => { if (armed.current && !finished.current) e.preventDefault(); };
     document.addEventListener("fullscreenchange", onFull);
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pagehide", onHide);
     for (const ev of ["contextmenu", "copy", "cut", "paste", "dragstart"]) document.addEventListener(ev, block);
     window.addEventListener("beforeunload", onUnload);
     return () => {
       document.removeEventListener("fullscreenchange", onFull);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pagehide", onHide);
       for (const ev of ["contextmenu", "copy", "cut", "paste", "dragstart"]) document.removeEventListener(ev, block);
       window.removeEventListener("beforeunload", onUnload);
     };
@@ -137,7 +153,14 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
   // ---- start
   const begin = async () => {
     setError(undefined);
-    try { await document.documentElement.requestFullscreen(); } catch { /* the overlay asks again */ }
+    if (!document.fullscreenEnabled) {
+      setError("This device can't run the test in full screen. Use a computer or laptop.");
+      return;
+    }
+    try { await document.documentElement.requestFullscreen(); } catch {
+      setError("The test needs full screen. Allow full screen and press Start again.");
+      return;
+    }
     setPhase("loading");
     const r = await startExam(sessionId, skill);
     if (r.error || !r.exam) { setError(r.error ?? "Could not start the test."); setPhase("intro"); return; }
@@ -148,7 +171,8 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     hl.load(r.exam.attemptId);
     setNow(Date.now());
     setPhase("running");
-    if (!document.fullscreenElement) setLeft(true);
+    // Leaving counts only once the student is in full screen.
+    if (document.fullscreenElement) armed.current = true; else setGate(true);
     if (r.exam.skill === "listening") {
       const n = r.exam.sections.length;
       const p = createPlayer(r.exam.sections, {
@@ -193,14 +217,35 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
                 <li>You have <b>60 minutes</b>. There is no extra transfer time.</li>
               </>
             )}
-            <li>The test runs in full screen. Leaving full screen or switching tabs is recorded and reported to your mentor.</li>
             <li>Your answers are saved as you go and submitted automatically when time runs out.</li>
           </ul>
+          <div className="mt-5 border-2 border-[#B4483D] bg-[#FBEDEB] px-4 py-3 text-[#8C2F25]">
+            <p className="text-[18px] font-bold uppercase leading-snug">Do not leave the test screen</p>
+            <p className="mt-1.5 text-[15px] font-semibold leading-snug">
+              The test runs in full screen. If you press Esc, leave full screen, switch to another tab or app, or close or reload this page,
+              you will be <u>removed from the test</u>, your score for {listening ? "Listening" : "Reading"} will be <u>0</u>,
+              and your mentor will be told immediately.
+            </p>
+          </div>
           {error && <p className="mt-4 border-l-4 border-[#B4483D] bg-[#FBEDEB] px-3 py-2 text-[13.5px] text-[#8C2F25]">{error}</p>}
           <button type="button" onClick={begin} disabled={phase === "loading"}
             className="mt-6 inline-flex h-11 items-center gap-2 bg-[#1A1A1A] px-6 text-[15px] font-semibold text-white hover:bg-black disabled:opacity-60">
-            {phase === "loading" && <Loader2 className="h-4 w-4 animate-spin" />} Start test
+            {phase === "loading" && <Loader2 className="h-4 w-4 animate-spin" />} I understand — start the test
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "removed") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F2F2F2] p-4 font-[Arial,Helvetica,sans-serif]">
+        <div className="w-full max-w-md border-2 border-[#B4483D] bg-white p-8 text-center">
+          <h1 className="text-[22px] font-bold text-[#8C2F25]">You have been removed from the test</h1>
+          <p className="mt-2 text-[14px] text-[#444]">
+            You left the test screen, so this {listening ? "Listening" : "Reading"} test has ended with a score of 0. Your mentor has been told.
+          </p>
+          <a href="/student/mocks" className="mt-6 inline-flex h-11 items-center bg-[#1A1A1A] px-6 text-[15px] font-semibold text-white">Back to my mocks</a>
         </div>
       </div>
     );
@@ -330,19 +375,19 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
       {hl.toolbar}
 
       {/* overlays */}
-      {needsTap && !left && (
+      {needsTap && !gate && (
         <Overlay>
           <p className="text-[15px]">Your browser needs one click to start the recording.</p>
           <button type="button" onClick={() => player.current?.retry()}
             className="mt-4 h-10 bg-[#2B2B2B] px-5 text-[14px] font-semibold text-white">Play recording</button>
         </Overlay>
       )}
-      {left && (
+      {gate && (
         <Overlay>
-          <p className="text-[16px] font-bold">You left the test screen</p>
-          <p className="mt-1 text-[14px] text-[#444]">This has been recorded. Return to full screen to continue — the timer has not stopped.</p>
-          <button type="button" onClick={() => { document.documentElement.requestFullscreen().then(() => setLeft(false)).catch(() => setLeft(false)); }}
-            className="mt-4 inline-flex h-10 items-center gap-2 bg-[#2B2B2B] px-5 text-[14px] font-semibold text-white"><Maximize className="h-4 w-4" /> Return to the test</button>
+          <p className="text-[16px] font-bold">Enter full screen to continue</p>
+          <p className="mt-1 text-[14px] text-[#444]">The timer is running. From now on, leaving full screen or this page ends the test with a score of 0.</p>
+          <button type="button" onClick={() => { document.documentElement.requestFullscreen().then(() => { armed.current = true; setGate(false); }).catch(() => {}); }}
+            className="mt-4 inline-flex h-10 items-center gap-2 bg-[#2B2B2B] px-5 text-[14px] font-semibold text-white"><Maximize className="h-4 w-4" /> Enter full screen</button>
         </Overlay>
       )}
       {confirming && (

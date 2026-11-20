@@ -1121,6 +1121,8 @@ export type Database = {
           band: number | null
           center_id: string
           deadline_at: string
+          disqualified_at: string | null
+          disqualify_reason: string | null
           focus_lost: number
           id: string
           marks: Json | null
@@ -1966,6 +1968,7 @@ export type Database = {
       save_mock_answers: { Args: { p_answers: Json; p_attempt: string }; Returns: undefined }
       submit_mock_module: { Args: { p_answers?: Json; p_attempt: string }; Returns: undefined }
       report_mock_focus: { Args: { p_attempt: string }; Returns: undefined }
+      leave_mock_module: { Args: { p_attempt: string; p_reason: string }; Returns: undefined }
       am_platform_admin: { Args: never; Returns: boolean }
       claim_admin_ai_request: { Args: { p_kind: string }; Returns: number }
       new_library_test: {
