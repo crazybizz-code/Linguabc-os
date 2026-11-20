@@ -807,4 +807,11 @@ export const ru: Record<string, string> = {
   "To pay": "К оплате",
   "was due {date}": "срок был {date}",
   "Pay at the centre's front desk.": "Оплатите на ресепшене центра.",
+  "My groups": "Мои группы",
+  "My students": "Мои ученики",
+  "Analytics": "Аналитика",
+  "Manage": "Управление",
+  "Money & inbox": "Деньги и входящие",
+  "My teaching": "Моё преподавание",
+  "Classwork": "Работа на уроках",
 };

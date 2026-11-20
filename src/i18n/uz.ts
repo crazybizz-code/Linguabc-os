@@ -807,4 +807,11 @@ export const uz: Record<string, string> = {
   "To pay": "To'lash kerak",
   "was due {date}": "muddati {date} edi",
   "Pay at the centre's front desk.": "Markaz qabulxonasida to'lang.",
+  "My groups": "Mening guruhlarim",
+  "My students": "Mening o'quvchilarim",
+  "Analytics": "Analitika",
+  "Manage": "Boshqaruv",
+  "Money & inbox": "Pul va xabarlar",
+  "My teaching": "Mening darslarim",
+  "Classwork": "Dars ishlari",
 };
