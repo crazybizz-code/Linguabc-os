@@ -26,6 +26,8 @@ export type QuestionGroup = { id: string; instructions?: string; options?: strin
 export type Content = {
   passage?: string | null;
   audio_url?: string | null;
+  /** Generated listening audio in the private bucket; played through a signed link. */
+  audio_path?: string | null;
   groups?: QuestionGroup[];
   questions?: Question[];
 };

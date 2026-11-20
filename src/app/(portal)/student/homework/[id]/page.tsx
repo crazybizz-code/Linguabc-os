@@ -9,6 +9,7 @@ import { CueCards, type VocabWord } from "@/components/library/cue-cards";
 import { QuestionList } from "@/components/questions/question-list";
 import { content, type AnswerKey, type Answers, type Marks } from "@/lib/questions";
 import { intlLocale } from "@/i18n";
+import { audioUrl } from "@/lib/audio";
 import { Quiz } from "./quiz";
 
 export const metadata = { title: "Homework" };
@@ -29,7 +30,8 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
   ]);
   const body = content(h.assignments?.content);
   const questions = body.questions ?? [];
-  const res = result as { status: string; score: number | null; feedback: string | null; answers: Answers; key: AnswerKey | null; marks: Marks } | null;
+  const res = result as { status: string; score: number | null; feedback: string | null; answers: Answers; key: AnswerKey | null; marks: Marks; transcript?: string } | null;
+  const audio = body.audio_url ?? (await audioUrl(supabase, body.audio_path));
   const vocab = (Array.isArray(item?.vocabulary) ? item.vocabulary : []) as VocabWord[];
   const due = new Date(h.due_at);
   const late = due.getTime() < Date.parse(new Date().toISOString());
@@ -54,8 +56,10 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
       )}
 
       {item && <PortalCard><MaterialView item={item} t={t} /></PortalCard>}
-      {!item && body.audio_url && <PortalCard><audio controls preload="none" src={body.audio_url} className="w-full" /></PortalCard>}
+      {!item && audio && <PortalCard><audio controls preload="none" src={audio} className="w-full" /></PortalCard>}
+      {!item && body.audio_path && !audio && <PortalCard><p className="text-[13px] text-[#B4483D]">{t("The recording could not be loaded. Refresh the page or tell your mentor.")}</p></PortalCard>}
       {!item && body.passage && <PortalCard><div className="library-prose whitespace-pre-line">{body.passage}</div></PortalCard>}
+      {!item && res?.transcript && <PortalCard title={t("Script")}><div className="library-prose whitespace-pre-line">{res.transcript}</div></PortalCard>}
 
       {res ? (
         <>

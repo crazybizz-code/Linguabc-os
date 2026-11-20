@@ -84,7 +84,7 @@ A few specific rules:
 - The prompt tells the model to ignore instructions inside the file. The mentor edits every draft before saving, and `check_questions` validates the structure in the database.
 - AI limits are enforced in the database: 20 requests per user per hour and 200 per centre per day. Every request is logged in `ai_requests`.
 - Library HTML is sanitised with `sanitize-html`: links get `rel="noopener noreferrer"` and iframes are sandboxed.
-- There's no Supabase Storage yet. Where Fish Audio / listening audio will be stored is **undecided**. Whatever is chosen has to keep each centre's files separate, the way RLS does for rows.
+- **Storage:** listening audio is in the private `listening-audio` bucket, one folder per centre (`{center_id}/…`). Storage policies (0017) keep each centre's files apart: staff and mentors of that centre can upload and listen; students and parents can listen only to audio set as homework for their group. Playback uses 2-hour signed URLs. Transcripts sit with the answer key.
 
 ## Secrets
 - Server only: `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`.

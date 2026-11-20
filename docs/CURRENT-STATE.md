@@ -1,6 +1,6 @@
 # Current state
 
-_Last updated: 2026-11-19. Update this file at the end of every working session._
+_Last updated: 2026-11-20. Update this file at the end of every working session._
 
 ## Code
 - `main`: the last feature merge is **`8826a16`**, "IELTS question types, server marking and vocabulary cue cards (#17)". It's followed by docs-only commits: `4f02d1c` (#18, project memory) and this state update (#19).
@@ -10,7 +10,7 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
   - #17 IELTS engine and cue cards
   - #16 Settings marked "Soon"
   - #15 Frankfurt region, loading states, owner menu
-- No feature work is in progress, and there are no open feature PRs.
+- **In progress:** Fish Audio / AI listening on branch `claude/fervent-mendel-iu86hg` (migration 0017, `src/lib/ai/fish.ts`, `src/lib/audio.ts`, listening editor and playback). Not merged, and 0017 is **not applied** to production.
 - Old feature branches are still on the remote: `feat/*`, `fix/*`, `docs/*`, `backend/v1-schema`, `frontend/auth`, `chore/env-defaults`. They're all merged.
 
 ## Production
@@ -20,6 +20,11 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 - **No QA centres or QA users are left.** `qa-q-centre` and its users `qa.q.owner`, `qa.q.mentor` and `qa.q.student` (`@linguabc.test`) were deleted on 2026-11-19, after the cue-card check.
   - Convora's data fingerprint was the same before and after.
   - The append-only `audit_log` keeps 15 rows for the deleted QA centre, plus 68 from earlier QA centres. They point to centre ids that no longer exist. That's expected and harmless.
+
+**Production check on 2026-11-20 (read-only):** project `ACTIVE_HEALTHY`, Postgres 17. Still one centre (Convora), 1 membership, 1 auth user, no QA centres or users. Library: 277 published, 18 hidden. `audit_log` 84 rows. No storage buckets yet.
+- Security advisor: `security definer` RPCs callable by `authenticated` (by design: each re-checks the role), `invite_preview` callable by `anon` (by design, for the join page), and **leaked-password protection is off** (Auth setting in the dashboard).
+- Performance advisor: 47 foreign keys without an index, 6 RLS policies that call `auth.uid()` per row, and 10 tables with two permissive SELECT policies. None matter at today's size. Worth one clean-up migration before launch.
+- Note: `finish_ai_request` takes token counts and cost from the caller. A mentor calling the RPC directly could under-report their own usage. The hourly and daily request limits still hold, so only the cost report is affected.
 
 ## Migrations applied to production
 `0001`–`0015`, and `0016` applied as three parts: `0016_ielts_questions_part1`, `_part2` and `_part3`. The repo has a single `0016_ielts_questions.sql`, and the parts were applied from it.
@@ -40,6 +45,7 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 - The owner then checked the deck visually in the browser.
 
 ## Not yet verified
+Checked 2026-11-20. None of these can be seen from the agent's environment: the Supabase token can't read auth settings, and Vercel and `app.linguabc.xyz` are blocked by its network. The owner has to check them in the dashboards.
 - **AI keys in Vercel:** whether `OPENROUTER_API_KEY` or `GEMINI_API_KEY` is set in production. Earlier AI checks used mock servers.
 - **Phone sign-in key:** whether `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) is set in Vercel. Phone sign-in needs it.
 - **Domain:** whether `app.linguabc.xyz` is attached to the Vercel project as the production domain. The auth email config says it's the Site URL.
@@ -50,8 +56,9 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 - Unused invite codes never expire.
 - Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 
-**Open decisions**
-- Where Fish Audio / listening audio is stored. Nothing has been chosen yet.
+**Open decisions:** none.
+
+**Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner has a Fish Audio account and will set the key in Vercel.
 
 **Settled on 2026-11-19:**
 - Click is the first payment provider.
@@ -63,6 +70,9 @@ _Last updated: 2026-11-19. Update this file at the end of every working session.
 **Documentation debt:** `README.md` is out of date. It lists migrations only up to 0008 and an `app/(workspace)/` folder that is now `app/(portal)/`. It hasn't been edited yet.
 
 ## Exact next task
-**Week 2: Fish Audio / AI listening.** Don't start until the owner says go.
-1. Settle the open decision on where listening audio is stored (see `ARCHITECTURE.md` → Storage). Record the choice there.
-2. Then build the Fish Audio integration and AI-generated listening sections with audio.
+**Finish Fish Audio / AI listening** (checklist in `V1-ROADMAP.md`):
+1. Review and merge the listening PR.
+2. With the owner's go-ahead, apply `0017_listening_audio.sql` to production.
+3. The owner sets `FISH_AUDIO_API_KEY` (and optionally `FISH_AUDIO_VOICE`, `FISH_AUDIO_VOICE_2`) in Vercel and redeploys.
+4. Live check in a throwaway `qa-*` centre: create a listening draft with AI, generate audio, save, assign, play it as the student, submit, see the script. Then delete the QA centre and its bucket folder.
+5. Then: the mock engine.

@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0016):
+Migrations live in `supabase/migrations/` (0001–0017):
 
 | # | Adds |
 |---|---|
@@ -58,6 +58,7 @@ Migrations live in `supabase/migrations/` (0001–0016):
 | 0014 | `create_custom_assignment`, `ai_requests`, AI limits |
 | 0015 | AI usage accounting: model, tokens, cost |
 | 0016 | IELTS question types and per-question marks (`grade_one`, `mark_map`, `grade_answers`, `submission_marks`, `check_questions`) |
+| 0017 | Listening audio: private `listening-audio` bucket and its storage policies, `assignment_keys.transcript`, `create_custom_assignment(p_audio_path)`, transcript in `my_homework_result`, AI request kind `audio` |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -65,11 +66,15 @@ Other rules the database enforces:
 - Private helpers live in schema `app`, which isn't exposed through the API.
 
 ## Storage
-- **Supabase Storage isn't used.** There are no buckets or storage calls in the code.
+- **Listening audio (decided 2026-11-20): a private Supabase Storage bucket, `listening-audio` (0017).**
+  - Path: `{center_id}/{uuid}.mp3`, MP3 only, 20 MB per file.
+  - Staff and mentors of the centre may upload and listen (`app.can_make_audio`). Students and parents may listen only to audio on an assignment set as homework for a group they can see (`app.can_hear_audio`).
+  - Only the uploader may delete a file, and only while no assignment uses it (used when a mentor records again).
+  - Pages play it through signed URLs valid for 2 hours (`src/lib/audio.ts`). The browser never gets a permanent link.
+  - With generated audio, the passage is the transcript. It is kept in `assignment_keys.transcript`, not in the assignment content, so a student gets it from `my_homework_result` only after submitting.
 - Uploaded worksheets (PDF, DOCX, TXT, PNG/JPG/WEBP, up to 4 MB, PDFs up to 12 pages) are read in the server action and sent inline to the AI provider. They aren't kept.
 - Library audio (`library_items.audio_url`) and assignment `audio_url` are external URLs.
 - Cue-card progress is kept only in the browser's `localStorage`.
-- **Open decision: where listening audio from Fish Audio is stored.** Nothing has been chosen. Options include a Supabase Storage bucket (public or signed URLs, scoped by centre) or provider-hosted URLs. Choose before building the listening feature and record the choice here.
 
 ## Roles and permissions
 - RLS helpers in `app` (0002):
@@ -105,7 +110,7 @@ Other rules the database enforces:
 | SMTP for auth email | Configured in the Supabase dashboard (sender domain `linguabc.xyz`) | Outside the repo |
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
 | Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
-| Fish Audio | Not integrated (planned for V1). Audio storage is undecided (see Storage). | — |
+| Fish Audio | Text-to-speech for listening scripts (`src/lib/ai/fish.ts`). Scripts written as `Name: words` become a dialogue with two alternating voices; each turn is one request and the MP3s are joined. Counted as AI requests (kind `audio`, UTF-8 bytes in `prompt_tokens`). | `FISH_AUDIO_API_KEY`, `FISH_AUDIO_VOICE`, `FISH_AUDIO_VOICE_2`, `FISH_AUDIO_MODEL` (default `s1`), `FISH_AUDIO_BASE_URL` |
 | Notifications | Not built. The `notifications` table and channel enum exist (0001), but no code uses them. V1 uses the `in_app` channel only; `sms`, `telegram` and `push` delivery come later. | — |
 
 ## Deployment

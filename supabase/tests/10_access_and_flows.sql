@@ -524,4 +524,72 @@ select tests.assert((submission_marks(:'sub_i')->'q1'->>'earned') = '1', 'mentor
 :as_ownerB
 select tests.expect_fail(format($$select submission_marks(%L)$$, :'sub_i'), 'forbidden');
 
+\echo '18. listening audio'
+select :'center_a' || '/11111111-1111-4111-8111-111111111111.mp3' as audio1,
+       :'center_a' || '/22222222-2222-4222-8222-222222222222.mp3' as audio2,
+       :'center_b' || '/33333333-3333-4333-8333-333333333333.mp3' as audio_b \gset
+-- who may upload
+:as_mentor
+insert into storage.objects (bucket_id, name) values ('listening-audio', :'audio1');
+insert into storage.objects (bucket_id, name) values ('listening-audio', :'audio2');
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('listening-audio', %L)$$, :'audio_b'), 'row-level security');
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('listening-audio', %L)$$, :'center_a' || '/x.mp3'), 'row-level security');
+:as_student
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('listening-audio', %L)$$, :'center_a' || '/44444444-4444-4444-8444-444444444444.mp3'), 'row-level security');
+select tests.expect_count('select * from storage.objects', 0);
+:as_ownerB
+select tests.expect_count('select * from storage.objects', 0);
+
+-- assignment with generated audio: the transcript goes to the key
+:as_mentor
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Lost audio', 'listening', 'B1', 'ai', 'A: hi', '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"true"}}', '[]', null, %L)$$,
+  :'center_a', :'center_a' || '/55555555-5555-4555-8555-555555555555.mp3'), 'not found');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Both', 'listening', 'B1', 'ai', 'A: hi', '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"true"}}', '[]', 'https://x/a.mp3', %L)$$,
+  :'center_a', :'audio1'), 'not both');
+select create_custom_assignment(:'center_a', 'Station announcement', 'listening', 'B1', 'ai',
+  'Speaker 1: The 9.15 train to Samarkand leaves from platform four.',
+  '[{"id":"q1","type":"gap","prompt":"The train leaves from platform ____","max_words":1}]',
+  '{"q1":{"accepted":["four","4"]}}', '[]', null, :'audio1') as la1 \gset
+select tests.assert((select content->>'audio_path' from assignments where id = :'la1') = :'audio1', 'audio path stored');
+select tests.assert((select content ? 'passage' from assignments where id = :'la1') = false, 'transcript not in content');
+select tests.assert((select transcript from assignment_keys where assignment_id = :'la1') like '%platform four%', 'transcript kept with the key');
+select tests.expect_fail(format($$select create_custom_assignment(%L, 'Reuse', 'listening', 'B1', 'ai', 'x', '[{"id":"q1","type":"tfng","prompt":"p"}]', '{"q1":{"answer":"true"}}', '[]', null, %L)$$,
+  :'center_a', :'audio1'), 'already used');
+delete from storage.objects where name = :'audio1';
+:as_superuser
+select tests.assert(exists (select 1 from storage.objects where name = :'audio1'), 'used audio cannot be deleted');
+-- an unused preview can be removed by its uploader only
+:as_acad
+delete from storage.objects where name = :'audio2';
+:as_superuser
+select tests.assert(exists (select 1 from storage.objects where name = :'audio2'), 'only the uploader deletes');
+:as_mentor
+delete from storage.objects where name = :'audio2';
+:as_superuser
+select tests.assert(not exists (select 1 from storage.objects where name = :'audio2'), 'uploader removed the unused preview');
+
+-- who may listen
+:as_student
+select tests.expect_count(format('select * from storage.objects where name = %L', :'audio1'), 0);
+:as_acad
+select approve_assignment(:'la1');
+select assign_assignment(:'la1', :'group1', now() + interval '2 days') as hw_l \gset
+:as_student
+select tests.expect_count(format('select * from storage.objects where name = %L', :'audio1'), 1);
+select tests.assert((select content::text from assignments where id = :'la1') not like '%platform four%', 'student cannot read the transcript');
+select tests.assert(my_homework_result(:'hw_l') is null, 'nothing before submitting');
+select save_submission(:'hw_l', '{"q1":"4"}', true);
+select tests.assert((my_homework_result(:'hw_l')->>'transcript') like '%platform four%', 'transcript after submitting');
+select tests.assert((select score from submissions where homework_id = :'hw_l' and student_id = :'st1') = 100, 'listening marked');
+:as_parent
+select tests.expect_count(format('select * from storage.objects where name = %L', :'audio1'), 1);
+:as_ownerB
+select tests.expect_count(format('select * from storage.objects where name = %L', :'audio1'), 0);
+:as_anon
+select tests.expect_fail(format($$select * from storage.objects where name = %L$$, :'audio1'), '');
+:as_acad
+select claim_ai_request(:'center_a', 'audio') as ai_audio \gset
+:as_superuser
+select tests.assert((select kind from ai_requests where id = :'ai_audio') = 'audio', 'audio is an AI request kind');
+
 \echo 'ALL TESTS PASSED'

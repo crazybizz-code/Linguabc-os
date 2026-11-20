@@ -192,16 +192,19 @@ export type Database = {
           answers: Json
           assignment_id: string
           center_id: string
+          transcript: string | null
         }
         Insert: {
           answers?: Json
           assignment_id: string
           center_id: string
+          transcript?: string | null
         }
         Update: {
           answers?: Json
           assignment_id?: string
           center_id?: string
+          transcript?: string | null
         }
         Relationships: [
           {
@@ -1859,6 +1862,7 @@ export type Database = {
       create_custom_assignment: {
         Args: {
           p_answers: Json
+          p_audio_path?: string
           p_audio_url?: string
           p_groups?: Json
           p_center: string

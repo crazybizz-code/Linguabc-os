@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Sparkles, Upload } from "lucide-react";
+import { AudioLines, Loader2, Plus, Sparkles, Upload } from "lucide-react";
 import { FieldLabel } from "@/components/ui/dialog";
 import { buttonPrimary, Card, inputClass } from "@/components/ui/primitives";
 import { FormError } from "@/components/workspace/form-dialog";
 import { useT } from "@/i18n/client";
-import { draftFromUpload, draftWithAI, saveDraft } from "./actions";
+import { draftFromUpload, draftWithAI, generateAudio, saveDraft } from "./actions";
 import { emptyQuestion, type Draft, type DraftGroup, type DraftQuestion } from "@/lib/ai/draft";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "./question-editor";
 import type { QuestionType } from "@/lib/questions";
@@ -90,6 +90,42 @@ export function AiFlow() {
   );
 }
 
+/** Generates the recording for a listening script and previews it. */
+function AudioPanel({ draft, onChange }: { draft: Draft; onChange: (path: string | undefined) => void }) {
+  const t = useT();
+  const [url, setUrl] = useState<string>();
+  const [madeFrom, setMadeFrom] = useState<string>();
+  const [error, setError] = useState<string>();
+  const [pending, start] = useTransition();
+  const stale = draft.audio_path && madeFrom !== undefined && madeFrom !== draft.passage;
+
+  return (
+    <div className="space-y-3 rounded-[12px] border border-border/70 bg-[#FCF8F4] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[13.5px] font-medium">{t("Recording")}</p>
+          <p className="text-[12px] text-muted-foreground">
+            {pending ? t("Recording the script — this can take up to a minute.") : draft.audio_path ? t("Listen before you save.") : t("No recording yet. Without one, students read the script instead.")}
+          </p>
+        </div>
+        <button type="button" disabled={pending || draft.passage.trim().length < 20} className={buttonPrimary}
+          onClick={() => start(async () => {
+            setError(undefined);
+            const r = await generateAudio(draft.passage, draft.audio_path);
+            if (r.error || !r.path) { setError(t(r.error ?? "Something went wrong. Try again.")); return; }
+            setUrl(r.url); setMadeFrom(draft.passage); onChange(r.path);
+          })}>
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <AudioLines className="h-4 w-4" />}
+          {draft.audio_path ? t("Record again") : t("Generate audio")}
+        </button>
+      </div>
+      {url && <audio controls src={url} className="w-full" />}
+      {stale && <p className="text-[12.5px] text-[#9A5B1E]">{t("The script changed after recording. Record again so they match.")}</p>}
+      {error && <p className="text-[12.5px] text-[#B4483D]">{error}</p>}
+    </div>
+  );
+}
+
 function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "upload" | "ai"; onRestart: () => void }) {
   const t = useT();
   const router = useRouter();
@@ -137,9 +173,16 @@ function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "
             </select>
           </FieldLabel>
         </div>
-        <FieldLabel label={t("Text for students")} hint={t("Optional — the passage, dialogue or instructions students read first.")}>
-          <textarea value={d.passage} rows={8} maxLength={30000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
-        </FieldLabel>
+        {d.skill === "listening" ? (
+          <FieldLabel label={t("Listening script")} hint={t("Write one line per turn as \"Name: words\". Students hear the recording and see this script only after they submit.")}>
+            <textarea value={d.passage} rows={10} maxLength={8000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
+          </FieldLabel>
+        ) : (
+          <FieldLabel label={t("Text for students")} hint={t("Optional — the passage, dialogue or instructions students read first.")}>
+            <textarea value={d.passage} rows={8} maxLength={30000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
+          </FieldLabel>
+        )}
+        {d.skill === "listening" && <AudioPanel draft={d} onChange={(audio_path) => setD((x) => ({ ...x, audio_path }))} />}
       </Card>
 
       {d.questions.map((q, i) => (

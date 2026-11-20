@@ -6,6 +6,7 @@ import { Badge, Card, type Tone } from "@/components/ui/primitives";
 import { QuestionList } from "@/components/questions/question-list";
 import { content as parseContent, type AnswerKey } from "@/lib/questions";
 import { todayISO } from "@/lib/dates";
+import { audioUrl } from "@/lib/audio";
 import { AssignDialog } from "../../library/[id]/assign";
 import { assignAssignment } from "../../../actions";
 import { ApproveButton } from "./approve";
@@ -21,12 +22,14 @@ export default async function AssignmentPage({ params }: PageProps<"/homework/as
   const { supabase, workspace, isStaff, t } = await getStaffContext();
   const [{ data: a }, { data: key }, { data: groups }] = await Promise.all([
     supabase.from("assignments").select("id, title, skill, level, source, status, content, library_item_id").eq("id", id).eq("center_id", workspace.centerId).maybeSingle(),
-    supabase.from("assignment_keys").select("answers").eq("assignment_id", id).maybeSingle(),
+    supabase.from("assignment_keys").select("answers, transcript").eq("assignment_id", id).maybeSingle(),
     supabase.from("groups").select("id, name").eq("center_id", workspace.centerId).eq("status", "active").order("name"),
   ]);
   if (!a) notFound();
   const body = parseContent(a.content);
   const answers = (key?.answers ?? {}) as AnswerKey;
+  const audio = body.audio_url ?? (await audioUrl(supabase, body.audio_path));
+  const text = body.passage ?? key?.transcript;
   const due = new Date(`${todayISO()}T12:00:00Z`);
   due.setUTCDate(due.getUTCDate() + 3);
 
@@ -49,9 +52,11 @@ export default async function AssignmentPage({ params }: PageProps<"/homework/as
       )}
       <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
         <Card className="p-6">
-          {body.audio_url && <audio controls preload="none" src={body.audio_url} className="mb-4 w-full" />}
-          {body.passage ? <div className="library-prose whitespace-pre-line">{body.passage}</div>
-            : !body.audio_url && <p className="text-[13px] text-muted-foreground">{t("No text — questions only.")}</p>}
+          {audio && <audio controls preload="none" src={audio} className="mb-4 w-full" />}
+          {body.audio_path && !audio && <p className="mb-4 text-[13px] text-[#B4483D]">{t("The recording could not be loaded.")}</p>}
+          {key?.transcript && <p className="mb-2 text-[12px] text-muted-foreground">{t("Script — students see it only after they submit.")}</p>}
+          {text ? <div className="library-prose whitespace-pre-line">{text}</div>
+            : !audio && <p className="text-[13px] text-muted-foreground">{t("No text — questions only.")}</p>}
         </Card>
         <Card className="p-5">
           <h2 className="text-[15px] font-semibold">{t("Questions")}</h2>

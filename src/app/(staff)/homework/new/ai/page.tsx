@@ -4,6 +4,8 @@ import { getStaffContext } from "@/lib/auth/current";
 import { AiFlow } from "../drafting";
 
 export const metadata = { title: "Create with AI" };
+// AI drafting and audio generation can take a minute or two.
+export const maxDuration = 180;
 
 export default async function Page() {
   const { t } = await getStaffContext();
