@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      practice_attempts: {
+        Row: { center_id: string; created_at: string; earned: number; id: string; item_id: string; score: number | null; skill: Database["public"]["Enums"]["skill"]; student_id: string; total: number }
+        Insert: { center_id: string; created_at?: string; earned?: number; id?: string; item_id: string; score?: number | null; skill: Database["public"]["Enums"]["skill"]; student_id: string; total?: number }
+        Update: { center_id?: string; created_at?: string; earned?: number; id?: string; item_id?: string; score?: number | null; skill?: Database["public"]["Enums"]["skill"]; student_id?: string; total?: number }
+        Relationships: []
+      }
       activities: {
         Row: {
           actor_id: string | null
@@ -2082,6 +2088,8 @@ export type Database = {
         Returns: number
       }
       reissue_invite: { Args: { p_membership: string }; Returns: string }
+      practice_library_item: { Args: { p_item: string; p_answers: Json }; Returns: Json }
+      my_practice_blocked: { Args: Record<string, never>; Returns: string[] }
       center_report: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       remind_payment: { Args: { p_invoice: string }; Returns: number }
       save_library_podcast: {

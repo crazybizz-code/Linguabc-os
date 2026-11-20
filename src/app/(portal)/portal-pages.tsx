@@ -6,6 +6,7 @@ import { loadProgress } from "@/lib/progress";
 import { ProgressView } from "@/components/progress/progress-view";
 import { AttendanceView, ChildSwitcher, HomeView, PaymentsView } from "@/components/portal/views";
 import { PortalCard } from "@/components/portal/cards";
+import { Badge } from "@/components/ui/primitives";
 import { ReceiptView } from "@/components/portal/receipt-view";
 import { LanguageSwitch } from "@/components/workspace/language-switch";
 import { PrintButton } from "../(staff)/payments/receipt/[id]/print-button";
@@ -129,6 +130,54 @@ export async function PortalProfile({ kind }: { kind: PortalKind }) {
           <LogOut className="h-4 w-4" /> {t("Sign out")}
         </button>
       </form>
+    </>
+  );
+}
+
+/** A parent's view of their child's homework: what was set, when it is due, and how it went. */
+export async function PortalChildHomework({ searchParams }: { searchParams: SP }) {
+  const { ctx, child } = await setup("parent", searchParams);
+  const { t, supabase } = ctx;
+  if (!child) return <NoChild text={t("No homework yet.")} />;
+  const L = intlLocale(ctx.locale);
+  const { data: enr } = await supabase.from("enrollments").select("group_id").eq("student_id", child.id);
+  const groups = (enr ?? []).map((e) => e.group_id);
+  const [{ data: hw }, { data: subs }] = await Promise.all([
+    groups.length ? supabase.from("homework").select("id, due_at, assignments(title)").in("group_id", groups).order("due_at", { ascending: false }).limit(40) : Promise.resolve({ data: [] }),
+    supabase.from("submissions").select("homework_id, status, score").eq("student_id", child.id),
+  ]);
+  const sub = new Map((subs ?? []).map((s) => [s.homework_id, s]));
+  const now = new Date();
+  const LABEL: Record<string, [string, "green" | "amber" | "red" | "neutral"]> = {
+    reviewed: ["Marked", "green"], submitted: ["Submitted", "green"], in_progress: ["Started", "amber"], not_started: ["Not started", "neutral"],
+  };
+  return (
+    <>
+      <ChildSwitcher ctx={ctx} current={child.id} base="/parent/homework" />
+      <PortalCard title={t("Homework")}>
+        {(hw ?? []).length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No homework yet.")}</p> : (
+          <ul className="divide-y divide-border/60">
+            {(hw ?? []).map((h) => {
+              const s = sub.get(h.id);
+              const status = s?.status ?? "not_started";
+              const late = status !== "submitted" && status !== "reviewed" && new Date(h.due_at) < now;
+              const [label, tone] = late ? ["Missed", "red" as const] : LABEL[status];
+              return (
+                <li key={h.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <span>
+                    <span className="block text-[13.5px] font-medium">{(h.assignments as unknown as { title: string } | null)?.title ?? "—"}</span>
+                    <span className="text-[11.5px] text-muted-foreground">{t("due {date}", { date: new Date(h.due_at).toLocaleDateString(L, { timeZone: "Asia/Tashkent", day: "numeric", month: "short" }) })}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    {s?.score != null && <span className="text-[13px] font-semibold">{Math.round(Number(s.score))}%</span>}
+                    <Badge tone={tone}>{t(label)}</Badge>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </PortalCard>
     </>
   );
 }

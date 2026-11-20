@@ -989,4 +989,32 @@ select tests.assert((:'rep'::jsonb->'attendance'->>'present')::int > 0, 'attenda
 :as_admin
 select tests.assert(center_report(:'center_a', current_date - 30, current_date) ? 'capacity', 'admin can read the report');
 
+\echo '28. self-practice'
+:as_superuser
+insert into library_items (id, kind, title, skill, level_min, level_max, body_html, questions)
+  values ('lib-p', 'article', 'Practice me', 'reading', 'B1', 'B2', 'Text',
+          '[{"id":"q1","type":"mc","prompt":"Why?","options":["a","b"]},{"id":"q2","type":"gap","prompt":"It is ____.","max_words":1}]');
+insert into library_answer_keys (item_id, answers) values ('lib-p', '{"q1":{"answer":1},"q2":{"accepted":["red"]}}');
+:as_mentor
+select tests.expect_fail($$select practice_library_item('lib-p', '{}')$$, 'students only');
+:as_student
+select tests.expect_fail($$select practice_library_item('lib-1', '{}')$$, 'set this as homework');
+select tests.assert('lib-1' in (select my_practice_blocked()), 'homework items are blocked');
+select practice_library_item('lib-p', '{"q1":1,"q2":"Red"}') as pr \gset
+select tests.assert((:'pr'::jsonb->>'score')::numeric = 100, 'all correct scores 100');
+select tests.assert(not (:'pr'::jsonb ? 'key') and (:'pr'::jsonb->'correct'->>'q2')::boolean, 'marks without the key');
+select tests.assert((practice_library_item('lib-p', '{"q1":0}')->>'score')::numeric = 0, 'wrong scores 0');
+select practice_library_item('lib-p', '{}');
+select tests.expect_fail($$select practice_library_item('lib-p', '{}')$$, '3 times today');
+select tests.expect_count('select * from practice_attempts', 3);
+:as_parent
+select tests.expect_count('select * from practice_attempts', 3);
+:as_mentor
+select tests.expect_count('select * from practice_attempts', 3);
+:as_student2
+select tests.expect_count('select * from practice_attempts', 0);
+:as_ownerB
+select tests.expect_count('select * from practice_attempts', 0);
+select tests.expect_fail($$insert into practice_attempts (center_id, student_id, item_id, skill) values (gen_random_uuid(), gen_random_uuid(), 'lib-p', 'reading')$$, 'row-level security|permission denied');
+
 \echo 'ALL TESTS PASSED'

@@ -25,3 +25,16 @@ export async function saveHomework(homeworkId: string, answers: Answers, submit:
   revalidatePath("/student", "layout");
   return { ok: true };
 }
+
+/** Marks a practice attempt in the database; returns which answers were right, never the key. */
+export async function checkPractice(itemId: string, answers: Answers): Promise<{ result?: { score: number | null; earned: number; total: number; correct: Record<string, boolean> }; error?: string }> {
+  const { supabase } = await getPortalContext("student");
+  const { data, error } = await supabase.rpc("practice_library_item", { p_item: String(itemId), p_answers: answers ?? {} });
+  if (error || !data) {
+    const m = error?.message ?? "";
+    return { error: /3 times today/.test(m) ? "You have practised this 3 times today. Try another one." : /homework/.test(m) ? "Your centre set this as homework, so it is not open for practice." : "Something went wrong. Try again." };
+  }
+  const r = data as { score: number | null; earned: number; total: number; correct: Record<string, boolean> };
+  return { result: { score: r.score == null ? null : Number(r.score), earned: r.earned, total: r.total, correct: r.correct ?? {} } };
+}
+
