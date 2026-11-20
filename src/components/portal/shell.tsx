@@ -16,12 +16,14 @@ export function PortalShell({
   centerName,
   base,
   items,
+  bell,
   children,
 }: {
   title: string;
   centerName: string;
   base: "/parent" | "/student";
   items: { key: string; href: string; label: string }[];
+  bell?: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -41,6 +43,7 @@ export function PortalShell({
             <div className="text-[14px] font-semibold tracking-[-0.02em] text-[#17211D]">{t(title)}</div>
             <div className="text-[10px] uppercase tracking-[0.09em] text-[#7A8F7F]">{centerName}</div>
           </div>
+          <div className="ml-auto">{bell}</div>
         </header>
         <main className="space-y-3 px-4">{children}</main>
       </div>

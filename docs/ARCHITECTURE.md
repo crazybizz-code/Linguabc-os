@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0021):
+Migrations live in `supabase/migrations/` (0001–0022):
 
 | # | Adds |
 |---|---|
@@ -63,6 +63,7 @@ Migrations live in `supabase/migrations/` (0001–0021):
 | 0019 | Online mocks: `mock_sessions.reading_test_id`/`listening_test_id`, `mock_attempts`, `mock_results.released_at` and raw scores, Academic band tables (`app.academic_band`), release before families see results, student RPCs (`my_online_mocks`, `start_mock_module`, `save_mock_answers`, `submit_mock_module`, `report_mock_focus`), staff RPCs (`set_mock_tests`, `close_expired_attempts`, `release_mock_results`), `norm_answer` keeps decimals |
 | 0020 | Mock lockdown: `leave_mock_module` ends a part with 0 when the student leaves the exam screen, `mock_attempts.disqualified_at`/`disqualify_reason`, in-app notifications to the session's staff (`app.notify_mock_staff`) |
 | 0021 | `notifications` in the `supabase_realtime` publication (live bell); the "left a mock" notice names the student and group |
+| 0022 | Notification triggers for families and students (attendance absent/late, invoice, payment, new homework, homework reviewed, mock scheduled, mock released, lesson cancelled or moved), `app.notify`, `app.family_of`, `app.group_audience`, `mark_my_notifications_read` |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -151,7 +152,17 @@ Other rules the database enforces:
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
 | Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
 | Fish Audio | Text-to-speech for listening scripts (`src/lib/ai/fish.ts`). Scripts written as `Name: words` become a dialogue: the mentor picks a voice per speaker from six voices the owner chose (defaults in the code; one has an Indian accent), each turn is one request and the MP3s are joined. Voice titles come from Fish (`GET /model/{id}`, cached a day). Counted as AI requests (kind `audio`, UTF-8 bytes in `prompt_tokens`). | `FISH_AUDIO_API_KEY`, `FISH_AUDIO_VOICES` (comma-separated ids, optional), `FISH_AUDIO_MODEL` (default `s1`), `FISH_AUDIO_BASE_URL` |
-| Notifications | In-app only so far: written for mock lockdown (0020) and shown live by the staff header bell (`components/workspace/notification-bell.tsx`, Supabase Realtime, plus a toast; polls every 30 s as a fallback). The rest of V1 step 4 (attendance, payments, homework, schedule, and parents and students) is still to build. `sms`, `telegram` and `push` come later. | — |
+| Notifications | In-app (V1 step 4, 0022).
+- **Writing:** database triggers, so every path notifies.
+  - Parents: absent or late.
+  - Student and parents: new invoice, payment received, mock result released.
+  - The group's students: new homework, mock scheduled.
+  - The student: homework reviewed.
+  - The group's students and parents: lesson cancelled or moved.
+  - Staff: a student left a mock (0020).
+- **Format:** each row keeps an English title/body plus `data.kind` and values. `components/notifications/describe.ts` renders it in the reader's language (uz/ru/en) with a link.
+- **Showing:** one bell component (`components/workspace/notification-bell.tsx`) in the staff header and the student and parent portals. It updates live through Supabase Realtime, shows a toast, polls every 30 s as a fallback, and marks all as read when opened.
+- **Later:** `sms`, `telegram` and `push`. | — |
 
 ## Deployment
 - **Vercel project** `linguabc-os` (team `crazybizz-codes-projects`), region `fra1`.

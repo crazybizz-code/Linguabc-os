@@ -86,6 +86,5 @@ Both are drafts waiting for the owner's review before publishing.
  Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
-1. **V1 step 3, basic progress:** merged (#29) on 2026-11-20. No migration.
-2. ~~QA centre `qa-mock`~~ deleted on 2026-11-20 with the owner's OK. It went in one transaction, with a fingerprint of all other data compared before and after; they matched. Production now has Convora only, 1 auth user, and 2 published library tests.
-3. Then V1 step 4: in-app notifications for attendance, payments, homework, mocks and schedule, for staff and families. The bell and the Realtime channel already exist.
+1. **V1 step 4, in-app notifications:** built on the branch (0022 triggers; a bell in the student and parent portals; translated text). With the owner's go-ahead: apply 0022, then merge.
+2. Then V1 step 5: Click payments (with a provider interface so Payme and Uzum can follow). This needs Click merchant credentials and a sandbox.

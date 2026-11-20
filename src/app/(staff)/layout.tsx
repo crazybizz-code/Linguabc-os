@@ -2,7 +2,7 @@ import { LogOut } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { isPlatformAdmin } from "@/lib/auth/platform";
 import { NotificationBell } from "@/components/workspace/notification-bell";
-import { myNotifications } from "./notifications";
+import { markNotificationsRead, myNotifications } from "./notifications";
 import { ROLE_LABEL } from "@/lib/auth/workspace";
 import { I18nProvider } from "@/i18n/client";
 import { MobileNav, Sidebar } from "@/components/workspace/sidebar";
@@ -27,7 +27,7 @@ export default async function StaffLayout({ children }: LayoutProps<"/">) {
               <span className="font-medium text-[#17211D]">{roleLabel}</span>
             </div>
             <div className="flex items-center gap-2">
-              <NotificationBell initial={notes} />
+              <NotificationBell initial={notes} audience="staff" load={myNotifications} markAll={markNotificationsRead} />
               {workspace.role === "owner" && <LanguageSwitch locale={locale} onChange={setLocale} />}
               <form action={signOut}>
                 <button className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border/80 bg-[#FCF8F4] px-3 text-[12px] font-medium text-[#17211D] hover:bg-white">

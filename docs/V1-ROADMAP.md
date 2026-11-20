@@ -83,6 +83,7 @@ The owner confirmed this order on 2026-11-19.
    Advanced adaptive intelligence comes later.
    **Merged on 2026-11-20 (#29):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
+   **Built on 2026-11-20:** 0022 triggers and a bell for staff, students and parents (live, translated). PR pending.
 5. **Click payments.**
    - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.
    - Design it so the provider is one part that can be swapped: Payme and Uzum must be addable later without rewriting the core payment model.
