@@ -87,4 +87,4 @@ Both are drafts waiting for the owner's review before publishing.
 
 ## Exact next task
 1. **V1 step 4, in-app notifications:** merged (#30) and 0022 applied on 2026-11-20 (8 notify triggers live).
-2. Then V1 step 5: Click payments (with a provider interface so Payme and Uzum can follow). This needs Click merchant credentials and a sandbox.
+2. Click payments moved to V2 (owner, 2026-11-20). Next: V1 step 6 and the pre-launch list (see `V1-ROADMAP.md`).

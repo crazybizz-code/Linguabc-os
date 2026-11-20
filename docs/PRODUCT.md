@@ -67,7 +67,7 @@ Admins, academic managers and mentors use the staff workspace in English. This w
    - attendance history
    - basic academic progress and trends
 4. **In-app notifications** triggered by the product for attendance, payments, homework, mock sessions and schedule changes.
-5. **Click payments for parents.**
+5. ~~**Click payments for parents.**~~ **Moved to V2 (owner, 2026-11-20).** In V1, families see payment *information* only: invoices, balances, receipts and payment notifications. Staff record payments at the desk.
    - Flow: Parent app → **Pay now** → Click → payment verified → the student's invoice and payment records are updated.
    - The payment model is designed so other providers (Payme, Uzum) can be added later without rewriting it.
 6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page and reports. Settings, the parents page and reports are "Soon" in the sidebar.
