@@ -22,6 +22,9 @@ function normalizePhone(p: string): string | null {
   return digits ? `+${digits}` : null;
 }
 
+/** Sign-in address of an account made with a phone only. It is never mailed. */
+const phoneOnlyEmail = (phone: string) => `p${phone.replace(/\D/g, "")}@phone.linguabc.xyz`;
+
 const INVALID_LOGIN = "Invalid email/phone or password.";
 
 /** Resolve a phone number to the account email, server-side only. */
@@ -114,7 +117,8 @@ const JoinSchema = z
   .object({
     code: z.string().trim().min(12),
     full_name: z.string().trim().min(2, "Enter your full name."),
-    email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+    phone: z.string().trim().refine((v) => v.replace(/\D/g, "").length >= 9, "Enter a valid phone number."),
+    email: z.union([z.literal(""), z.string().trim().toLowerCase().email("Enter a valid email address or leave it empty.")]),
     password: z.string().min(8, "Use at least 8 characters for your password."),
     confirm: z.string(),
   })
@@ -129,13 +133,36 @@ export async function joinWithInvite(_: FormState, form: FormData): Promise<Form
   const { data: preview } = await supabase.rpc("invite_preview", { p_code: v.code });
   if (!preview?.length) return { error: "This invitation is no longer valid. Ask your centre to send a new one." };
 
+  // The phone is how most students and parents sign in, so it must be theirs alone.
+  const phone = normalizePhone(v.phone)!;
+  const admin = createAdminClient();
+  if (admin) {
+    const { data: taken } = await admin.from("profiles").select("id").eq("phone", phone).maybeSingle();
+    if (taken) return { error: "This phone number already has an account. Log in with it, then open the invitation link again." };
+  }
+  const meta = { full_name: v.full_name, phone, invite_code: v.code.toUpperCase() };
+
+  // No email: the account is created confirmed on the server (the invitation
+  // is the proof), under an address that is never mailed, and the person
+  // signs in with phone and password.
+  if (!v.email) {
+    if (!admin) return { error: "Joining without an email isn't available yet. Enter your email, or ask your centre." };
+    const { error: createError } = await admin.auth.admin.createUser({
+      email: phoneOnlyEmail(phone), password: v.password, email_confirm: true, user_metadata: meta,
+    });
+    if (createError) {
+      return { error: /already|registered|exists/i.test(createError.message) ? "This phone number already has an account. Log in with it, then open the invitation link again." : "We couldn't create your account. Try again." };
+    }
+    const { data: signedIn, error: signInError } = await supabase.auth.signInWithPassword({ email: phoneOnlyEmail(phone), password: v.password });
+    if (signInError || !signedIn.user) return { error: "Your account was created. Log in with your phone number and password." };
+    const problem = await finishOnboarding(supabase, signedIn.user);
+    redirect(problem ? `/?notice=${encodeURIComponent(problem)}` : "/");
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: v.email,
     password: v.password,
-    options: {
-      emailRedirectTo: callbackUrl("/"),
-      data: { full_name: v.full_name, invite_code: v.code.toUpperCase() },
-    },
+    options: { emailRedirectTo: callbackUrl("/"), data: meta },
   });
   if (error) return { error: error.message };
 

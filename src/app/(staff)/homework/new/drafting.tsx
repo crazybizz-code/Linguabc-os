@@ -11,7 +11,7 @@ import { draftFromUpload, draftWithAI, generateAudio, saveDraft } from "./action
 import { emptyQuestion, type Draft, type DraftGroup, type DraftQuestion } from "@/lib/ai/draft";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "./question-editor";
 import type { QuestionType } from "@/lib/questions";
-import type { Voice } from "@/lib/ai/script";
+import { MAX_SCRIPT_CHARS, type Voice } from "@/lib/ai/script";
 import { AudioPanel } from "@/components/questions/audio-panel";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -141,7 +141,7 @@ function DraftEditor({ initial, source, voices, onRestart }: { initial: Draft; s
         </div>
         {d.skill === "listening" ? (
           <FieldLabel label={t("Listening script")} hint={t("Write one line per turn as \"Name: words\". Students hear the recording and see this script only after they submit.")}>
-            <textarea value={d.passage} rows={10} maxLength={8000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
+            <textarea value={d.passage} rows={10} maxLength={MAX_SCRIPT_CHARS} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
           </FieldLabel>
         ) : (
           <FieldLabel label={t("Text for students")} hint={t("Optional — the passage, dialogue or instructions students read first.")}>

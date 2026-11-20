@@ -829,4 +829,98 @@ select tests.expect_count('select * from notifications where read_at is null', 0
 :as_parent
 select tests.assert((select count(*) from notifications where read_at is null) > 0, 'others stay unread');
 
+\echo '23. invite codes expire'
+:as_ownerA
+select membership_id as m_inv, invite_code as code_inv from invite_member(:'center_a', 'mentor', 'Late Mentor') \gset
+select tests.assert((select invite_expires_at between now() + interval '13 days' and now() + interval '15 days' from memberships where id = :'m_inv'), 'a new code is good for 14 days');
+:as_anon
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_inv'), 1);
+-- an expired code is neither shown nor redeemable
+:as_superuser
+update memberships set invite_expires_at = now() - interval '1 minute' where id = :'m_inv';
+:as_anon
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_inv'), 0);
+:as_ownerB
+select tests.expect_fail(format($$select accept_invite(%L)$$, :'code_inv'), 'expired');
+-- only those who may issue the invite can reissue it
+:as_mentor
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'forbidden');
+:as_admin
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_admin'), '');
+select reissue_invite(:'m_inv') as code_new \gset
+select tests.assert(:'code_new' <> :'code_inv', 'reissue gives a new code');
+:as_anon
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_new'), 1);
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_inv'), 0);
+:as_ownerB
+select tests.expect_fail(format($$select accept_invite(%L)$$, :'code_inv'), 'invalid');
+-- the fresh code works once, then it is gone
+:as_superuser
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-0000000000c1', 'late@a.uz', '{}');
+reset role; select tests.login('c1'); set role authenticated;
+select accept_invite(:'code_new');
+select tests.assert((select invite_code is null and invite_expires_at is null and status = 'active' from memberships where id = :'m_inv'), 'accepted invite clears its code');
+:as_ownerA
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'already accepted');
+
+\echo '24. answer keys only for the mentor of the work'
+-- mentor (group1) set lib-1; mentor2 teaches group2 only
+:as_mentor
+select tests.assert((select count(*) from assignment_keys k join assignments a on a.id = k.assignment_id where a.library_item_id = 'lib-1') = 1, 'group mentor reads the key');
+:as_mentor2
+select tests.expect_count(format($$select * from assignment_keys k join assignments a on a.id = k.assignment_id where a.library_item_id = %L$$, 'lib-1'), 0);
+select a.id as key_asg from assignments a where a.library_item_id = 'lib-1' \gset
+update assignment_keys set answers = '{}' where assignment_id = :'key_asg';
+select tests.expect_fail(format($$insert into assignment_keys (assignment_id, center_id, answers) values (%L, %L, '{}')$$, :'key_asg', :'center_a'), 'row-level security');
+:as_mentor
+update assignment_keys set answers = '{}' where assignment_id = :'key_asg';
+:as_acad
+select tests.assert((select answers->'q1'->>'answer' from assignment_keys where assignment_id = :'key_asg') = '1', 'mentors cannot change a key directly; academic manager still reads it');
+
+\echo '25. LinguABC podcasts'
+\set pq '[{"id":"q1","type":"mc","prompt":"Who?","options":["a","b","c"]},{"id":"q2","type":"tfng","prompt":"S"},{"id":"q3","type":"gap","prompt":"It is ____.","max_words":1}]'
+\set pa '{"q1":{"answer":0},"q2":{"answer":"true"},"q3":{"accepted":["red"]}}'
+\set ptr '[{"speaker":"Host","text":"Hello."}]'
+:as_ownerB
+select tests.expect_fail($$select save_library_podcast(null, 'Sneaky', '', 'A1', 'A1', '{}', '[]', '[]', '{}', '[]', null, null, 0)$$, 'forbidden');
+:as_ownerA
+select save_library_podcast(null, 'At the market', 'Buying fruit', 'A1', 'A2', array['Shopping',' food '], :'ptr', :'pq', :'pa', '[]', null, null, 0) as pod \gset
+select tests.assert((select status = 'draft' and kind = 'podcast' and topics = array['food','shopping'] from library_items where id = :'pod'), 'draft podcast saved');
+select tests.expect_fail(format($$select set_library_podcast_status(%L, 'published')$$, :'pod'), 'Record the podcast');
+select tests.expect_fail(format($$select save_library_podcast(%L, 'At the market', '', 'A1', 'A2', '{}', '[]', '[{"id":"q1","type":"open","prompt":"x"}]', '{}', '[]', null, null, 0)$$, :'pod'), 'only');
+-- the recording must exist and the link must match it
+select tests.expect_fail(format($$select save_library_podcast(%L, 'At the market', '', 'A1', 'A2', '{}', %L, %L, %L, '[]', 'podcasts/00000000-0000-4000-8000-000000000001.mp3', 'https://x.supabase.co/storage/v1/object/public/library-podcasts/podcasts/00000000-0000-4000-8000-000000000001.mp3', 120)$$, :'pod', :'ptr', :'pq', :'pa'), 'not found');
+insert into storage.objects (bucket_id, name) values ('library-podcasts', 'podcasts/00000000-0000-4000-8000-000000000001.mp3');
+select tests.expect_fail(format($$select save_library_podcast(%L, 'At the market', '', 'A1', 'A2', '{}', %L, %L, %L, '[]', 'podcasts/00000000-0000-4000-8000-000000000001.mp3', 'https://evil.example/x.mp3', 120)$$, :'pod', :'ptr', :'pq', :'pa'), 'does not match');
+select save_library_podcast(:'pod', 'At the market', '', 'A1', 'A2', '{}', :'ptr', :'pq', :'pa', '[]', 'podcasts/00000000-0000-4000-8000-000000000001.mp3', 'https://x.supabase.co/storage/v1/object/public/library-podcasts/podcasts/00000000-0000-4000-8000-000000000001.mp3', 125);
+select tests.assert((select minutes = 3 and duration_seconds = 125 from library_items where id = :'pod'), 'length stored');
+:as_ownerB
+select tests.expect_fail($$insert into storage.objects (bucket_id, name) values ('library-podcasts', 'podcasts/00000000-0000-4000-8000-000000000002.mp3')$$, 'row-level security');
+-- drafts are hidden from centres, keys too
+:as_mentor
+select tests.expect_count(format($$select * from library_items where id = %L$$, :'pod'), 0);
+select tests.expect_count(format($$select * from library_answer_keys where item_id = %L$$, :'pod'), 0);
+select tests.expect_fail(format($$select assign_library_item(%L, %L, %L, now() + interval '2 days')$$, :'center_a', :'pod', :'group1'), 'not found');
+:as_ownerA
+select set_library_podcast_status(:'pod', 'published');
+select tests.expect_fail(format($$select save_library_podcast(%L, 'Changed', '', 'A1', 'A2', '{}', '[]', '[]', '{}', '[]', null, null, 0)$$, :'pod'), 'Unpublish');
+:as_mentor
+select tests.expect_count(format($$select * from library_answer_keys where item_id = %L$$, :'pod'), 1);
+select assign_library_item(:'center_a', :'pod', :'group1', now() + interval '2 days') as hw_pod \gset
+:as_student
+select tests.expect_count(format($$select * from library_items where id = %L and audio_url is not null$$, :'pod'), 1);
+select tests.expect_count(format($$select * from library_answer_keys where item_id = %L$$, :'pod'), 0);
+:as_ownerA
+select tests.expect_fail(format($$select delete_library_podcast(%L)$$, :'pod'), 'homework');
+-- a recording in use cannot be removed
+delete from storage.objects where bucket_id = 'library-podcasts' and name = 'podcasts/00000000-0000-4000-8000-000000000001.mp3';
+:as_superuser
+select tests.assert(exists (select 1 from storage.objects where name = 'podcasts/00000000-0000-4000-8000-000000000001.mp3'), 'used recording kept');
+:as_ownerA
+select save_library_podcast(null, 'Spare', '', 'C1', 'C2', '{}', '[]', '[]', '{}', '[]', null, null, 0) as pod2 \gset
+select delete_library_podcast(:'pod2');
+select tests.expect_count(format($$select * from library_items where id = %L$$, :'pod2'), 0);
+
 \echo 'ALL TESTS PASSED'

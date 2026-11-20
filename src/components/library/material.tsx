@@ -10,7 +10,9 @@ export type Material = {
 
 /** A library article (sanitised HTML or plain text) or podcast (audio + transcript), with attribution. */
 export function MaterialView({ item, t }: { item: Material; t: T }) {
-  const transcript = (Array.isArray(item.transcript) ? item.transcript : []) as Line[];
+  // Expression tags like "[excited]" guide the voice; readers don't need them.
+  const transcript = ((Array.isArray(item.transcript) ? item.transcript : []) as Line[])
+    .map((l) => ({ ...l, text: String(l.text ?? "").replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s{2,}/g, " ").trim() }));
   return (
     <>
       {item.kind === "podcast" && item.audio_url && <audio controls preload="none" src={item.audio_url} className="mb-5 w-full" />}

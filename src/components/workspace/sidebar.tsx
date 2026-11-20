@@ -18,6 +18,7 @@ import {
   Users,
   Wallet,
   Library,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, cn } from "@/components/ui/primitives";
@@ -56,7 +57,10 @@ const SECTIONS: { title: string; items: Item[] }[] = [
   },
   {
     title: "LinguABC",
-    items: [{ href: "/admin/tests", label: "LinguABC tests", icon: Library, platformOnly: true }],
+    items: [
+      { href: "/admin/tests", label: "LinguABC tests", icon: Library, platformOnly: true },
+      { href: "/admin/podcasts", label: "LinguABC podcasts", icon: Mic, platformOnly: true },
+    ],
   },
 ];
 

@@ -27,6 +27,8 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 - Note: `finish_ai_request` takes token counts and cost from the caller. A mentor calling the RPC directly could under-report their own usage. The hourly and daily request limits still hold, so only the cost report is affected.
 
 ## Migrations applied to production
+**2026-11-20 (later), with the owner's go-ahead:** `0023_invite_expiry`, `0024_answer_key_scope`, `0025_library_podcasts`. Checked as roles in one rolled-back transaction: a stranger is not a platform admin, sees no answer keys or drafts, and is refused `save_library_podcast` and `reissue_invite`; the Convora owner (platform admin) can save a draft podcast and sees it; nothing was left behind (295 library items, 277 published, as before). The `library-podcasts` bucket is public.
+
 `0017_listening_audio` applied on 2026-11-20. The `listening-audio` bucket and its 3 storage policies exist.
 
 **Listening SQL check on production (2026-11-20):** one transaction with throwaway QA users and a `qa-listening` centre, rolled back at the end, so nothing was left behind (verified by counts afterwards). All checks passed: the mentor can upload and outsiders and students can't; a student hears the audio only once it's set as homework, can't read the transcript or key before submitting, and gets the transcript and a 100% score after; an outsider can't hear it. Direct `DELETE` on `storage.objects` is blocked by Supabase (`storage.protect_delete`), so the delete policy is tested only in the local suite and through the Storage API.
@@ -50,17 +52,21 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 
 ## Not yet verified
 Checked 2026-11-20. None of these can be seen from the agent's environment: the Supabase token can't read auth settings, and Vercel and `app.linguabc.xyz` are blocked by its network. The owner has to check them in the dashboards.
-- ~~AI keys in Vercel~~: **confirmed 2026-11-20.** OpenRouter is set: `ai_requests` shows a live `google/gemini-3.7-flash` call from the owner. Fish Audio is set too (a live `fish/s1` call).
-- **Phone sign-in key:** whether `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) is set in Vercel. Phone sign-in needs it.
+- ~~AI keys in Vercel~~: **confirmed 2026-11-20.** OpenRouter is set: `ai_requests` shows a live `google/gemini-3.7-flash` call from the owner. Fish Audio is set too (a live `fish/s1` call). **Fish retires `s1` on 31 Dec 2026** (owner's screenshot of the Fish dashboard, 2026-11-20: later `s1` requests are served by S2.1 Pro at the same price); the code now defaults to `s2.1-pro`. If `FISH_AUDIO_MODEL=s1` is set in Vercel, remove it or change it to `s2.1-pro`. Fish API spend so far: $0.57 over 30 days.
+- ~~Phone sign-in key~~: **confirmed 2026-11-20** from the owner's screenshot of Vercel: `SUPABASE_SECRET_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are set for Production (marked sensitive). Values not seen. `/join` now asks for a phone (required) and an email (optional, owner's choice 2026-11-20); phone-only accounts are created confirmed on the server under `p<digits>@phone.linguabc.xyz` (never mailed) and sign in by phone. They can't reset a password by email yet: the centre has to help.
 - **Domain:** whether `app.linguabc.xyz` is attached to the Vercel project as the production domain. The auth email config says it's the Site URL.
 - **Custom SMTP** in the Supabase dashboard.
 
 ## Blockers and open items
-**Pre-launch security blockers** (must be fixed before V1 goes live; see `SECURITY.md`):
+**Pre-launch security blockers:** both fixed (0023, 0024), merged in PR #31 and applied to production on 2026-11-20. Original notes:
 - Unused invite codes never expire.
 - Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 
-**Open decisions:** none.
+**Launch gate (owner, 2026-11-20):** V1 goes to no centre until all Base44 prototype sections exist, the library has at least 5 full reading and 5 full listening mocks plus enough homework content, and all 3 ways of creating homework work. See `V1-ROADMAP.md` → Launch gate.
+
+**Owner, 2026-11-20 (later):** no online payment in V1, only payment reminders for parents. Podcasts: as many as articles, the new ones made with Fish Audio from A1 to C2. Listening mock parts must open with the exam's spoken instructions. Roles to be set up in order, with a review of how each role signs in.
+
+**Open decisions:** target counts for library podcasts, articles, sections and passages at launch.
 
 **Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner set `FISH_AUDIO_API_KEY` in Vercel and chose six voices (now the defaults in `src/lib/ai/fish.ts`).
 

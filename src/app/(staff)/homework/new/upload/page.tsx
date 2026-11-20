@@ -6,7 +6,7 @@ import { UploadFlow } from "../drafting";
 
 export const metadata = { title: "Upload your material" };
 // AI drafting and audio generation can take a minute or two.
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 export default async function Page() {
   const { t } = await getStaffContext();

@@ -28,6 +28,7 @@ export default function ForgotPasswordPage() {
             <Field label="Email address" name="email" type="email" icon={Mail} autoFocus autoComplete="email" placeholder="you@example.com" required />
             <SubmitButton pending="Sending…">Send reset link</SubmitButton>
           </form>
+          <p className="mt-3 text-[11.5px] leading-relaxed text-muted-foreground">Joined with a phone number and no email? Ask your centre to help you set a new password.</p>
         </>
       )}
     </AuthShell>

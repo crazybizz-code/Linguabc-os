@@ -9,33 +9,13 @@ import { LEVELS, type Level } from "@/lib/ai/draft";
 import { testToStored, type SectionDraft, type TestDraft } from "@/lib/ai/test-store";
 import type { Cast } from "@/lib/ai/script";
 import { LIBRARY_AUDIO } from "@/lib/audio";
+import { withAdminAi } from "@/lib/ai/admin-ai";
 
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const level = (v: string): Level => ((LEVELS as readonly string[]).includes(v) ? (v as Level) : "B2");
 const skillOf = (v: string): TestSkill => (v === "listening" ? "listening" : "reading");
 const friendly = (m: string) => (/forbidden|permission/i.test(m) ? "You don't have permission to do that." : m);
-
-function aiError(e: unknown) {
-  if (e instanceof AiUnavailable) return e.message;
-  console.error(e);
-  return "Something went wrong. Try again.";
-}
-
-/** Runs one AI or voice job, recording it as the admin's usage (no centre). */
-async function withAdminAi<T>(kind: "test" | "audio", run: () => Promise<{ value: T; model: string; prompt: number; completion: number; cost: number }>): Promise<{ value?: T; error?: string }> {
-  const { supabase } = await getPlatformContext();
-  const { data: id, error } = await supabase.rpc("claim_admin_ai_request", { p_kind: kind });
-  if (error || id == null) return { error: error ? friendly(error.message) : "You don't have permission to do that." };
-  try {
-    const r = await run();
-    await supabase.rpc("finish_ai_request", { p_id: id, p_model: r.model, p_prompt: r.prompt, p_completion: r.completion, p_cost: r.cost, p_ok: true });
-    return { value: r.value };
-  } catch (e) {
-    await supabase.rpc("finish_ai_request", { p_id: id, p_model: "", p_prompt: 0, p_completion: 0, p_cost: 0, p_ok: false });
-    return { error: aiError(e) };
-  }
-}
 
 export async function createTest(form: FormData): Promise<{ id?: string; error?: string }> {
   const { supabase } = await getPlatformContext();
@@ -64,7 +44,7 @@ export async function recordSection(testId: string, script: string, previous?: s
   if (!fishConfigured()) return { error: "Audio is not configured yet. Add a Fish Audio key in the hosting settings." };
   const text = String(script ?? "").trim();
   if (text.length < 20) return { error: "Write the script first." };
-  if (text.length > MAX_SCRIPT_CHARS) return { error: "The script is too long for one recording (8,000 characters at most)." };
+  if (text.length > MAX_SCRIPT_CHARS) return { error: "The script is too long for one recording (12,000 characters at most)." };
   const { supabase } = await getPlatformContext();
   const r = await withAdminAi("audio", async () => {
     const speech = await speakScript(text, cast && typeof cast === "object" ? cast : {});

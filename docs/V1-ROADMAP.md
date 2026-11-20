@@ -2,6 +2,30 @@
 
 **Target: V1 by 15 January 2027** (confirmed by the owner on 2026-11-19).
 
+## Launch gate (owner, 2026-11-20)
+V1 is **not given to any centre** until every item below is done. All of it is due by 15 January 2027.
+
+**1. Every section of the Base44 prototype** (`lingu-core-flow.base44.app`) exists in the real app. Missing as of 2026-11-20:
+- Staff: Parents, Reports, Settings, Notifications inbox page, Schedule, Mentors, Academic analytics, Profile, MFA (two-step sign-in), a page per group (`/groups/[id]`), a page per branch (`/branches/[id]`)
+- Student: My plan, Practice (reading and listening drills)
+- Parent: Homework, Notifications, Child
+- Per-role menus as in the prototype (Owner, Administrator, Academic manager, Mentor), instead of one shared menu with items hidden per role
+- **Roles in order (owner, 2026-11-20):** set up the owner, admin, mentor, student and parent sections one by one, and review how each role gets into the platform (sign-up, invite code, sign-in by email or phone, where each lands).
+
+**2. Library content at launch:**
+- [ ] **At least 5 full mock tests** for reading and 5 for listening: IELTS Academic, 40 questions each, published in `library_tests`. Today there is 1 of each.
+- [ ] Listening mocks sound like the real exam: each part opens with the spoken instructions ("This is an IELTS Listening test... Part One... you have some time to look at questions 1 to 5"), has silent reading time, a break in the middle (Parts 1-3) and check time at the end. A part lasts about 6-8 minutes. The existing test's parts are about 3 minutes and start straight away: add the instructions in the editor and record again.
+- [ ] **As many podcasts as articles** (owner, 2026-11-20). Tool built: `/admin/podcasts` (0025), AI drafts the episode, Fish records it with `FISH_AUDIO_PODCAST_MODEL` (owner chose S2.1 Pro), admin checks and publishes. Library today has no A1, C1 or C2 items at all. Articles (236 published) are good as they are; the 41 podcasts are good too. The rest are **made by LinguABC with Fish Audio**, at every level from A1 to C2, with enough variety at each level.
+- [ ] Reading and listening sections and passages with questions for homework. Target count: to be set by the owner.
+
+**3. Homework creation works well in all 3 ways:**
+- [ ] Upload a worksheet (PDF, DOCX, TXT): questions are extracted correctly
+- [ ] Pick from the LinguABC library
+- [ ] Create with AI (skill, level, question count), with answers, and audio for listening
+Each one is checked end to end in a QA centre before launch.
+
+**4. Security:** the two pre-launch blockers below.
+
 ## Done (merged to `main`)
 | PR | Merged | What |
 |---|---|---|
@@ -84,15 +108,13 @@ The owner confirmed this order on 2026-11-19.
    **Merged on 2026-11-20 (#29):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
    **Built on 2026-11-20:** 0022 triggers and a bell for staff, students and parents (live, translated). PR pending.
-5. **Click payments.**
-   - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.
-   - Design it so the provider is one part that can be swapped: Payme and Uzum must be addable later without rewriting the core payment model.
+5. ~~**Click payments.**~~ **Not in V1** (owner, 2026-11-20). In V1 parents are only **told about payments**: in-app reminders before a fee is due and when it is overdue. The centre records payments at the desk as today. Online payment (Click first, then Payme and Uzum behind one provider interface) moves to V2.
 6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page, reports, and whatever else V1 still needs.
 
 ### Pre-launch blockers (security)
 Both must be fixed before V1 goes live. Details in `SECURITY.md`.
-- [ ] Unused invite codes never expire.
-- [ ] Answer keys are visible to every mentor in the centre, not only the mentor of the group.
+- [x] Unused invite codes never expire. Fixed in 0023 (14-day codes, "New link"); SQL section 23. Applied to production on 2026-11-20.
+- [x] Answer keys are visible to every mentor in the centre, not only the mentor of the group. Fixed in 0024; SQL section 24. Applied to production on 2026-11-20.
 
 ## Known dependencies
 **Fish Audio**

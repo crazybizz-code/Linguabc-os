@@ -1,3 +1,4 @@
+import { readableScript } from "@/lib/ai/script";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Layers } from "lucide-react";
@@ -59,7 +60,7 @@ export default async function StudentHomeworkPage({ params }: PageProps<"/studen
       {!item && audio && <PortalCard><audio controls preload="none" src={audio} className="w-full" /></PortalCard>}
       {!item && body.audio_path && !audio && <PortalCard><p className="text-[13px] text-[#B4483D]">{t("The recording could not be loaded. Refresh the page or tell your mentor.")}</p></PortalCard>}
       {!item && body.passage && <PortalCard><div className="library-prose whitespace-pre-line">{body.passage}</div></PortalCard>}
-      {!item && res?.transcript && <PortalCard title={t("Script")}><div className="library-prose whitespace-pre-line">{res.transcript}</div></PortalCard>}
+      {!item && res?.transcript && <PortalCard title={t("Script")}><div className="library-prose whitespace-pre-line">{readableScript(res.transcript)}</div></PortalCard>}
 
       {res ? (
         <>

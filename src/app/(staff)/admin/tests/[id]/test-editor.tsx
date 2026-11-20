@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2, Plus, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Megaphone, Plus, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { FieldLabel } from "@/components/ui/dialog";
 import { Badge, buttonPrimary, buttonSecondary, Card, inputClass, type Tone } from "@/components/ui/primitives";
 import { AudioPanel } from "@/components/questions/audio-panel";
 import { useT } from "@/i18n/client";
 import { emptyQuestion, type DraftGroup, type DraftQuestion, type Level } from "@/lib/ai/draft";
-import type { Voice } from "@/lib/ai/script";
+import { MAX_SCRIPT_CHARS, type Voice } from "@/lib/ai/script";
+import { frameListening, hasFrame } from "@/lib/ai/listening-frame";
 import type { QuestionType } from "@/lib/questions";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "../../../homework/new/question-editor";
 import { deleteTest, draftSection, recordSection, saveTest, setTestStatus, type TestDraft } from "../actions";
@@ -158,10 +159,21 @@ function SectionCard({ index, section: s, first, testId, skill, level, voices, a
       )}
       <FieldLabel label={t("Section title")}><input value={s.title} disabled={locked} maxLength={120} onChange={(e) => onChange({ title: e.target.value })} className={inputClass} /></FieldLabel>
       <FieldLabel label={t(listening ? "Listening script" : "Passage")}
-        hint={listening ? t("Write one line per turn as \"Name: words\". Students hear the recording and see this script only after they submit.") : undefined}>
-        <textarea value={s.passage} disabled={locked} rows={listening ? 10 : 14} maxLength={listening ? 8000 : 20000}
+        hint={listening ? t("Write one line per turn as \"Name: words\". A line [pause 30] is 30 seconds of silence. Students hear the recording and see this script only after they submit.") : undefined}>
+        <textarea value={s.passage} disabled={locked} rows={listening ? 10 : 14} maxLength={listening ? MAX_SCRIPT_CHARS : 20000}
           onChange={(e) => onChange({ passage: e.target.value })} className={area} />
       </FieldLabel>
+      {listening && !locked && s.passage.trim() && !hasFrame(s.passage) && (
+        <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[#E7D3B5] bg-[#FBF3E6] px-3.5 py-3">
+          <p className="min-w-[220px] flex-1 text-[12.5px] leading-relaxed text-[#8A5A26]">
+            {t("This script has no exam instructions. Add them so the recording opens like the real test, with time to read the questions. To add the break in the middle of the part, first put a line [break] where the second set of questions starts.")}
+          </p>
+          <button type="button" className={buttonSecondary}
+            onClick={() => onChange({ passage: frameListening(s.passage, index, first, last) })}>
+            <Megaphone className="h-4 w-4" /> {t("Add exam instructions")}
+          </button>
+        </div>
+      )}
       {listening && (locked ? (audioUrl && <audio controls preload="none" src={audioUrl} className="w-full" />) : (
         <AudioPanel script={s.passage} audioPath={s.audio_path} initialUrl={audioUrl} voices={voices}
           record={(script, previous, cast) => recordSection(testId, script, previous, cast)}
