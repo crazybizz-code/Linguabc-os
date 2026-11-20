@@ -1,6 +1,6 @@
 import "server-only";
 import { AiUnavailable } from "./gemini";
-import { defaultCast, MAX_SCRIPT_CHARS, splitScript, type Cast, type Voice } from "./script";
+import { defaultCast, MAX_SCRIPT_CHARS, speakable, splitScript, turnGap, type Cast, type Segment, type Voice } from "./script";
 
 export { MAX_SCRIPT_CHARS, splitScript };
 
@@ -213,13 +213,22 @@ export async function speakScript(script: string, chosen: Cast = {}, opts: { mod
   await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, async () => {
     while (next < todo.length) {
       const i = todo[next++];
-      pieces[i] = await tts(segments[i].text, cast[segments[i].speaker ?? ""] || undefined, model);
+      pieces[i] = await tts(speakable(segments[i].text), cast[segments[i].speaker ?? ""] || undefined, model);
     }
   }));
 
   // Pauses copy the format of the first spoken piece.
   const sample = pieces.find(Boolean)!;
-  const audio = Buffer.concat(segments.map((s, i) => (s.pause ? silence(sample, s.pause) : audioFrames(pieces[i]))));
+  // A natural break between turns, as people leave in real speech.
+  const out: Buffer[] = [];
+  let prev: Segment | null = null;
+  segments.forEach((s, i) => {
+    if (s.pause) { out.push(silence(sample, s.pause)); prev = null; return; }
+    if (prev) out.push(silence(sample, turnGap(prev.speaker, s.speaker, i)));
+    out.push(audioFrames(pieces[i]));
+    prev = s;
+  });
+  const audio = Buffer.concat(out);
   return {
     audio,
     bytes: Buffer.byteLength(spoken.map((s) => s.text).join(""), "utf8"),
