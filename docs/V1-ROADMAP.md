@@ -28,7 +28,16 @@
 - [x] Cue cards checked on a library-based homework: the data path under RLS, and the owner's visual check in the browser (2026-11-19)
 - [x] QA centre `qa-q-centre` and its users `qa.q.%@linguabc.test` deleted (2026-11-19)
 
-The milestone is complete. Next: Fish Audio / AI listening.
+The milestone is complete.
+
+## Current milestone: Fish Audio / AI listening (started 2026-11-20)
+- [x] Storage decided: private Supabase bucket `listening-audio`, signed URLs (owner, 2026-11-20)
+- [x] Migration 0017, SQL test section 18 (passes locally)
+- [x] Fish Audio client, "Generate audio" in the listening draft editor, playback for staff and students, transcript after submitting
+- [ ] PR reviewed and merged
+- [ ] 0017 applied to production (owner's go-ahead needed)
+- [x] `FISH_AUDIO_API_KEY` set in Vercel (owner, 2026-11-20); six voices chosen, defaults in code
+- [ ] Live check in a QA centre: generate, save, assign, play as the student, then delete the QA centre
 
 ## Remaining V1 work, in order
 The owner confirmed this order on 2026-11-19.
@@ -56,8 +65,9 @@ Both must be fixed before V1 goes live. Details in `SECURITY.md`.
 
 ## Known dependencies
 **Fish Audio**
-- Needs an API key and account. None is configured, and no code exists yet.
-- **Where the audio is stored is an open decision.** Supabase Storage isn't used at all today, and existing audio is external URLs. Choose (bucket, access rules, signed or public URLs) before building.
+- The owner has an account; the key goes in Vercel as `FISH_AUDIO_API_KEY`. The six voices the owner chose are the defaults in `src/lib/ai/fish.ts`; `FISH_AUDIO_VOICES` overrides them.
+- The request format (`POST /v1/tts`, `model` header, JSON body) was written from memory: the docs site was unreachable from the build environment. It was tested only against a mock server, so the first live call is the real test.
+- Audio is stored in the private `listening-audio` bucket (see `ARCHITECTURE.md` → Storage).
 
 **Click payments**
 - Needs a Click merchant account and credentials, and a way to test against it (a sandbox, if Click offers one).

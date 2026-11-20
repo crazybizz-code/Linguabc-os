@@ -35,6 +35,8 @@ export type Draft = {
   skill: Skill;
   level: Level;
   passage: string;
+  /** Listening: the generated recording in storage. The passage is then its transcript. */
+  audio_path?: string;
   groups: DraftGroup[];
   questions: DraftQuestion[];
 };

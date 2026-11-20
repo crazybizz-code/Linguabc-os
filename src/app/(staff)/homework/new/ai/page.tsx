@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
+import { voiceOptions } from "@/lib/ai/fish";
 import { AiFlow } from "../drafting";
 
 export const metadata = { title: "Create with AI" };
+// AI drafting and audio generation can take a minute or two.
+export const maxDuration = 180;
 
 export default async function Page() {
   const { t } = await getStaffContext();
@@ -14,7 +17,7 @@ export default async function Page() {
         <h1 className="text-[26px] font-semibold tracking-[-0.03em]">{t("Create with AI")}</h1>
         <p className="mt-1 text-[13.5px] text-muted-foreground">{t("Describe the exact sub-skill you want to drill this week.")}</p>
       </div>
-      <AiFlow />
+      <AiFlow voices={await voiceOptions()} />
     </div>
   );
 }
