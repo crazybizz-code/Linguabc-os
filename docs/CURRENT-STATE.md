@@ -87,5 +87,5 @@ Both are drafts waiting for the owner's review before publishing.
 
 ## Exact next task
 1. **V1 step 3, basic progress:** merged (#29) on 2026-11-20. No migration.
-2. QA centre `qa-mock` is still live. The owner decided not to test reading or sending results separately. Delete only with the owner's OK, after listing what goes.
+2. ~~QA centre `qa-mock`~~ deleted on 2026-11-20 with the owner's OK. It went in one transaction, with a fingerprint of all other data compared before and after; they matched. Production now has Convora only, 1 auth user, and 2 published library tests.
 3. Then V1 step 4: in-app notifications for attendance, payments, homework, mocks and schedule, for staff and families. The bell and the Realtime channel already exist.
