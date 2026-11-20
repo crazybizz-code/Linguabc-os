@@ -113,8 +113,8 @@ The owner confirmed this order on 2026-11-19.
 
 ### Pre-launch blockers (security)
 Both must be fixed before V1 goes live. Details in `SECURITY.md`.
-- [x] Unused invite codes never expire. Fixed in 0023 (14-day codes, "New link"); SQL section 23. Waiting to be applied to production.
-- [x] Answer keys are visible to every mentor in the centre, not only the mentor of the group. Fixed in 0024; SQL section 24. Waiting to be applied to production.
+- [x] Unused invite codes never expire. Fixed in 0023 (14-day codes, "New link"); SQL section 23. Applied to production on 2026-11-20.
+- [x] Answer keys are visible to every mentor in the centre, not only the mentor of the group. Fixed in 0024; SQL section 24. Applied to production on 2026-11-20.
 
 ## Known dependencies
 **Fish Audio**

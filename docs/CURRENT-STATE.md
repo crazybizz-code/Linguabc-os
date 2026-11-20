@@ -27,6 +27,8 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 - Note: `finish_ai_request` takes token counts and cost from the caller. A mentor calling the RPC directly could under-report their own usage. The hourly and daily request limits still hold, so only the cost report is affected.
 
 ## Migrations applied to production
+**2026-11-20 (later), with the owner's go-ahead:** `0023_invite_expiry`, `0024_answer_key_scope`, `0025_library_podcasts`. Checked as roles in one rolled-back transaction: a stranger is not a platform admin, sees no answer keys or drafts, and is refused `save_library_podcast` and `reissue_invite`; the Convora owner (platform admin) can save a draft podcast and sees it; nothing was left behind (295 library items, 277 published, as before). The `library-podcasts` bucket is public.
+
 `0017_listening_audio` applied on 2026-11-20. The `listening-audio` bucket and its 3 storage policies exist.
 
 **Listening SQL check on production (2026-11-20):** one transaction with throwaway QA users and a `qa-listening` centre, rolled back at the end, so nothing was left behind (verified by counts afterwards). All checks passed: the mentor can upload and outsiders and students can't; a student hears the audio only once it's set as homework, can't read the transcript or key before submitting, and gets the transcript and a 100% score after; an outsider can't hear it. Direct `DELETE` on `storage.objects` is blocked by Supabase (`storage.protect_delete`), so the delete policy is tested only in the local suite and through the Storage API.
@@ -56,7 +58,7 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 - **Custom SMTP** in the Supabase dashboard.
 
 ## Blockers and open items
-**Pre-launch security blockers:** both fixed on branch `claude/magical-archimedes-5i3fzc` (migrations 0023 and 0024, SQL sections 23-24 pass locally); not yet merged or applied to production. Original notes:
+**Pre-launch security blockers:** both fixed (0023, 0024), merged in PR #31 and applied to production on 2026-11-20. Original notes:
 - Unused invite codes never expire.
 - Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 
