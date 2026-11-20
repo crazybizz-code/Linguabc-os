@@ -8,6 +8,15 @@ import { getWorkspaces, homePath, type Role, type Workspace } from "./workspace"
 export const STAFF_ROLES: Role[] = ["owner", "admin", "academic_manager", "mentor"];
 
 /**
+ * Someone who turned on two-step sign-in must enter their code before any
+ * workspace opens. (The claims say which level this session reached.)
+ */
+export async function requireSecondStep(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (data?.currentLevel === "aal1" && data?.nextLevel === "aal2") redirect("/mfa");
+}
+
+/**
  * Interface language. Owners choose (uz / ru / en, default uz) and the
  * choice is stored on their profile; admins, mentors and students use
  * English; parents default to Uzbek.
@@ -27,6 +36,7 @@ export const getStaffContext = cache(async () => {
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
   if (!userId) redirect("/login");
+  await requireSecondStep(supabase);
 
   const [workspaces, profile] = await Promise.all([
     getWorkspaces(supabase, userId),

@@ -2,15 +2,17 @@ import { getStaffContext } from "@/lib/auth/current";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { ROLE_LABEL } from "@/lib/auth/workspace";
 import { PasswordForm } from "./password-form";
+import { TwoStep } from "./two-step";
 
 export const metadata = { title: "Profile" };
 
 /** Who you are in this centre, and your password. */
 export default async function ProfilePage() {
   const { supabase, workspace, userId, t } = await getStaffContext();
-  const [{ data: profile }, { data: user }] = await Promise.all([
+  const [{ data: profile }, { data: user }, { data: factors }] = await Promise.all([
     supabase.from("profiles").select("full_name, phone").eq("id", userId).maybeSingle(),
     supabase.auth.getUser(),
+    supabase.auth.mfa.listFactors(),
   ]);
   const email = user.user?.email ?? "";
   const rows: [string, string][] = [
@@ -31,6 +33,10 @@ export default async function ProfilePage() {
               <span className="text-[13.5px] font-medium">{v}</span>
             </div>
           ))}
+        </Card>
+        <Card className="p-5 lg:col-span-2">
+          <h2 className="text-[15px] font-semibold">{t("Two-step sign-in")}</h2>
+          <TwoStep on={(factors?.totp ?? []).length > 0} />
         </Card>
         <Card className="p-5">
           <h2 className="text-[15px] font-semibold">{t("Change password")}</h2>
