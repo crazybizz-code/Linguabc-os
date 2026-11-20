@@ -624,4 +624,11 @@ export const ru: Record<string, string> = {
   "The audio file was not found. Generate the audio again.": "Аудиофайл не найден. Создайте аудио заново.",
   "That audio is already used by another assignment. Generate the audio again.": "Это аудио уже используется в другом задании. Создайте аудио заново.",
   "Use either an audio link or generated audio, not both.": "Используйте либо ссылку на аудио, либо созданное аудио, но не оба сразу.",
+  "Narrator": "Рассказчик",
+  "Voice 2 (Indian accent)": "Голос 2 (индийский акцент)",
+  "Voice 1": "Голос 1",
+  "Voice 3": "Голос 3",
+  "Voice 4": "Голос 4",
+  "Voice 5": "Голос 5",
+  "Voice 6": "Голос 6",
 };

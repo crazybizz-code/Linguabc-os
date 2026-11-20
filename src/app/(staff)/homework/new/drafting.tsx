@@ -11,6 +11,7 @@ import { draftFromUpload, draftWithAI, generateAudio, saveDraft } from "./action
 import { emptyQuestion, type Draft, type DraftGroup, type DraftQuestion } from "@/lib/ai/draft";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "./question-editor";
 import type { QuestionType } from "@/lib/questions";
+import { defaultCast, speakersOf, type Cast, type Voice } from "@/lib/ai/script";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const SKILLS = ["reading", "listening", "writing", "speaking", "vocabulary", "grammar"];
@@ -40,12 +41,12 @@ function Working({ label }: { label: string }) {
   );
 }
 
-export function UploadFlow() {
+export function UploadFlow({ voices }: { voices: Voice[] }) {
   const t = useT();
   const [draft, setDraft] = useState<Draft>();
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
-  if (draft) return <DraftEditor initial={draft} source="upload" onRestart={() => setDraft(undefined)} />;
+  if (draft) return <DraftEditor initial={draft} source="upload" voices={voices} onRestart={() => setDraft(undefined)} />;
   if (pending) return <Working label={t("Reading your worksheet and preparing questions — this can take up to a minute.")} />;
   return (
     <Card className="max-w-2xl p-6">
@@ -65,12 +66,12 @@ export function UploadFlow() {
   );
 }
 
-export function AiFlow() {
+export function AiFlow({ voices }: { voices: Voice[] }) {
   const t = useT();
   const [draft, setDraft] = useState<Draft>();
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
-  if (draft) return <DraftEditor initial={draft} source="ai" onRestart={() => setDraft(undefined)} />;
+  if (draft) return <DraftEditor initial={draft} source="ai" voices={voices} onRestart={() => setDraft(undefined)} />;
   if (pending) return <Working label={t("Writing your assignment — this usually takes 10–30 seconds.")} />;
   return (
     <Card className="max-w-2xl p-6">
@@ -91,8 +92,11 @@ export function AiFlow() {
 }
 
 /** Generates the recording for a listening script and previews it. */
-function AudioPanel({ draft, onChange }: { draft: Draft; onChange: (path: string | undefined) => void }) {
+function AudioPanel({ draft, voices, onChange }: { draft: Draft; voices: Voice[]; onChange: (path: string | undefined) => void }) {
   const t = useT();
+  const [chosen, setChosen] = useState<Cast>({});
+  const speakers = speakersOf(draft.passage).slice(0, 8);
+  const cast = defaultCast(speakers, voices, chosen);
   const [url, setUrl] = useState<string>();
   const [madeFrom, setMadeFrom] = useState<string>();
   const [error, setError] = useState<string>();
@@ -111,7 +115,7 @@ function AudioPanel({ draft, onChange }: { draft: Draft; onChange: (path: string
         <button type="button" disabled={pending || draft.passage.trim().length < 20} className={buttonPrimary}
           onClick={() => start(async () => {
             setError(undefined);
-            const r = await generateAudio(draft.passage, draft.audio_path);
+            const r = await generateAudio(draft.passage, draft.audio_path, cast);
             if (r.error || !r.path) { setError(t(r.error ?? "Something went wrong. Try again.")); return; }
             setUrl(r.url); setMadeFrom(draft.passage); onChange(r.path);
           })}>
@@ -119,6 +123,17 @@ function AudioPanel({ draft, onChange }: { draft: Draft; onChange: (path: string
           {draft.audio_path ? t("Record again") : t("Generate audio")}
         </button>
       </div>
+      {speakers.length > 0 && voices.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {speakers.map((s) => (
+            <FieldLabel key={s} label={s || t("Narrator")}>
+              <select value={cast[s]} disabled={pending} onChange={(e) => setChosen({ ...chosen, [s]: e.target.value })} className={inputClass}>
+                {voices.map((v) => <option key={v.id} value={v.id}>{t(v.label)}</option>)}
+              </select>
+            </FieldLabel>
+          ))}
+        </div>
+      )}
       {url && <audio controls src={url} className="w-full" />}
       {stale && <p className="text-[12.5px] text-[#9A5B1E]">{t("The script changed after recording. Record again so they match.")}</p>}
       {error && <p className="text-[12.5px] text-[#B4483D]">{error}</p>}
@@ -126,7 +141,7 @@ function AudioPanel({ draft, onChange }: { draft: Draft; onChange: (path: string
   );
 }
 
-function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "upload" | "ai"; onRestart: () => void }) {
+function DraftEditor({ initial, source, voices, onRestart }: { initial: Draft; source: "upload" | "ai"; voices: Voice[]; onRestart: () => void }) {
   const t = useT();
   const router = useRouter();
   const [d, setD] = useState(initial);
@@ -182,7 +197,7 @@ function DraftEditor({ initial, source, onRestart }: { initial: Draft; source: "
             <textarea value={d.passage} rows={8} maxLength={30000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
           </FieldLabel>
         )}
-        {d.skill === "listening" && <AudioPanel draft={d} onChange={(audio_path) => setD((x) => ({ ...x, audio_path }))} />}
+        {d.skill === "listening" && <AudioPanel draft={d} voices={voices} onChange={(audio_path) => setD((x) => ({ ...x, audio_path }))} />}
       </Card>
 
       {d.questions.map((q, i) => (

@@ -36,7 +36,7 @@ The milestone is complete.
 - [x] Fish Audio client, "Generate audio" in the listening draft editor, playback for staff and students, transcript after submitting
 - [ ] PR reviewed and merged
 - [ ] 0017 applied to production (owner's go-ahead needed)
-- [ ] `FISH_AUDIO_API_KEY` (and voices) set in Vercel
+- [x] `FISH_AUDIO_API_KEY` set in Vercel (owner, 2026-11-20); six voices chosen, defaults in code
 - [ ] Live check in a QA centre: generate, save, assign, play as the student, then delete the QA centre
 
 ## Remaining V1 work, in order
@@ -65,7 +65,7 @@ Both must be fixed before V1 goes live. Details in `SECURITY.md`.
 
 ## Known dependencies
 **Fish Audio**
-- The owner has an account; the key goes in Vercel as `FISH_AUDIO_API_KEY`. Voices are optional (`FISH_AUDIO_VOICE`, `FISH_AUDIO_VOICE_2`).
+- The owner has an account; the key goes in Vercel as `FISH_AUDIO_API_KEY`. The six voices the owner chose are the defaults in `src/lib/ai/fish.ts`; `FISH_AUDIO_VOICES` overrides them.
 - The request format (`POST /v1/tts`, `model` header, JSON body) was written from memory: the docs site was unreachable from the build environment. It was tested only against a mock server, so the first live call is the real test.
 - Audio is stored in the private `listening-audio` bucket (see `ARCHITECTURE.md` → Storage).
 

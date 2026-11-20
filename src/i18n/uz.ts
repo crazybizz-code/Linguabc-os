@@ -624,4 +624,11 @@ export const uz: Record<string, string> = {
   "The audio file was not found. Generate the audio again.": "Audio fayl topilmadi. Audioni qayta yarating.",
   "That audio is already used by another assignment. Generate the audio again.": "Bu audio boshqa topshiriqda ishlatilgan. Audioni qayta yarating.",
   "Use either an audio link or generated audio, not both.": "Audio havola yoki yaratilgan audiodan bittasini ishlating, ikkalasini emas.",
+  "Narrator": "Hikoyachi",
+  "Voice 2 (Indian accent)": "Ovoz 2 (hind aksenti)",
+  "Voice 1": "Ovoz 1",
+  "Voice 3": "Ovoz 3",
+  "Voice 4": "Ovoz 4",
+  "Voice 5": "Ovoz 5",
+  "Voice 6": "Ovoz 6",
 };

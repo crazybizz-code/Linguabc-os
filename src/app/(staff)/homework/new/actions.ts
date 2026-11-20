@@ -7,6 +7,7 @@ import { aiConfigured, AiUnavailable, type Part, type Usage } from "@/lib/ai/gem
 import { extractDraft, generateDraft, LEVELS, SKILLS, type Draft, type Level, type Skill } from "@/lib/ai/assignment-draft";
 import { fishConfigured, MAX_SCRIPT_CHARS, speakScript } from "@/lib/ai/fish";
 import { AUDIO_BUCKET, audioUrl } from "@/lib/audio";
+import type { Cast } from "@/lib/ai/script";
 
 export type DraftResult = { draft?: Draft; error?: string };
 const MAX_FILE = 4 * 1024 * 1024;
@@ -90,7 +91,7 @@ const AUDIO_PATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/;
  * assignment) and a short-lived link for the preview player. A previous
  * preview the mentor is replacing is removed if no assignment uses it.
  */
-export async function generateAudio(script: string, previous?: string): Promise<AudioResult> {
+export async function generateAudio(script: string, previous?: string, cast?: Cast): Promise<AudioResult> {
   if (!fishConfigured()) return { error: "Audio is not configured yet. Add a Fish Audio key in the hosting settings." };
   const text = String(script ?? "").trim();
   if (text.length < 20) return { error: "Write the script first." };
@@ -101,7 +102,7 @@ export async function generateAudio(script: string, previous?: string): Promise<
   if (error || id == null) return { error: error && /AI limit/.test(error.message) ? error.message : "You don't have permission to do that." };
 
   try {
-    const speech = await speakScript(text);
+    const speech = await speakScript(text, cast && typeof cast === "object" ? cast : {});
     const path = `${workspace.centerId}/${crypto.randomUUID()}.mp3`;
     const { error: upErr } = await supabase.storage.from(AUDIO_BUCKET).upload(path, speech.audio, { contentType: "audio/mpeg", upsert: false });
     if (upErr) {

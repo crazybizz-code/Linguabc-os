@@ -58,7 +58,7 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Open decisions:** none.
 
-**Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner has a Fish Audio account and will set the key in Vercel.
+**Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner set `FISH_AUDIO_API_KEY` in Vercel and chose six voices (now the defaults in `src/lib/ai/fish.ts`).
 
 **Settled on 2026-11-19:**
 - Click is the first payment provider.
@@ -73,6 +73,6 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 **Finish Fish Audio / AI listening** (checklist in `V1-ROADMAP.md`):
 1. Review and merge the listening PR.
 2. With the owner's go-ahead, apply `0017_listening_audio.sql` to production.
-3. The owner sets `FISH_AUDIO_API_KEY` (and optionally `FISH_AUDIO_VOICE`, `FISH_AUDIO_VOICE_2`) in Vercel and redeploys.
+3. Deploy (merging to `main` does it); the Fish key is already in Vercel.
 4. Live check in a throwaway `qa-*` centre: create a listening draft with AI, generate audio, save, assign, play it as the student, submit, see the script. Then delete the QA centre and its bucket folder.
 5. Then: the mock engine.

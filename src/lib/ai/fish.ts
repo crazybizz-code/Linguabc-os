@@ -1,52 +1,68 @@
 import "server-only";
 import { AiUnavailable } from "./gemini";
+import { defaultCast, splitScript, type Cast, type Voice } from "./script";
+
+export { splitScript };
 
 /**
  * Fish Audio text-to-speech (REST, no SDK). Server-only: the key never
  * reaches the browser.
  *
  *   FISH_AUDIO_API_KEY   required
- *   FISH_AUDIO_VOICE     voice (model) id for the first speaker; optional
- *   FISH_AUDIO_VOICE_2   voice for the second speaker in a dialogue; optional
+ *   FISH_AUDIO_VOICES    comma-separated voice (model) ids; defaults below
  *   FISH_AUDIO_MODEL     TTS model header (default "s1")
  *   FISH_AUDIO_BASE_URL  only for local testing
  *
- * A script written as "Name: line" turns into a dialogue: each speaker gets
- * a voice (alternating between the two), lines are spoken one by one and the
- * MP3 pieces are joined. Without a second voice everything uses one voice.
+ * Each speaker in a "Name: words" script gets a voice (the mentor can pick),
+ * turns are spoken one by one and the MP3 pieces are joined.
  */
 export const fishConfigured = () => Boolean(process.env.FISH_AUDIO_API_KEY);
+
+/** Voices chosen by the owner on fish.audio (2026-11-20). Voice ids are public, not secrets. */
+const DEFAULT_VOICES: Voice[] = [
+  { id: "933563129e564b19a115bedd57b7406a", label: "Voice 1" },
+  { id: "45e74f1d840842afaf3e0f50006fc9e7", label: "Voice 2 (Indian accent)" },
+  { id: "1e632bc1503a411387360bfb100ccfc9", label: "Voice 3" },
+  { id: "054d313a29aa48bca65275f73647e7c9", label: "Voice 4" },
+  { id: "52f28d67f67543f7b8d8c875261d4643", label: "Voice 5" },
+  { id: "531f90254e3d4810a047a90b9309fdd0", label: "Voice 6" },
+];
+const VOICE_ID = /^[0-9a-f]{32}$/;
+
+function configuredVoices(): Voice[] {
+  const ids = (process.env.FISH_AUDIO_VOICES ?? "").split(",").map((v) => v.trim()).filter((v) => VOICE_ID.test(v));
+  return ids.length ? ids.map((id, i) => DEFAULT_VOICES.find((v) => v.id === id) ?? { id, label: `Voice ${i + 1}` }) : DEFAULT_VOICES;
+}
+
+/**
+ * The voices mentors can choose from, named after their fish.audio titles
+ * when those can be read (cached for a day), otherwise "Voice n".
+ */
+export async function voiceOptions(): Promise<Voice[]> {
+  const voices = configuredVoices();
+  if (!fishConfigured()) return voices;
+  const base = process.env.FISH_AUDIO_BASE_URL || "https://api.fish.audio";
+  return Promise.all(voices.map(async (v) => {
+    try {
+      const res = await fetch(`${base}/model/${v.id}`, {
+        headers: { Authorization: `Bearer ${process.env.FISH_AUDIO_API_KEY}` },
+        signal: AbortSignal.timeout(4000),
+        next: { revalidate: 86400 },
+      });
+      if (!res.ok) return v;
+      const title = String(((await res.json()) as { title?: unknown }).title ?? "").trim().slice(0, 60);
+      const accent = v.label.match(/\(.*\)$/)?.[0];
+      return title ? { id: v.id, label: accent && !title.toLowerCase().includes("indian") ? `${title} ${accent}` : title } : v;
+    } catch { return v; }
+  }));
+}
 
 /** Keeps one listening section to a few minutes of audio (and its cost bounded). */
 export const MAX_SCRIPT_CHARS = 8000;
 const MAX_SEGMENTS = 60;
 const PARALLEL = 3;
 
-export type Segment = { speaker: string | null; text: string };
 export type Speech = { audio: Buffer; bytes: number; model: string; segments: number };
-
-const LABEL = /^\s*([A-Z][A-Za-z0-9 .'-]{0,30}|[A-Z]):\s+(.+)$/;
-
-/** Splits a script into spoken segments, merging consecutive lines of one speaker. */
-export function splitScript(script: string): Segment[] {
-  const out: Segment[] = [];
-  let current: string | null = null;
-  for (const raw of script.replace(/\r/g, "").split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-    const m = LABEL.exec(line);
-    const speaker: string | null = m ? m[1].trim() : current;
-    const text = (m ? m[2] : line).trim();
-    // Stage directions like "[sound of a door]" are not read out.
-    const spoken = text.replace(/\[[^\]]*\]/g, "").trim();
-    current = speaker;
-    if (!spoken) continue;
-    const last = out[out.length - 1];
-    if (last && last.speaker === speaker) last.text += `\n${spoken}`;
-    else out.push({ speaker, text: spoken });
-  }
-  return out;
-}
 
 /** Strips a leading ID3v2 tag so joined MP3 pieces play as one stream. */
 function stripId3(buf: Buffer): Buffer {
@@ -83,27 +99,23 @@ async function tts(text: string, voice: string | undefined, model: string): Prom
   throw new AiUnavailable("The voice service is busy. Try again in a minute.");
 }
 
-/** Turns a listening script into one MP3. */
-export async function speakScript(script: string): Promise<Speech> {
+/** Turns a listening script into one MP3, each speaker read by their voice. */
+export async function speakScript(script: string, chosen: Cast = {}): Promise<Speech> {
   if (!fishConfigured()) throw new AiUnavailable("Audio is not configured yet. Add a Fish Audio key in the hosting settings.");
   const model = process.env.FISH_AUDIO_MODEL || "s1";
-  const voices = [process.env.FISH_AUDIO_VOICE, process.env.FISH_AUDIO_VOICE_2].map((v) => v?.trim() || undefined);
-
-  let segments = splitScript(script);
+  const segments = splitScript(script);
   if (segments.length === 0) throw new AiUnavailable("Write the script first.");
-  // One voice only: read the whole script in one request.
-  if (!voices[1]) segments = [{ speaker: null, text: segments.map((s) => s.text).join("\n") }];
   if (segments.length > MAX_SEGMENTS) throw new AiUnavailable("The dialogue has too many turns. Merge some lines and try again.");
 
-  const order = [...new Set(segments.map((s) => s.speaker ?? ""))];
-  const voiceOf = (s: Segment) => voices[order.indexOf(s.speaker ?? "") % 2] ?? voices[0];
+  // Only configured voices may be used, whatever the browser sent.
+  const cast = defaultCast([...new Set(segments.map((s) => s.speaker ?? ""))], configuredVoices(), chosen);
 
   const pieces: Buffer[] = new Array(segments.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(PARALLEL, segments.length) }, async () => {
     while (next < segments.length) {
       const i = next++;
-      pieces[i] = await tts(segments[i].text, voiceOf(segments[i]), model);
+      pieces[i] = await tts(segments[i].text, cast[segments[i].speaker ?? ""] || undefined, model);
     }
   }));
 
