@@ -6,6 +6,7 @@ import { AnswerInput } from "@/components/questions/answer-input";
 import { blocksOf, isAnswered, type Answers } from "@/lib/questions";
 import { cn } from "@/components/ui/primitives";
 import { reportFocus, saveExam, startExam, submitExam, type ExamStart } from "../../actions";
+import { Marked, useHighlights } from "./highlight";
 
 /**
  * The IELTS computer-delivered test screen for one module of a mock.
@@ -40,6 +41,7 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
   // The recording plays through one Audio object created when the test
   // starts, outside React's tree.
   const player = useRef<Player | null>(null);
+  const hl = useHighlights();
   const submitting = useRef(false);
   const answersRef = useRef(answers);
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -143,6 +145,7 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     setOffset(off);
     setExam(r.exam);
     setAnswers(r.exam.answers ?? {});
+    hl.load(r.exam.attemptId);
     setNow(Date.now());
     setPhase("running");
     if (!document.fullscreenElement) setLeft(true);
@@ -250,24 +253,32 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
       </div>
 
       {/* body */}
-      <div className={cn("min-h-0 flex-1", listening ? "overflow-y-auto" : "grid grid-cols-1 md:grid-cols-2")}>
+      <div onMouseUp={hl.onMouseUp} onScroll={hl.hide} className={cn("min-h-0 flex-1", listening ? "overflow-y-auto" : "grid grid-cols-1 md:grid-cols-2")}>
         {!listening && (
-          <article className="min-h-0 overflow-y-auto border-r border-[#DDDDDD] px-6 py-5">
+          <article onScroll={hl.hide} className="min-h-0 select-text overflow-y-auto border-r border-[#DDDDDD] px-6 py-5">
             <h2 className="mb-3 text-[18px] font-bold">{sec.title}</h2>
-            <div className="whitespace-pre-line text-[15px] leading-[1.7]">{sec.passage}</div>
+            <div className="whitespace-pre-line text-[15px] leading-[1.7]">
+              <Marked id={`p-${sec.id}`} text={sec.passage ?? ""} spans={hl.marks[`p-${sec.id}`]} />
+            </div>
           </article>
         )}
-        <section className={cn("min-h-0 overflow-y-auto px-6 py-5", listening && "mx-auto max-w-3xl")}>
+        <section onScroll={hl.hide} className={cn("min-h-0 overflow-y-auto px-6 py-5", listening && "mx-auto max-w-3xl")}>
           {blocksOf(sec.questions, sec.groups, sec.start).map((block, bi) => (
             <div key={bi} className="mb-6 space-y-3">
               <p className="text-[14px] font-bold">
                 Questions {block.items[0].n}{block.items.length > 1 ? `–${block.items[block.items.length - 1].n}` : ""}
               </p>
-              {block.group?.instructions && <p className="text-[14px] italic text-[#333]">{block.group.instructions}</p>}
+              {block.group?.instructions && (
+                <p className="select-text text-[14px] italic text-[#333]">
+                  <Marked id={`g-${sec.id}-${bi}`} text={block.group.instructions} spans={hl.marks[`g-${sec.id}-${bi}`]} />
+                </p>
+              )}
               {block.items.map(({ q, n }) => (
                 <div key={q.id} id={`q-${n}`} className={cn("scroll-mt-24 border-l-4 py-1 pl-3", flags.has(q.id) ? "border-[#E0A100]" : "border-transparent")}>
                   <div className="flex items-start justify-between gap-3">
-                    <p className="whitespace-pre-line text-[15px] font-semibold">{n}.{q.type === "gap" ? "" : ` ${q.prompt}`}</p>
+                    <p className="select-text whitespace-pre-line text-[15px] font-semibold">
+                      {n}.{q.type !== "gap" && <> <Marked id={`q-${q.id}`} text={q.prompt} spans={hl.marks[`q-${q.id}`]} /></>}
+                    </p>
                     <button type="button" onClick={() => toggleFlag(q.id)} title="Review this question later"
                       className={cn("flex shrink-0 items-center gap-1 border px-2 py-0.5 text-[11.5px]", flags.has(q.id) ? "border-[#E0A100] bg-[#FFF4D6]" : "border-[#CCCCCC] text-[#666]")}>
                       <Flag className="h-3 w-3" /> Review
@@ -314,6 +325,8 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
         </div>
       </footer>
 
+
+      {hl.toolbar}
 
       {/* overlays */}
       {needsTap && !left && (
