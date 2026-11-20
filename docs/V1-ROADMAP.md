@@ -28,6 +28,8 @@
 | #23 | 2026-11-20 | Fish Audio: lower sampling (temperature 0.3) so a voice stays steady across lines |
 | #24 | 2026-11-20 | Mock engine B: online IELTS mocks (exam mode, auto-marking, mentor release, 0019) |
 | #25 | 2026-11-20 | Exam: listening plays at start (fix found in QA); three-colour highlighting |
+| #26 | 2026-11-20 | Exam: highlight gap-fill sentences and options |
+| #27 | 2026-11-20 | Mock lockdown: leaving ends the part with 0, staff notified (0020) |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production

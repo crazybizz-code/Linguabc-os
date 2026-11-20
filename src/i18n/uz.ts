@@ -692,4 +692,6 @@ export const uz: Record<string, string> = {
   "A student left a mock test": "O'quvchi mock testdan chiqib ketdi",
   "removed: left the test screen": "chetlatildi: test ekranidan chiqdi",
   "Removed (0)": "Chetlatilgan (0)",
+  "Open the mock": "Mockni ochish",
+  "Close": "Yopish",
 };

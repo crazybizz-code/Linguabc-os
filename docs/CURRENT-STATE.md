@@ -88,7 +88,7 @@ Both are drafts waiting for the owner's review before publishing.
 ## Exact next task
 **Mock engine part B is merged (#24), and 0019 is applied (2026-11-20).** Checked on production: `norm_answer('1.5 metres')` keeps the decimal, the view has `released_at`, and the security advisor shows nothing new.
 1. ~~The owner records listening Parts 2–4 and publishes both library tests.~~ Done on 2026-11-20: Listening Test 1 and Reading Test 1 are published.
-   **QA in progress:** centre `qa-mock` has users `qa.m.owner`, `qa.m.mentor` and `qa.m.student` (`@linguabc.test`, created by SQL) and session "QA Full Mock" with both tests. The first run found the listening playback bug fixed in #25; the attempts were cleared after the merge so the run can start again.
+   **QA in progress:** centre `qa-mock` has users `qa.m.owner`, `qa.m.mentor` and `qa.m.student` (`@linguabc.test`, created by SQL) and session "QA Full Mock" with both tests. The first run found the listening playback bug fixed in #25. #26 (highlighting gap-fill and options) and #27 (lockdown, 0020 applied) followed. QA attempts were cleared after each merge so the run starts clean.
 2. A live check in a throwaway `qa-*` centre, which the owner needs for the UI:
    - a mock session with the published tests;
    - a QA student takes both modules in the exam screen;

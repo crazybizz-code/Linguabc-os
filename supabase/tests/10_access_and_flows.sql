@@ -773,7 +773,8 @@ select leave_mock_module(:'att_x', 'left_page');
 select tests.assert((select raw_score = 0 and band = 0 and disqualify_reason = 'left_fullscreen' from mock_attempts where id = :'att_x'), 'left: scored 0 despite saved answers');
 select tests.assert((select listening_band = 0 from mock_results where mock_session_id = :'ms5' and student_id = :'st1'), 'listening band 0 on the result');
 select tests.assert((select count(*) from notifications) = :n_before + 1, 'examiner (group mentor) notified once');
-select tests.assert((select body from notifications order by created_at desc limit 1) like '%left the Listening test%left full screen%', 'notification explains what happened');
+select tests.assert((select body from notifications order by created_at desc limit 1) like 'Aziz Karimov (B2 Morning) left the Listening test%left full screen%', 'notification names the student and group');
+select tests.assert((select data->>'student_name' from notifications order by created_at desc limit 1) = 'Aziz Karimov', 'student name kept in data');
 :as_ownerA
 select tests.assert((select count(*) from notifications where data->>'kind' = 'mock_left') = 1, 'owner notified');
 :as_acad

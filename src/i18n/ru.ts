@@ -692,4 +692,6 @@ export const ru: Record<string, string> = {
   "A student left a mock test": "Ученик покинул пробный тест",
   "removed: left the test screen": "снят: покинул экран теста",
   "Removed (0)": "Снят (0)",
+  "Open the mock": "Открыть пробный экзамен",
+  "Close": "Закрыть",
 };
