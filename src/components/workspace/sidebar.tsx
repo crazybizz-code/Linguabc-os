@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  Library,
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, cn } from "@/components/ui/primitives";
@@ -24,7 +25,7 @@ import { useT } from "@/i18n/client";
 
 // ownerHidden: day-to-day teaching operations. The owner runs the business
 // (branches, groups, payments, staff, reports); admins and mentors run classes.
-type Item = { href: string; label: string; icon: LucideIcon; soon?: boolean; adminOnly?: boolean; staffOnly?: boolean; ownerHidden?: boolean };
+type Item = { href: string; label: string; icon: LucideIcon; soon?: boolean; adminOnly?: boolean; staffOnly?: boolean; ownerHidden?: boolean; platformOnly?: boolean };
 const SECTIONS: { title: string; items: Item[] }[] = [
   {
     title: "Centre",
@@ -53,6 +54,10 @@ const SECTIONS: { title: string; items: Item[] }[] = [
       { href: "/staff", label: "Staff & mentors", icon: ShieldCheck, staffOnly: true },
     ],
   },
+  {
+    title: "LinguABC",
+    items: [{ href: "/admin/tests", label: "LinguABC tests", icon: Library, platformOnly: true }],
+  },
 ];
 
 export function Sidebar({
@@ -61,16 +66,18 @@ export function Sidebar({
   isAdmin,
   isStaff,
   isOwner,
+  isPlatformAdmin = false,
 }: {
   name: string;
   roleLabel: string;
   isAdmin: boolean;
   isStaff: boolean;
   isOwner: boolean;
+  isPlatformAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const t = useT();
-  const visible = (i: Item) => (!i.adminOnly || isAdmin) && (!i.staffOnly || isStaff) && !(i.ownerHidden && isOwner);
+  const visible = (i: Item) => (!i.adminOnly || isAdmin) && (!i.staffOnly || isStaff) && !(i.ownerHidden && isOwner) && (!i.platformOnly || isPlatformAdmin);
 
   return (
     <aside className="sticky top-4 hidden print:!hidden h-[calc(100vh-2rem)] w-[248px] shrink-0 flex-col rounded-[22px] bg-[#12392B] px-3.5 py-5 text-[#FAF5EF] lg:flex">
@@ -142,10 +149,10 @@ export function Sidebar({
 }
 
 /** Compact nav for phones and tablets. */
-export function MobileNav({ isStaff, isAdmin, isOwner }: { isStaff: boolean; isAdmin: boolean; isOwner: boolean }) {
+export function MobileNav({ isStaff, isAdmin, isOwner, isPlatformAdmin = false }: { isStaff: boolean; isAdmin: boolean; isOwner: boolean; isPlatformAdmin?: boolean }) {
   const pathname = usePathname();
   const t = useT();
-  const items = SECTIONS.flatMap((s) => s.items).filter((i) => !i.soon && (!i.staffOnly || isStaff) && (!i.adminOnly || isAdmin) && !(i.ownerHidden && isOwner));
+  const items = SECTIONS.flatMap((s) => s.items).filter((i) => !i.soon && (!i.staffOnly || isStaff) && (!i.adminOnly || isAdmin) && !(i.ownerHidden && isOwner) && (!i.platformOnly || isPlatformAdmin));
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto pb-1 lg:hidden">
       {items.map((i) => {

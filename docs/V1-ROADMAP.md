@@ -55,6 +55,7 @@ The owner confirmed this order on 2026-11-19.
    - Homework is different: when a full listening or reading test, a single section or a single passage is set as homework, the student sees the result as soon as they submit (as today).
    - **Content:** homework is made by the centre (AI or upload), and centres may also use LinguABC library tests. **Full mocks use LinguABC library tests only.** The mentor previews the library's full reading and listening tests and picks the one they like for the session.
    - **IELTS Academic** band tables for reading and listening (40 questions each).
+   - **Content tool (PR A, built 2026-11-20):** LinguABC admins write full tests at `/admin/tests` (AI drafts each section, Fish records listening, admin edits and publishes). Migration 0018.
    - **Timed like the exam:** listening audio plays once with no pausing, then 2 minutes to check; reading is 60 minutes. Answers submit automatically when time runs out, and the deadline is enforced on the server.
 3. **Basic progress:**
    - Student 360 academic and administrative history

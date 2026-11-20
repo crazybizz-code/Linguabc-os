@@ -76,4 +76,7 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 **Listening UI check passed (2026-11-20):** the owner created a B2 gap-fill listening (6 questions) with AI in Convora, and Fish Audio recorded the conversation. This was the first live Fish call.
 
 ## Exact next task
-**Step 2: the mock engine** (online mocks with reading and listening taken in the app). The owner's rules are in `V1-ROADMAP.md`: reading and listening are auto-marked but go to the mentor first; the mentor adds speaking and writing and releases the full result. Homework results stay instant. Don't start until the owner says go.
+**Mock engine, part A (library tests): built on branch `claude/fervent-mendel-iu86hg`, not merged, and 0018 is not applied.**
+1. With the owner's go-ahead: apply 0018, then add the owner's auth user to `platform_admins` (SQL only), then merge.
+2. The owner writes the first listening and reading tests at `/admin/tests` and publishes them.
+3. Then part B: mock sessions use a published test. Students take it timed in the app, marking and Academic bands happen in the database, results go to the mentor first, and the mentor adds writing and speaking and releases the full result.

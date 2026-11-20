@@ -592,4 +592,69 @@ select claim_ai_request(:'center_a', 'audio') as ai_audio \gset
 :as_superuser
 select tests.assert((select kind from ai_requests where id = :'ai_audio') = 'audio', 'audio is an AI request kind');
 
+\echo '19. library tests (platform admins)'
+:as_superuser
+insert into platform_admins (user_id) values ('00000000-0000-0000-0000-0000000000a1');
+:as_ownerB
+select tests.assert(not am_platform_admin(), 'ownerB is not a platform admin');
+select tests.expect_fail($$select new_library_test('listening', 'Sneaky test')$$, 'forbidden');
+select tests.expect_fail($$select claim_admin_ai_request('test')$$, 'forbidden');
+select tests.expect_fail('select * from platform_admins', 'permission denied');
+:as_ownerA
+select tests.assert(am_platform_admin(), 'ownerA is a platform admin');
+select claim_admin_ai_request('test') as admin_ai \gset
+:as_superuser
+select tests.assert((select center_id is null and kind = 'test' from ai_requests where id = :'admin_ai'), 'admin AI use belongs to no centre');
+:as_ownerA
+select tests.expect_fail($$select new_library_test('writing', 'Essay test')$$, 'reading or listening');
+select new_library_test('listening', 'Listening Test 1', 'B2') as lt \gset
+insert into storage.objects (bucket_id, name) select 'library-audio', format('tests/%s/00000000-0000-4000-8000-00000000000%s.mp3', :'lt', n) from generate_series(1, 3) n;
+:as_ownerB
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('library-audio', 'tests/%s/00000000-0000-4000-8000-000000000009.mp3')$$, :'lt'), 'row-level security');
+:as_ownerA
+-- 4 sections x 10 questions; section 4 has no recording yet
+select jsonb_agg(jsonb_build_object('id', 's' || s, 'title', 'Part ' || s,
+         'audio_path', case when s < 4 then format('tests/%s/00000000-0000-4000-8000-00000000000%s.mp3', :'lt', s) end,
+         'groups', '[]'::jsonb,
+         'questions', (select jsonb_agg(jsonb_build_object('id', 'q' || ((s - 1) * 10 + i), 'type', 'tfng', 'prompt', 'Statement ' || i) order by i) from generate_series(1, 10) i))
+       order by s) as lt_sections,
+       (select jsonb_object_agg('q' || n, jsonb_build_object('answer', 'true')) from generate_series(1, 40) n) as lt_answers
+from generate_series(1, 4) s \gset
+select save_library_test(:'lt', 'listening', 'Listening Test 1', 'B2', jsonb_strip_nulls(:'lt_sections'::jsonb), :'lt_answers', '{"s1":"Anna: Hello."}');
+select tests.assert((select question_count from library_tests where id = :'lt') = 40, '40 questions counted');
+select tests.expect_fail(format($$select set_library_test_status(%L, 'published')$$, :'lt'), 'four sections, each with its recording');
+select tests.expect_fail(format($$select save_library_test(%L, 'listening', 'X test', null, '[{"id":"s1","audio_path":"tests/%s/00000000-0000-4000-8000-000000000008.mp3","questions":[{"id":"q1","type":"tfng","prompt":"p"}]}]', '{"q1":{"answer":"true"}}')$$, :'lt', :'lt'), 'recording was not found');
+select tests.expect_fail(format($$select save_library_test(%L, 'listening', 'X test', null, '[{"id":"s1","questions":[{"id":"q1","type":"tfng","prompt":"p"}]},{"id":"s2","questions":[{"id":"q1","type":"tfng","prompt":"p"}]}]', '{"q1":{"answer":"true"}}')$$, :'lt'), 'must be unique');
+insert into storage.objects (bucket_id, name) values ('library-audio', format('tests/%s/00000000-0000-4000-8000-000000000004.mp3', :'lt'));
+select save_library_test(:'lt', 'listening', 'Listening Test 1', 'B2',
+  jsonb_set(:'lt_sections'::jsonb, '{3,audio_path}', to_jsonb(format('tests/%s/00000000-0000-4000-8000-000000000004.mp3', :'lt'))), :'lt_answers', '{"s1":"Anna: Hello."}');
+-- staff can't see drafts
+:as_mentor
+select tests.expect_count('select * from library_tests', 0);
+:as_ownerA
+select set_library_test_status(:'lt', 'published');
+select tests.expect_fail(format($$select save_library_test(%L, 'listening', 'Listening Test 1', 'B2', %L, %L)$$, :'lt', :'lt_sections', :'lt_answers'), 'Unpublish');
+select tests.expect_fail(format($$select delete_library_test(%L)$$, :'lt'), 'Hide the test');
+-- published: staff and mentors of any centre see it and can listen; nobody but admins reads the key
+:as_mentor
+select tests.expect_count('select * from library_tests', 1);
+select tests.expect_count('select * from library_test_keys', 0);
+select tests.expect_count(format($$select * from storage.objects where bucket_id = 'library-audio' and name like 'tests/%s/%%'$$, :'lt'), 4);
+select tests.expect_fail($$select new_library_test('reading', 'Mentor test')$$, 'forbidden');
+:as_ownerB
+select tests.expect_count('select * from library_tests', 1);
+select tests.expect_count('select * from library_test_keys', 0);
+:as_student
+select tests.expect_count('select * from library_tests', 0);
+select tests.expect_count(format($$select * from storage.objects where bucket_id = 'library-audio' and name like 'tests/%s/%%'$$, :'lt'), 0);
+:as_ownerA
+select tests.expect_count('select * from library_test_keys', 1);
+-- reading needs three real passages
+select new_library_test('reading', 'Reading Test 1') as rt \gset
+select tests.expect_fail(format($$select save_library_test(%L, 'reading', 'Reading Test 1', null, '[{"id":"s1","audio_path":"x","questions":[{"id":"q1","type":"tfng","prompt":"p"}]}]', '{"q1":{"answer":"true"}}')$$, :'rt'), 'no audio');
+select save_library_test(:'rt', 'reading', 'Reading Test 1', null, '[{"id":"s1","passage":"Short.","questions":[{"id":"q1","type":"tfng","prompt":"p"}]}]', '{"q1":{"answer":"true"}}');
+select tests.expect_fail(format($$select set_library_test_status(%L, 'published')$$, :'rt'), '40 questions');
+select delete_library_test(:'rt');
+select tests.expect_count(format('select * from library_tests where id = %L', :'rt'), 0);
+
 \echo 'ALL TESTS PASSED'

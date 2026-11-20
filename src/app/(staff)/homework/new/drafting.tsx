@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AudioLines, Loader2, Plus, Sparkles, Upload } from "lucide-react";
+import { Loader2, Plus, Sparkles, Upload } from "lucide-react";
 import { FieldLabel } from "@/components/ui/dialog";
 import { buttonPrimary, Card, inputClass } from "@/components/ui/primitives";
 import { FormError } from "@/components/workspace/form-dialog";
@@ -11,7 +11,8 @@ import { draftFromUpload, draftWithAI, generateAudio, saveDraft } from "./action
 import { emptyQuestion, type Draft, type DraftGroup, type DraftQuestion } from "@/lib/ai/draft";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "./question-editor";
 import type { QuestionType } from "@/lib/questions";
-import { defaultCast, speakersOf, type Cast, type Voice } from "@/lib/ai/script";
+import type { Voice } from "@/lib/ai/script";
+import { AudioPanel } from "@/components/questions/audio-panel";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const SKILLS = ["reading", "listening", "writing", "speaking", "vocabulary", "grammar"];
@@ -91,56 +92,6 @@ export function AiFlow({ voices }: { voices: Voice[] }) {
   );
 }
 
-/** Generates the recording for a listening script and previews it. */
-function AudioPanel({ draft, voices, onChange }: { draft: Draft; voices: Voice[]; onChange: (path: string | undefined) => void }) {
-  const t = useT();
-  const [chosen, setChosen] = useState<Cast>({});
-  const speakers = speakersOf(draft.passage).slice(0, 8);
-  const cast = defaultCast(speakers, voices, chosen);
-  const [url, setUrl] = useState<string>();
-  const [madeFrom, setMadeFrom] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [pending, start] = useTransition();
-  const stale = draft.audio_path && madeFrom !== undefined && madeFrom !== draft.passage;
-
-  return (
-    <div className="space-y-3 rounded-[12px] border border-border/70 bg-[#FCF8F4] p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[13.5px] font-medium">{t("Recording")}</p>
-          <p className="text-[12px] text-muted-foreground">
-            {pending ? t("Recording the script — this can take up to a minute.") : draft.audio_path ? t("Listen before you save.") : t("No recording yet. Without one, students read the script instead.")}
-          </p>
-        </div>
-        <button type="button" disabled={pending || draft.passage.trim().length < 20} className={buttonPrimary}
-          onClick={() => start(async () => {
-            setError(undefined);
-            const r = await generateAudio(draft.passage, draft.audio_path, cast);
-            if (r.error || !r.path) { setError(t(r.error ?? "Something went wrong. Try again.")); return; }
-            setUrl(r.url); setMadeFrom(draft.passage); onChange(r.path);
-          })}>
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <AudioLines className="h-4 w-4" />}
-          {draft.audio_path ? t("Record again") : t("Generate audio")}
-        </button>
-      </div>
-      {speakers.length > 0 && voices.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {speakers.map((s) => (
-            <FieldLabel key={s} label={s || t("Narrator")}>
-              <select value={cast[s]} disabled={pending} onChange={(e) => setChosen({ ...chosen, [s]: e.target.value })} className={inputClass}>
-                {voices.map((v) => <option key={v.id} value={v.id}>{t(v.label)}</option>)}
-              </select>
-            </FieldLabel>
-          ))}
-        </div>
-      )}
-      {url && <audio controls src={url} className="w-full" />}
-      {stale && <p className="text-[12.5px] text-[#9A5B1E]">{t("The script changed after recording. Record again so they match.")}</p>}
-      {error && <p className="text-[12.5px] text-[#B4483D]">{error}</p>}
-    </div>
-  );
-}
-
 function DraftEditor({ initial, source, voices, onRestart }: { initial: Draft; source: "upload" | "ai"; voices: Voice[]; onRestart: () => void }) {
   const t = useT();
   const router = useRouter();
@@ -197,7 +148,7 @@ function DraftEditor({ initial, source, voices, onRestart }: { initial: Draft; s
             <textarea value={d.passage} rows={8} maxLength={30000} onChange={(e) => setD({ ...d, passage: e.target.value })} className={area} />
           </FieldLabel>
         )}
-        {d.skill === "listening" && <AudioPanel draft={d} voices={voices} onChange={(audio_path) => setD((x) => ({ ...x, audio_path }))} />}
+        {d.skill === "listening" && <AudioPanel script={d.passage} audioPath={d.audio_path} voices={voices} record={generateAudio} onChange={(audio_path) => setD((x) => ({ ...x, audio_path }))} />}
       </Card>
 
       {d.questions.map((q, i) => (
