@@ -147,6 +147,16 @@ export async function inviteStaff(_: ActionState, form: FormData): Promise<Actio
   return { ok: true, link: `${siteUrl()}/join?code=${data?.[0]?.invite_code}` };
 }
 
+/** A fresh 14-day link for a pending invite; the old link stops working. */
+export async function reissueInvite(membershipId: string): Promise<{ link?: string; expires?: string; error?: string }> {
+  const { supabase } = await getStaffContext();
+  const { data, error } = await supabase.rpc("reissue_invite", { p_membership: membershipId });
+  if (error || !data) return { error: friendly(error?.message ?? "Could not make a new link.") };
+  revalidatePath("/staff");
+  revalidatePath("/students", "layout");
+  return { link: `${siteUrl()}/join?code=${data}`, expires: new Date(Date.now() + 14 * 86400_000).toISOString() };
+}
+
 // ---------------------------------------------------------- student logins
 export async function inviteStudentLogin(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase, workspace } = await getStaffContext();

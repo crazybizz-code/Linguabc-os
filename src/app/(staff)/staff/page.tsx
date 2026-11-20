@@ -4,7 +4,7 @@ import { getStaffContext } from "@/lib/auth/current";
 import { ROLE_LABEL } from "@/lib/auth/workspace";
 import { siteUrl } from "@/lib/supabase/config";
 import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { CopyLink, InviteStaff } from "./invite-staff";
+import { InviteLink, InviteStaff } from "./invite-staff";
 
 export const metadata = { title: "Staff" };
 
@@ -13,7 +13,7 @@ export default async function StaffPage() {
   if (!isStaff) redirect("/dashboard");
   const center = workspace.centerId;
   const [members, groups, branches] = await Promise.all([
-    supabase.from("memberships").select("id, full_name, email, phone, role, status, invite_code, branch_id").eq("center_id", center)
+    supabase.from("memberships").select("id, full_name, email, phone, role, status, invite_code, invite_expires_at, branch_id").eq("center_id", center)
       .in("role", ["owner", "admin", "academic_manager", "mentor"]).order("created_at"),
     supabase.from("group_overview").select("mentor_id, student_count").eq("center_id", center).eq("status", "active"),
     supabase.from("branches").select("id, name").eq("center_id", center).order("name"),
@@ -71,7 +71,7 @@ export default async function StaffPage() {
                       {m.status === "invited" && (
                         <div className="max-w-[300px] space-y-1.5">
                           <Badge tone="amber">{t("Invited")}</Badge>
-                          {isAdmin && m.invite_code && <CopyLink link={`${siteUrl()}/join?code=${m.invite_code}`} />}
+                          {isAdmin && m.invite_code && <InviteLink membershipId={m.id} link={`${siteUrl()}/join?code=${m.invite_code}`} expiresAt={m.invite_expires_at} canReissue={workspace.role === "owner" || !["owner", "admin"].includes(m.role)} />}
                         </div>
                       )}
                     </td>

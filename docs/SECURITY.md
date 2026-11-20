@@ -5,7 +5,7 @@ The database is the security boundary. The Next.js app reads and writes with the
 ## Pre-launch blockers
 Confirmed by the owner on 2026-11-19. Both must be fixed before V1 goes live.
 
-1. **Unused invite codes never expire.** A pending invite stays redeemable until it's used or its membership is changed. Fix: give codes an expiry, check it in `accept_invite`, and let staff reissue a code.
+1. ~~**Unused invite codes never expire.**~~ **Fixed in 0023** (not yet applied to production): codes last 14 days, `accept_invite` and `invite_preview` refuse expired codes, and `reissue_invite` gives a fresh code and cancels the old one.
 2. **Answer keys are visible too widely.** `assignment_keys` can be read and written by staff and by **every mentor in the centre** (`app.has_role(center_id, '{mentor}')`), not only the mentor of the group the work is set for. Fix: limit mentor access to assignments they created, or that are set for groups they teach. Add a test where a mentor from a different group gets nothing.
 
 ## Tenant isolation
@@ -55,7 +55,7 @@ A few specific rules:
 
 ## Invite security
 - **Codes:** 6 random bytes as 12 hex characters (`gen_random_bytes`), single-use. Redeeming one sets `invite_code = null` and binds the membership to the signed-in user.
-- **No expiry:** invite codes don't expire in the database. A pending invite stays redeemable until it's used or the membership is changed. This is a pre-launch blocker (see above).
+- **Expiry (0023):** a code is good for 14 days (`invite_expires_at`). Expired codes are not shown on `/join` and can't be redeemed. Whoever may issue the invite can reissue it (`reissue_invite`: owner or admin, and only the owner for owners and admins); the old code stops working at once.
 - **Issuing:** only owner or admin can issue invites, and only the owner can invite owners or admins.
   - A student invite must point to an existing student without a login.
   - A parent invite must point to an existing guardian without a login.

@@ -755,4 +755,10 @@ export const uz: Record<string, string> = {
   "Write one line per turn as \"Name: words\". A line [pause 30] is 30 seconds of silence. Students hear the recording and see this script only after they submit.": "Har bir navbatni alohida qatorga \"Ism: so'zlar\" ko'rinishida yozing. [pause 30] qatori 30 soniya jimlik bo'ladi. O'quvchilar yozuvni eshitadi, skriptni esa faqat topshirgandan keyin ko'radi.",
   "This script has no exam instructions. Add them so the recording opens like the real test, with time to read the questions. To add the break in the middle of the part, first put a line [break] where the second set of questions starts.": "Bu skriptda imtihon yo'riqnomalari yo'q. Yozuv haqiqiy imtihondagidek boshlanishi va savollarni o'qishga vaqt berilishi uchun ularni qo'shing. Qism o'rtasidagi tanaffusni qo'shish uchun avval ikkinchi savollar to'plami boshlanadigan joyga [break] qatorini qo'ying.",
   "Add exam instructions": "Imtihon yo'riqnomalarini qo'shish",
+  "Link expired": "Havola muddati tugagan",
+  "Link works until {date}": "Havola {date} gacha ishlaydi",
+  "New link": "Yangi havola",
+  "Could not make a new link.": "Yangi havola yaratib bo'lmadi.",
+  "Student invited": "O'quvchi taklif qilingan",
+  "This invitation has expired or is no longer valid. Ask your centre to send a new link.": "Bu taklif muddati tugagan yoki endi yaroqsiz. Markazingizdan yangi havola so'rang.",
 };

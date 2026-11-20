@@ -829,4 +829,40 @@ select tests.expect_count('select * from notifications where read_at is null', 0
 :as_parent
 select tests.assert((select count(*) from notifications where read_at is null) > 0, 'others stay unread');
 
+\echo '23. invite codes expire'
+:as_ownerA
+select membership_id as m_inv, invite_code as code_inv from invite_member(:'center_a', 'mentor', 'Late Mentor') \gset
+select tests.assert((select invite_expires_at between now() + interval '13 days' and now() + interval '15 days' from memberships where id = :'m_inv'), 'a new code is good for 14 days');
+:as_anon
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_inv'), 1);
+-- an expired code is neither shown nor redeemable
+:as_superuser
+update memberships set invite_expires_at = now() - interval '1 minute' where id = :'m_inv';
+:as_anon
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_inv'), 0);
+:as_ownerB
+select tests.expect_fail(format($$select accept_invite(%L)$$, :'code_inv'), 'expired');
+-- only those who may issue the invite can reissue it
+:as_mentor
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'forbidden');
+:as_admin
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_admin'), '');
+select reissue_invite(:'m_inv') as code_new \gset
+select tests.assert(:'code_new' <> :'code_inv', 'reissue gives a new code');
+:as_anon
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_new'), 1);
+select tests.expect_count(format($$select * from invite_preview(%L)$$, :'code_inv'), 0);
+:as_ownerB
+select tests.expect_fail(format($$select accept_invite(%L)$$, :'code_inv'), 'invalid');
+-- the fresh code works once, then it is gone
+:as_superuser
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-0000000000c1', 'late@a.uz', '{}');
+reset role; select tests.login('c1'); set role authenticated;
+select accept_invite(:'code_new');
+select tests.assert((select invite_code is null and invite_expires_at is null and status = 'active' from memberships where id = :'m_inv'), 'accepted invite clears its code');
+:as_ownerA
+select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'already accepted');
+
 \echo 'ALL TESTS PASSED'

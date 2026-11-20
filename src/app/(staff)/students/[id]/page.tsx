@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowUpRight, ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { siteUrl } from "@/lib/supabase/config";
 import { Avatar, Badge, Card, Progress, buttonPrimary, cn, formatUZS, prettyNumbers, type Tone } from "@/components/ui/primitives";
-import { CopyLink } from "../../staff/invite-staff";
+import { InviteLink } from "../../staff/invite-staff";
 import { RecordPayment } from "../../payments/record-payment";
 import { inviteParentLogin, inviteStudentLogin } from "../../actions";
 import { LoginInvite } from "./login-invite";
@@ -28,7 +28,7 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(L, { timeZone: TZ, day: "numeric", month: "short", year: "numeric" });
   const fmtDT = (iso: string) => new Date(iso).toLocaleString(L, { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-  const { data: student } = await supabase.from("students").select("*, branches(name), memberships!students_membership_id_center_id_fkey(status, invite_code)").eq("id", id).maybeSingle();
+  const { data: student } = await supabase.from("students").select("*, branches(name), memberships!students_membership_id_center_id_fkey(id, status, invite_code, invite_expires_at)").eq("id", id).maybeSingle();
   if (!student) notFound();
   const tabs = TABS.filter((t) => t !== "payments" || isAdmin);
   const tab = (tabs as readonly string[]).includes(String(rawTab)) ? (rawTab as (typeof TABS)[number]) : "overview";
@@ -36,7 +36,7 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
   const [overview, enrollments, guardians, attendance, activities, mock, invoices, payments] = await Promise.all([
     supabase.from("student_overview").select("*").eq("id", id).maybeSingle(),
     supabase.from("enrollments").select("id, group_id, start_date, monthly_fee, discount_percent, due_day, status, groups(name, mentor_id, course_id, courses(name))").eq("student_id", id).order("start_date", { ascending: false }),
-    supabase.from("guardians").select("id, full_name, phone, relationship, is_primary, membership_id, memberships!guardians_membership_id_center_id_fkey(status, invite_code)").eq("student_id", id),
+    supabase.from("guardians").select("id, full_name, phone, relationship, is_primary, membership_id, memberships!guardians_membership_id_center_id_fkey(id, status, invite_code, invite_expires_at)").eq("student_id", id),
     supabase.from("attendance_records").select("id, status, note, lessons(starts_at, groups(name))").eq("student_id", id).order("marked_at", { ascending: false }).limit(60),
     supabase.from("activities").select("id, type, title, detail, occurred_at").eq("student_id", id).order("occurred_at", { ascending: false }).limit(20),
     supabase.from("mock_result_scores").select("reading_band, listening_band, writing_band, speaking_band, overall_band").eq("student_id", id).eq("status", "completed").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
@@ -79,6 +79,12 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {isAdmin && studentLogin?.status === "invited" && studentLogin.invite_code && (
+              <div className="w-[300px]">
+                <p className="mb-1 text-[11.5px] font-medium text-[#8A5A26]">{t("Student invited")}</p>
+                <InviteLink membershipId={studentLogin.id} link={`${siteUrl()}/join?code=${studentLogin.invite_code}`} expiresAt={studentLogin.invite_expires_at} canReissue />
+              </div>
+            )}
             {isAdmin && !studentLogin && <LoginInvite label={t("Invite student")} field="student_id" value={student.id} action={inviteStudentLogin} who={student.full_name} />}
             {isAdmin && primary && !primary.membership_id && <LoginInvite label={t("Invite parent")} field="guardian_id" value={primary.id} action={inviteParentLogin} who={primary.full_name} />}
             {groupId && <Link href="/groups" className={`${buttonPrimary} h-9 text-[12.5px]`}>{t("Open group")} <ArrowUpRight className="h-4 w-4" /></Link>}
@@ -249,7 +255,7 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
                   </div>
                   <div className="min-w-[260px]">
                     {g.memberships?.status === "active" ? <Badge tone="green">{t("Parent portal active")}</Badge>
-                      : g.memberships?.status === "invited" && g.memberships.invite_code ? <CopyLink link={`${siteUrl()}/join?code=${g.memberships.invite_code}`} />
+                      : g.memberships?.status === "invited" && g.memberships.invite_code ? (isAdmin ? <InviteLink membershipId={g.memberships.id} link={`${siteUrl()}/join?code=${g.memberships.invite_code}`} expiresAt={g.memberships.invite_expires_at} canReissue /> : <Badge tone="amber">{t("Invited")}</Badge>)
                       : isAdmin ? <LoginInvite label={t("Invite to parent portal")} field="guardian_id" value={g.id} action={inviteParentLogin} who={g.full_name} /> : <Badge tone="neutral">{t("No portal access")}</Badge>}
                   </div>
                 </li>

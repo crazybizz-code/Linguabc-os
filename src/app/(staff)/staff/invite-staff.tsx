@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, Send } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Check, Copy, Loader2, RefreshCw, Send } from "lucide-react";
 import { FieldLabel } from "@/components/ui/dialog";
 import { cn, inputClass } from "@/components/ui/primitives";
 import { FormDialog } from "@/components/workspace/form-dialog";
-import { inviteStaff } from "../actions";
+import { inviteStaff, reissueInvite } from "../actions";
 import { useT } from "@/i18n/client";
 
 const ROLES = [
@@ -32,6 +32,41 @@ export function CopyLink({ link }: { link: string }) {
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         {copied ? t("Copied") : t("Copy")}
       </button>
+    </div>
+  );
+}
+
+/**
+ * A pending invite's link with its expiry. Codes last 14 days; an expired
+ * one can't be copied, only replaced. "New link" also cancels the old one.
+ */
+export function InviteLink({ membershipId, link, expiresAt, canReissue }: { membershipId: string; link: string; expiresAt: string | null; canReissue: boolean }) {
+  const t = useT();
+  const [state, setState] = useState({ link, expiresAt });
+  const [error, setError] = useState<string>();
+  const [pending, start] = useTransition();
+  // eslint-disable-next-line react-hooks/purity -- the expiry is checked at render time on purpose
+  const expired = !state.expiresAt || new Date(state.expiresAt).getTime() <= Date.now();
+  const renew = () => start(async () => {
+    setError(undefined);
+    const r = await reissueInvite(membershipId);
+    if (r.error || !r.link) setError(t(r.error ?? "Could not make a new link."));
+    else setState({ link: r.link, expiresAt: r.expires ?? null });
+  });
+  return (
+    <div className="space-y-1.5">
+      {!expired && <CopyLink link={state.link} />}
+      <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-muted-foreground">
+        {expired
+          ? <span className="font-medium text-[#B4483D]">{t("Link expired")}</span>
+          : <span>{t("Link works until {date}", { date: new Date(state.expiresAt!).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) })}</span>}
+        {canReissue && (
+          <button type="button" disabled={pending} onClick={renew} className="inline-flex items-center gap-1 font-medium text-[#12392B] hover:underline disabled:opacity-60">
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} {t("New link")}
+          </button>
+        )}
+      </div>
+      {error && <p className="text-[11.5px] text-[#B4483D]">{error}</p>}
     </div>
   );
 }

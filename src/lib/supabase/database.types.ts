@@ -1057,6 +1057,7 @@ export type Database = {
           full_name: string
           id: string
           invite_code: string | null
+          invite_expires_at: string | null
           invited_by: string | null
           phone: string | null
           role: Database["public"]["Enums"]["member_role"]
@@ -1071,6 +1072,7 @@ export type Database = {
           full_name: string
           id?: string
           invite_code?: string | null
+          invite_expires_at?: string | null
           invited_by?: string | null
           phone?: string | null
           role: Database["public"]["Enums"]["member_role"]
@@ -1085,6 +1087,7 @@ export type Database = {
           full_name?: string
           id?: string
           invite_code?: string | null
+          invite_expires_at?: string | null
           invited_by?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["member_role"]
@@ -2066,6 +2069,7 @@ export type Database = {
         Args: { p_lesson: string; p_records: Json }
         Returns: number
       }
+      reissue_invite: { Args: { p_membership: string }; Returns: string }
       record_payment: {
         Args: {
           p_amount: number

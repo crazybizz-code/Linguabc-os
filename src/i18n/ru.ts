@@ -755,4 +755,10 @@ export const ru: Record<string, string> = {
   "Write one line per turn as \"Name: words\". A line [pause 30] is 30 seconds of silence. Students hear the recording and see this script only after they submit.": "Пишите каждую реплику с новой строки в виде «Имя: слова». Строка [pause 30] — это 30 секунд тишины. Ученики слушают запись, а сценарий видят только после сдачи.",
   "This script has no exam instructions. Add them so the recording opens like the real test, with time to read the questions. To add the break in the middle of the part, first put a line [break] where the second set of questions starts.": "В сценарии нет инструкций экзамена. Добавьте их, чтобы запись начиналась как на настоящем тесте, со временем на чтение вопросов. Чтобы добавить паузу в середине части, сначала поставьте строку [break] там, где начинается второй блок вопросов.",
   "Add exam instructions": "Добавить инструкции экзамена",
+  "Link expired": "Срок ссылки истёк",
+  "Link works until {date}": "Ссылка действует до {date}",
+  "New link": "Новая ссылка",
+  "Could not make a new link.": "Не удалось создать новую ссылку.",
+  "Student invited": "Ученик приглашён",
+  "This invitation has expired or is no longer valid. Ask your centre to send a new link.": "Срок приглашения истёк или оно больше не действует. Попросите центр прислать новую ссылку.",
 };
