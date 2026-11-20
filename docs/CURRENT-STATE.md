@@ -68,6 +68,8 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Fish Audio credits (owner, 2026-11-20):** parked. Balance $0.43; no top-up for now. Library audio (podcasts, the 4 missing listening mocks) waits for a decision: Fish (~$25-30 in total) or a free model (Kokoro was tried: free but flat and blurry; Chatterbox on a free Colab GPU not tried yet).
 
+**Work on branch `claude/magical-archimedes-5i3fzc` after PR #31 (not merged, migrations not applied):** 0026 payment reminders (pg_cron), 0027 centre report, 0028 practice; per-role menus and every Base44 section (see `V1-ROADMAP.md`); two-step sign-in. SQL suite: 28 sections pass locally. tsc, eslint and build clean. No page was clicked through in a browser: the agent can't sign in to production.
+
 **Open decisions:** target counts for library podcasts, articles, sections and passages at launch.
 
 **Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner set `FISH_AUDIO_API_KEY` in Vercel and chose six voices (now the defaults in `src/lib/ai/fish.ts`).

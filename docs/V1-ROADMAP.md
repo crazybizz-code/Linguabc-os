@@ -5,7 +5,8 @@
 ## Launch gate (owner, 2026-11-20)
 V1 is **not given to any centre** until every item below is done. All of it is due by 15 January 2027.
 
-**1. Every section of the Base44 prototype** (`lingu-core-flow.base44.app`) exists in the real app. Missing as of 2026-11-20:
+**1. Every section of the Base44 prototype** (`lingu-core-flow.base44.app`) exists in the real app.
+   **Built 2026-11-20 (branch `claude/magical-archimedes-5i3fzc`, not merged yet):** per-role menus; staff Notifications inbox, Schedule, Profile (password, two-step sign-in), group and branch pages, Parents, Mentors, Academic analytics, Reports (0027), Settings; student My plan and Practice (0028); parent Homework and Notifications; MFA. Not built: a separate parent "Child" tab (Home and Profile cover it). Missing as of the morning of 2026-11-20:
 - Staff: Parents, Reports, Settings, Notifications inbox page, Schedule, Mentors, Academic analytics, Profile, MFA (two-step sign-in), a page per group (`/groups/[id]`), a page per branch (`/branches/[id]`)
 - Student: My plan, Practice (reading and listening drills)
 - Parent: Homework, Notifications, Child
