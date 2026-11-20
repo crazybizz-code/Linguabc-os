@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { cn } from "@/components/ui/primitives";
 import {
   choicesFor, choiceValue, isChosen, optionLabel, optionText, selectCount, splitGap, wordLimit,
@@ -11,13 +13,15 @@ import {
  * a pool to match against, a word-limited gap, or a writing box.
  */
 export function AnswerInput({
-  q, groups, value, disabled, onChange,
+  q, groups, value, disabled, onChange, text = (s) => s,
 }: {
   q: Question;
   groups?: QuestionGroup[];
   value: AnswerValue | undefined;
   disabled?: boolean;
   onChange: (v: AnswerValue) => void;
+  /** Renders a piece of question or option text (the exam uses it for highlighting). */
+  text?: (s: string, key: string) => ReactNode;
 }) {
   const choices = choicesFor(q, groups);
 
@@ -53,9 +57,12 @@ export function AnswerInput({
     return (
       <>
         {parts ? (
-          <p className="mt-2 text-[14px] leading-[2.2]">{parts[0]}{box}{parts[1]}</p>
+          <p className="mt-2 text-[14px] leading-[2.2]">{text(parts[0], `${q.id}-a`)}{box}{text(parts[1], `${q.id}-b`)}</p>
         ) : (
-          box
+          <>
+            <p className="mt-2 whitespace-pre-line text-[14px]">{text(q.prompt, `${q.id}-a`)}</p>
+            {box}
+          </>
         )}
         <p className="mt-1.5 text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
           Write no more than {wordLimit(q)}
@@ -76,12 +83,14 @@ export function AnswerInput({
         </p>
       )}
       <div className={cn("mt-3 space-y-2", (q.type === "tfng" || q.type === "ynng") && "flex flex-wrap gap-2 space-y-0")}>
-        {choices.map((text, i) => {
+        {choices.map((label, i) => {
           const on = isChosen(q, i, value);
           const compact = q.type === "tfng" || q.type === "ynng";
           return (
             <label
               key={i}
+              // Selecting option text to highlight it must not pick the option.
+              onClick={(e) => { if (window.getSelection()?.toString()) e.preventDefault(); }}
               className={cn(
                 "flex cursor-pointer gap-3 border text-[13.5px] transition-colors",
                 compact ? "items-center rounded-full px-3.5 py-2" : "rounded-[11px] px-3 py-2.5",
@@ -103,7 +112,7 @@ export function AnswerInput({
               />
               <span>
                 {!compact && <span className="mr-1.5 font-medium text-[#5F6B66]">{optionLabel(i, q.type)}</span>}
-                {optionText(text)}
+                {text(optionText(label), `${q.id}-o${i}`)}
               </span>
             </label>
           );
