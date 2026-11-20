@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Wallet } from "lucide-react";
 import { Avatar, Badge, EmptyState, formatUZS, type Tone } from "@/components/ui/primitives";
 import { RecordPayment } from "./record-payment";
+import { RemindButton } from "./remind-button";
 import { useT } from "@/i18n/client";
 
 export type InvoiceRow = {
@@ -19,6 +20,7 @@ export type InvoiceRow = {
   lastPayment: string | null;
   lastPaymentId: string | null;
   parent: string;
+  remindedAt: string | null;
 };
 
 const TONE: Record<string, Tone> = { paid: "green", partial: "amber", pending: "amber", overdue: "red", void: "neutral" };
@@ -75,7 +77,12 @@ export function PaymentsTable({ rows, periodLabel }: { rows: InvoiceRow[]; perio
                 </td>
                 <td className="px-4 py-3 text-[#3B4A42]">{r.parent}</td>
                 <td className="px-4 py-3 text-right">
-                  {r.balance > 0 && r.status !== "void" && <RecordPayment compact invoiceId={r.id} student={r.student} balance={r.balance} period={r.dueDate.slice(0, 7)} />}
+                  {r.balance > 0 && r.status !== "void" && (
+                    <span className="inline-flex items-start gap-2">
+                      <RemindButton invoiceId={r.id} remindedAt={r.remindedAt} />
+                      <RecordPayment compact invoiceId={r.id} student={r.student} balance={r.balance} period={r.dueDate.slice(0, 7)} />
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

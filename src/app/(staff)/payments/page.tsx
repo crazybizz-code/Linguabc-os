@@ -26,14 +26,16 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
   const period = typeof month === "string" && /^\d{4}-\d{2}-01$/.test(month) ? month : current;
   const center = workspace.centerId;
 
-  const [inv, students, enrollments, groups, guardians, payments] = await Promise.all([
+  const [inv, students, enrollments, groups, guardians, payments, reminded] = await Promise.all([
     supabase.from("invoice_balances").select("*").eq("center_id", center).eq("period", period),
     supabase.from("students").select("id, full_name").eq("center_id", center),
     supabase.from("enrollments").select("id, group_id").eq("center_id", center),
     supabase.from("groups").select("id, name").eq("center_id", center),
     supabase.from("guardians").select("student_id, full_name, is_primary").eq("center_id", center),
     supabase.from("payments").select("id, invoice_id, kind, amount, paid_at").eq("center_id", center).order("paid_at", { ascending: false }),
+    supabase.from("invoices").select("id, last_reminded_at").eq("center_id", center).eq("period", period),
   ]);
+  const remindedAt = new Map((reminded.data ?? []).map((i) => [i.id, i.last_reminded_at]));
   const studentName = new Map((students.data ?? []).map((s) => [s.id, s.full_name]));
   const enrollGroup = new Map((enrollments.data ?? []).map((e) => [e.id, e.group_id]));
   const groupName = new Map((groups.data ?? []).map((g) => [g.id, g.name]));
@@ -55,6 +57,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
       lastPayment: lastPay.get(i.id!)?.date ?? null,
       lastPaymentId: lastPay.get(i.id!)?.id ?? null,
       parent: parent.get(i.student_id!) ?? "—",
+      remindedAt: remindedAt.get(i.id!) ?? null,
     }))
     .sort((a, b) => a.student.localeCompare(b.student));
 
@@ -76,7 +79,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
       <PageHeader
         eyebrow={t("Administrative operations")}
         title={t("Payments")}
-        description={t("Student tuition — who has paid, who hasn't, and what to do about it.")}
+        description={t("Student tuition — who has paid, who hasn't, and what to do about it. Families get an in-app reminder 3 days before a fee is due and weekly while it is overdue.")}
         actions={<RunBilling period={period} label={monthOnly(period)} />}
       />
       <Card className="grid grid-cols-2 divide-border/60 xl:grid-cols-4 xl:divide-x">

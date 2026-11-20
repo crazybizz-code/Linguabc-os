@@ -109,6 +109,7 @@ The owner confirmed this order on 2026-11-19.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
    **Built on 2026-11-20:** 0022 triggers and a bell for staff, students and parents (live, translated). PR pending.
 5. ~~**Click payments.**~~ **Not in V1** (owner, 2026-11-20). In V1 parents are only **told about payments**: in-app reminders before a fee is due and when it is overdue. The centre records payments at the desk as today. Online payment (Click first, then Payme and Uzum behind one provider interface) moves to V2.
+   **Built 2026-11-20 (0026):** reminders 3 days before the due date and weekly while overdue, sent daily at 09:00 Tashkent by pg_cron (`app.send_payment_reminders`); a Remind button on the payments desk (once a day per invoice); an amount-to-pay banner on the parent and student payments pages. SQL section 26.
 6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page, reports, and whatever else V1 still needs.
 
 ### Pre-launch blockers (security)

@@ -923,4 +923,52 @@ select save_library_podcast(null, 'Spare', '', 'C1', 'C2', '{}', '[]', '[]', '{}
 select delete_library_podcast(:'pod2');
 select tests.expect_count(format($$select * from library_items where id = %L$$, :'pod2'), 0);
 
+\echo '26. payment reminders'
+:as_superuser
+select b.id as inv_r from invoice_balances b join invoices i on i.id = b.id
+ where b.student_id = :'st1' and i.status = 'open' and b.balance > 0 order by b.period desc limit 1 \gset
+update invoices set last_reminded_at = now() where id <> :'inv_r';
+update invoices set due_date = app.local_today() + 2, last_reminded_at = null where id = :'inv_r';
+select app.send_payment_reminders();
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_due' and data->>'invoice_id' = :'inv_r') = 1, 'parent told once that a fee is due soon');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_due' and data->>'invoice_id' = :'inv_r') = 1, 'student told too');
+:as_mentor
+select tests.expect_count($$select * from notifications where data->>'kind' in ('payment_due','payment_overdue')$$, 0);
+:as_superuser
+-- the due-soon reminder went out before the due date; now it is a day late
+update invoices set due_date = app.local_today() - 1, last_reminded_at = now() - interval '3 days' where id = :'inv_r';
+select app.send_payment_reminders();
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 1, 'overdue reminder once');
+:as_superuser
+update invoices set last_reminded_at = now() - interval '8 days' where id = :'inv_r';
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 2, 'overdue again after a week');
+-- by hand: owner or admin only, once a day
+:as_admin
+select tests.expect_fail(format($$select remind_payment(%L)$$, :'inv_r'), 'already reminded today');
+:as_superuser
+update invoices set last_reminded_at = now() - interval '2 days' where id = :'inv_r';
+:as_mentor
+select tests.expect_fail(format($$select remind_payment(%L)$$, :'inv_r'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select remind_payment(%L)$$, :'inv_r'), 'forbidden');
+:as_admin
+select tests.assert(remind_payment(:'inv_r') >= 1, 'admin reminded the family');
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 3, 'manual reminder delivered');
+-- a paid fee is never chased
+:as_admin
+select * from record_payment(:'inv_r', (select balance from invoice_balances where id = :'inv_r')::bigint, 'cash');
+:as_superuser
+update invoices set last_reminded_at = now() - interval '30 days' where id = :'inv_r';
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 3, 'no reminder once paid');
+
 \echo 'ALL TESTS PASSED'

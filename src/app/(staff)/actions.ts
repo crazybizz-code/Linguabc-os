@@ -157,6 +157,15 @@ export async function reissueInvite(membershipId: string): Promise<{ link?: stri
   return { link: `${siteUrl()}/join?code=${data}`, expires: new Date(Date.now() + 14 * 86400_000).toISOString() };
 }
 
+/** Reminds a student's family about an unpaid fee (in-app), at most once a day. */
+export async function remindPayment(invoiceId: string): Promise<{ sent?: number; error?: string }> {
+  const { supabase } = await getStaffContext();
+  const { data, error } = await supabase.rpc("remind_payment", { p_invoice: invoiceId });
+  if (error) return { error: friendly(error.message.replace(/^.*?(This family)/, "$1")) };
+  revalidatePath("/payments");
+  return { sent: data ?? 0 };
+}
+
 // ---------------------------------------------------------- student logins
 export async function inviteStudentLogin(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase, workspace } = await getStaffContext();

@@ -66,6 +66,8 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Owner, 2026-11-20 (later):** no online payment in V1, only payment reminders for parents. Podcasts: as many as articles, the new ones made with Fish Audio from A1 to C2. Listening mock parts must open with the exam's spoken instructions. Roles to be set up in order, with a review of how each role signs in.
 
+**Fish Audio credits (owner, 2026-11-20):** parked. Balance $0.43; no top-up for now. Library audio (podcasts, the 4 missing listening mocks) waits for a decision: Fish (~$25-30 in total) or a free model (Kokoro was tried: free but flat and blurry; Chatterbox on a free Colab GPU not tried yet).
+
 **Open decisions:** target counts for library podcasts, articles, sections and passages at launch.
 
 **Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner set `FISH_AUDIO_API_KEY` in Vercel and chose six voices (now the defaults in `src/lib/ai/fish.ts`).

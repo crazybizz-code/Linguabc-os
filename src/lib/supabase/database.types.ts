@@ -767,6 +767,7 @@ export type Database = {
           due_date: string
           enrollment_id: string
           id: string
+          last_reminded_at: string | null
           period: string
           status: Database["public"]["Enums"]["invoice_status"]
           student_id: string
@@ -778,6 +779,7 @@ export type Database = {
           due_date: string
           enrollment_id: string
           id?: string
+          last_reminded_at?: string | null
           period: string
           status?: Database["public"]["Enums"]["invoice_status"]
           student_id: string
@@ -789,6 +791,7 @@ export type Database = {
           due_date?: string
           enrollment_id?: string
           id?: string
+          last_reminded_at?: string | null
           period?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           student_id?: string
@@ -2079,6 +2082,7 @@ export type Database = {
         Returns: number
       }
       reissue_invite: { Args: { p_membership: string }; Returns: string }
+      remind_payment: { Args: { p_invoice: string }; Returns: number }
       save_library_podcast: {
         Args: {
           p_answers: Json
