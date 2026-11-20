@@ -53,6 +53,9 @@ The owner confirmed this order on 2026-11-19.
    - Reading and listening are marked by the database the moment the student submits, **but the result goes to the mentor first, not the student.**
    - The mentor sees the reading and listening bands, adds the speaking and writing bands they marked themselves, then **releases the full result** (all four bands and the overall band) to the student and parent.
    - Homework is different: when a full listening or reading test, a single section or a single passage is set as homework, the student sees the result as soon as they submit (as today).
+   - **Content:** homework is made by the centre (AI or upload), and centres may also use LinguABC library tests. **Full mocks use LinguABC library tests only.** The mentor previews the library's full reading and listening tests and picks the one they like for the session.
+   - **IELTS Academic** band tables for reading and listening (40 questions each).
+   - **Timed like the exam:** listening audio plays once with no pausing, then 2 minutes to check; reading is 60 minutes. Answers submit automatically when time runs out, and the deadline is enforced on the server.
 3. **Basic progress:**
    - Student 360 academic and administrative history
    - homework completion and results
