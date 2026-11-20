@@ -86,5 +86,5 @@ Both are drafts waiting for the owner's review before publishing.
  Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
-1. **V1 step 4, in-app notifications:** built on the branch (0022 triggers; a bell in the student and parent portals; translated text). With the owner's go-ahead: apply 0022, then merge.
+1. **V1 step 4, in-app notifications:** merged (#30) and 0022 applied on 2026-11-20 (8 notify triggers live).
 2. Then V1 step 5: Click payments (with a provider interface so Payme and Uzum can follow). This needs Click merchant credentials and a sandbox.

@@ -32,6 +32,7 @@
 | #27 | 2026-11-20 | Mock lockdown: leaving ends the part with 0, staff notified (0020) |
 | #28 | 2026-11-20 | Live staff notifications (Realtime, toast); notice names the student and group (0021) |
 | #29 | 2026-11-20 | Basic progress: Student 360 tab, student and parent pages, staff overview |
+| #30 | 2026-11-20 | In-app notifications for students, parents and staff (0022) |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
@@ -83,7 +84,7 @@ The owner confirmed this order on 2026-11-19.
    Advanced adaptive intelligence comes later.
    **Merged on 2026-11-20 (#29):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
-   **Built on 2026-11-20:** 0022 triggers and a bell for staff, students and parents (live, translated). PR pending.
+   **Merged on 2026-11-20 (#30), 0022 applied:** triggers and a bell for staff, students and parents (live, translated).
 5. **Click payments.**
    - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.
    - Design it so the provider is one part that can be swapped: Payme and Uzum must be addable later without rewriting the core payment model.
