@@ -37,7 +37,9 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
   const [needsTap, setNeedsTap] = useState(false);
   const [reviewEnds, setReviewEnds] = useState<number>();
   const [volume, setVolume] = useState(0.9);
-  const audio = useRef<HTMLAudioElement>(null);
+  // The recording plays through one Audio object created when the test
+  // starts, outside React's tree.
+  const player = useRef<Player | null>(null);
   const submitting = useRef(false);
   const answersRef = useRef(answers);
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -59,7 +61,7 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     if (!exam || submitting.current) return;
     submitting.current = true;
     setConfirming(false);
-    audio.current?.pause();
+    player.current?.pause();
     const r = await submitExam(exam.attemptId, answersRef.current);
     if (r.error) { setError(r.error); submitting.current = false; return; }
     setPhase("done");
@@ -107,30 +109,10 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     };
   }, [phase, exam]);
 
-  // ---- listening: play each part once, in order
-  const playTrack = useCallback(async (i: number, at = 0) => {
-    const el = audio.current;
-    const src = exam?.sections[i]?.audio;
-    if (!el || !src) return;
-    setTrack(i);
-    setPart(i);
-    el.src = src;
-    el.volume = volume;
-    el.currentTime = at;
-    try { await el.play(); setNeedsTap(false); } catch { setNeedsTap(true); }
-  }, [exam, volume]);
-
-  const onEnded = () => {
-    if (!exam) return;
-    const next = track + 1;
-    if (next < exam.sections.length && exam.sections[next].audio) setTimeout(() => void playTrack(next), 3000);
-    else { setTrack(exam.sections.length); setReviewEnds(Date.now() + REVIEW_MS); }
-  };
-
   // On resume, carry on from where the recording would be now.
-  const resumeListening = useCallback(async (x: ExamStart, off: number) => {
+  const resumeListening = useCallback(async (p: Player, x: ExamStart, off: number) => {
     const elapsed = (Date.now() + off - Date.parse(x.startedAt)) / 1000;
-    if (elapsed < 5) return playTrack(0);
+    if (elapsed < 5) return p.play(0);
     const durations = await Promise.all(x.sections.map((s) => new Promise<number>((resolve) => {
       if (!s.audio) return resolve(0);
       const a = new Audio(); a.preload = "metadata"; a.src = s.audio;
@@ -139,14 +121,16 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     })));
     let t = elapsed;
     for (let i = 0; i < durations.length; i++) {
-      if (t < durations[i]) return playTrack(i, t);
+      if (t < durations[i]) return p.play(i, t);
       t -= durations[i] + 3;
     }
     setTrack(x.sections.length);
     setReviewEnds(Date.parse(x.startedAt) - off + (durations.reduce((a, b) => a + b + 3, 0) * 1000) + REVIEW_MS);
-  }, [playTrack]);
+  }, []);
 
-  useEffect(() => { if (audio.current) audio.current.volume = volume; }, [volume]);
+  useEffect(() => { player.current?.setVolume(volume); }, [volume]);
+
+  useEffect(() => () => { player.current?.pause(); }, []);
 
   // ---- start
   const begin = async () => {
@@ -162,7 +146,17 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     setNow(Date.now());
     setPhase("running");
     if (!document.fullscreenElement) setLeft(true);
-    if (r.exam.skill === "listening") void resumeListening(r.exam, off);
+    if (r.exam.skill === "listening") {
+      const n = r.exam.sections.length;
+      const p = createPlayer(r.exam.sections, {
+        track: (i) => { setTrack(i); setPart(i); },
+        finished: () => { setTrack(n); setReviewEnds(Date.now() + REVIEW_MS); },
+        blocked: setNeedsTap,
+      });
+      p.setVolume(volume);
+      player.current = p;
+      void resumeListening(p, r.exam, off);
+    }
   };
 
   const goTo = (n: number) => {
@@ -320,13 +314,12 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
         </div>
       </footer>
 
-      {listening && <audio ref={audio} onEnded={onEnded} preload="auto" className="hidden" />}
 
       {/* overlays */}
       {needsTap && !left && (
         <Overlay>
           <p className="text-[15px]">Your browser needs one click to start the recording.</p>
-          <button type="button" onClick={() => { void audio.current?.play().then(() => setNeedsTap(false)).catch(() => {}); }}
+          <button type="button" onClick={() => player.current?.retry()}
             className="mt-4 h-10 bg-[#2B2B2B] px-5 text-[14px] font-semibold text-white">Play recording</button>
         </Overlay>
       )}
@@ -354,6 +347,37 @@ export function ExamApp({ sessionId, sessionName, skill, candidate }: { sessionI
     </div>
   );
 }
+
+/** Plays the parts of a listening test once each, in order, with a short gap. */
+function createPlayer(sections: ExamStart["sections"], on: { track: (i: number) => void; finished: () => void; blocked: (b: boolean) => void }) {
+  const el = new Audio();
+  el.preload = "auto";
+  let current = -1;
+  const play = async (i: number, at = 0): Promise<void> => {
+    const src = sections[i]?.audio;
+    if (!src) return;
+    current = i;
+    on.track(i);
+    el.src = src;
+    if (at > 0) {
+      await new Promise<void>((resolve) => { el.onloadedmetadata = () => resolve(); setTimeout(resolve, 4000); });
+      el.currentTime = at;
+    }
+    try { await el.play(); on.blocked(false); } catch { on.blocked(true); }
+  };
+  el.onended = () => {
+    const next = current + 1;
+    if (next < sections.length && sections[next].audio) setTimeout(() => void play(next), 3000);
+    else { current = sections.length; on.finished(); }
+  };
+  return {
+    play,
+    retry: () => { el.play().then(() => on.blocked(false)).catch(() => {}); },
+    pause: () => el.pause(),
+    setVolume: (v: number) => { el.volume = v; },
+  };
+}
+type Player = ReturnType<typeof createPlayer>;
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
