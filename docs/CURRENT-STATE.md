@@ -56,7 +56,7 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 - **Custom SMTP** in the Supabase dashboard.
 
 ## Blockers and open items
-**Pre-launch security blockers** (must be fixed before V1 goes live; see `SECURITY.md`):
+**Pre-launch security blockers:** both fixed on branch `claude/magical-archimedes-5i3fzc` (migrations 0023 and 0024, SQL sections 23-24 pass locally); not yet merged or applied to production. Original notes:
 - Unused invite codes never expire.
 - Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 

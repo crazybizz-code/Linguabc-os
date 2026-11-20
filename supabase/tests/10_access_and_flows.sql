@@ -865,4 +865,18 @@ select tests.assert((select invite_code is null and invite_expires_at is null an
 :as_ownerA
 select tests.expect_fail(format($$select reissue_invite(%L)$$, :'m_inv'), 'already accepted');
 
+\echo '24. answer keys only for the mentor of the work'
+-- mentor (group1) set lib-1; mentor2 teaches group2 only
+:as_mentor
+select tests.assert((select count(*) from assignment_keys k join assignments a on a.id = k.assignment_id where a.library_item_id = 'lib-1') = 1, 'group mentor reads the key');
+:as_mentor2
+select tests.expect_count(format($$select * from assignment_keys k join assignments a on a.id = k.assignment_id where a.library_item_id = %L$$, 'lib-1'), 0);
+select a.id as key_asg from assignments a where a.library_item_id = 'lib-1' \gset
+update assignment_keys set answers = '{}' where assignment_id = :'key_asg';
+select tests.expect_fail(format($$insert into assignment_keys (assignment_id, center_id, answers) values (%L, %L, '{}')$$, :'key_asg', :'center_a'), 'row-level security');
+:as_mentor
+update assignment_keys set answers = '{}' where assignment_id = :'key_asg';
+:as_acad
+select tests.assert((select answers->'q1'->>'answer' from assignment_keys where assignment_id = :'key_asg') = '1', 'mentors cannot change a key directly; academic manager still reads it');
+
 \echo 'ALL TESTS PASSED'

@@ -6,7 +6,7 @@ The database is the security boundary. The Next.js app reads and writes with the
 Confirmed by the owner on 2026-11-19. Both must be fixed before V1 goes live.
 
 1. ~~**Unused invite codes never expire.**~~ **Fixed in 0023** (not yet applied to production): codes last 14 days, `accept_invite` and `invite_preview` refuse expired codes, and `reissue_invite` gives a fresh code and cancels the old one.
-2. **Answer keys are visible too widely.** `assignment_keys` can be read and written by staff and by **every mentor in the centre** (`app.has_role(center_id, '{mentor}')`), not only the mentor of the group the work is set for. Fix: limit mentor access to assignments they created, or that are set for groups they teach. Add a test where a mentor from a different group gets nothing.
+2. **Fixed in 0024** (not yet applied to production): a mentor reads a key only for work they wrote or work set for a group they teach, and only owner, admin and academic manager may write the table directly (the homework functions write keys as definer). SQL section 24. ~~**Answer keys are visible too widely.**~~ `assignment_keys` can be read and written by staff and by **every mentor in the centre** (`app.has_role(center_id, '{mentor}')`), not only the mentor of the group the work is set for. Fix: limit mentor access to assignments they created, or that are set for groups they teach. Add a test where a mentor from a different group gets nothing.
 
 ## Tenant isolation
 - Every business row has `center_id`.
