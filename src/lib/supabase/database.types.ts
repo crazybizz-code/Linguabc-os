@@ -967,7 +967,10 @@ export type Database = {
       library_items: {
         Row: {
           attribution: string | null
+          audio_path: string | null
           audio_url: string | null
+          created_by: string | null
+          updated_at: string | null
           author: string | null
           body_format: string
           body_html: string | null
@@ -994,7 +997,10 @@ export type Database = {
         }
         Insert: {
           attribution?: string | null
+          audio_path?: string | null
           audio_url?: string | null
+          created_by?: string | null
+          updated_at?: string | null
           author?: string | null
           body_format?: string
           body_html?: string | null
@@ -1021,7 +1027,10 @@ export type Database = {
         }
         Update: {
           attribution?: string | null
+          audio_path?: string | null
           audio_url?: string | null
+          created_by?: string | null
+          updated_at?: string | null
           author?: string | null
           body_format?: string
           body_html?: string | null
@@ -2070,6 +2079,26 @@ export type Database = {
         Returns: number
       }
       reissue_invite: { Args: { p_membership: string }; Returns: string }
+      save_library_podcast: {
+        Args: {
+          p_answers: Json
+          p_audio_path: string | null
+          p_audio_url: string | null
+          p_description: string
+          p_id: string | null
+          p_level_max: Database["public"]["Enums"]["cefr_level"]
+          p_level_min: Database["public"]["Enums"]["cefr_level"]
+          p_questions: Json
+          p_seconds: number
+          p_title: string
+          p_topics: string[]
+          p_transcript: Json
+          p_vocabulary: Json
+        }
+        Returns: string
+      }
+      set_library_podcast_status: { Args: { p_id: string; p_status: string }; Returns: undefined }
+      delete_library_podcast: { Args: { p_id: string }; Returns: undefined }
       record_payment: {
         Args: {
           p_amount: number

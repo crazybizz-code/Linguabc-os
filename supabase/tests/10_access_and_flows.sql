@@ -879,4 +879,48 @@ update assignment_keys set answers = '{}' where assignment_id = :'key_asg';
 :as_acad
 select tests.assert((select answers->'q1'->>'answer' from assignment_keys where assignment_id = :'key_asg') = '1', 'mentors cannot change a key directly; academic manager still reads it');
 
+\echo '25. LinguABC podcasts'
+\set pq '[{"id":"q1","type":"mc","prompt":"Who?","options":["a","b","c"]},{"id":"q2","type":"tfng","prompt":"S"},{"id":"q3","type":"gap","prompt":"It is ____.","max_words":1}]'
+\set pa '{"q1":{"answer":0},"q2":{"answer":"true"},"q3":{"accepted":["red"]}}'
+\set ptr '[{"speaker":"Host","text":"Hello."}]'
+:as_ownerB
+select tests.expect_fail($$select save_library_podcast(null, 'Sneaky', '', 'A1', 'A1', '{}', '[]', '[]', '{}', '[]', null, null, 0)$$, 'forbidden');
+:as_ownerA
+select save_library_podcast(null, 'At the market', 'Buying fruit', 'A1', 'A2', array['Shopping',' food '], :'ptr', :'pq', :'pa', '[]', null, null, 0) as pod \gset
+select tests.assert((select status = 'draft' and kind = 'podcast' and topics = array['food','shopping'] from library_items where id = :'pod'), 'draft podcast saved');
+select tests.expect_fail(format($$select set_library_podcast_status(%L, 'published')$$, :'pod'), 'Record the podcast');
+select tests.expect_fail(format($$select save_library_podcast(%L, 'At the market', '', 'A1', 'A2', '{}', '[]', '[{"id":"q1","type":"open","prompt":"x"}]', '{}', '[]', null, null, 0)$$, :'pod'), 'only');
+-- the recording must exist and the link must match it
+select tests.expect_fail(format($$select save_library_podcast(%L, 'At the market', '', 'A1', 'A2', '{}', %L, %L, %L, '[]', 'podcasts/00000000-0000-4000-8000-000000000001.mp3', 'https://x.supabase.co/storage/v1/object/public/library-podcasts/podcasts/00000000-0000-4000-8000-000000000001.mp3', 120)$$, :'pod', :'ptr', :'pq', :'pa'), 'not found');
+insert into storage.objects (bucket_id, name) values ('library-podcasts', 'podcasts/00000000-0000-4000-8000-000000000001.mp3');
+select tests.expect_fail(format($$select save_library_podcast(%L, 'At the market', '', 'A1', 'A2', '{}', %L, %L, %L, '[]', 'podcasts/00000000-0000-4000-8000-000000000001.mp3', 'https://evil.example/x.mp3', 120)$$, :'pod', :'ptr', :'pq', :'pa'), 'does not match');
+select save_library_podcast(:'pod', 'At the market', '', 'A1', 'A2', '{}', :'ptr', :'pq', :'pa', '[]', 'podcasts/00000000-0000-4000-8000-000000000001.mp3', 'https://x.supabase.co/storage/v1/object/public/library-podcasts/podcasts/00000000-0000-4000-8000-000000000001.mp3', 125);
+select tests.assert((select minutes = 3 and duration_seconds = 125 from library_items where id = :'pod'), 'length stored');
+:as_ownerB
+select tests.expect_fail($$insert into storage.objects (bucket_id, name) values ('library-podcasts', 'podcasts/00000000-0000-4000-8000-000000000002.mp3')$$, 'row-level security');
+-- drafts are hidden from centres, keys too
+:as_mentor
+select tests.expect_count(format($$select * from library_items where id = %L$$, :'pod'), 0);
+select tests.expect_count(format($$select * from library_answer_keys where item_id = %L$$, :'pod'), 0);
+select tests.expect_fail(format($$select assign_library_item(%L, %L, %L, now() + interval '2 days')$$, :'center_a', :'pod', :'group1'), 'not found');
+:as_ownerA
+select set_library_podcast_status(:'pod', 'published');
+select tests.expect_fail(format($$select save_library_podcast(%L, 'Changed', '', 'A1', 'A2', '{}', '[]', '[]', '{}', '[]', null, null, 0)$$, :'pod'), 'Unpublish');
+:as_mentor
+select tests.expect_count(format($$select * from library_answer_keys where item_id = %L$$, :'pod'), 1);
+select assign_library_item(:'center_a', :'pod', :'group1', now() + interval '2 days') as hw_pod \gset
+:as_student
+select tests.expect_count(format($$select * from library_items where id = %L and audio_url is not null$$, :'pod'), 1);
+select tests.expect_count(format($$select * from library_answer_keys where item_id = %L$$, :'pod'), 0);
+:as_ownerA
+select tests.expect_fail(format($$select delete_library_podcast(%L)$$, :'pod'), 'homework');
+-- a recording in use cannot be removed
+delete from storage.objects where bucket_id = 'library-podcasts' and name = 'podcasts/00000000-0000-4000-8000-000000000001.mp3';
+:as_superuser
+select tests.assert(exists (select 1 from storage.objects where name = 'podcasts/00000000-0000-4000-8000-000000000001.mp3'), 'used recording kept');
+:as_ownerA
+select save_library_podcast(null, 'Spare', '', 'C1', 'C2', '{}', '[]', '[]', '{}', '[]', null, null, 0) as pod2 \gset
+select delete_library_podcast(:'pod2');
+select tests.expect_count(format($$select * from library_items where id = %L$$, :'pod2'), 0);
+
 \echo 'ALL TESTS PASSED'

@@ -11,6 +11,7 @@ export { MAX_SCRIPT_CHARS, splitScript };
  *   FISH_AUDIO_API_KEY   required
  *   FISH_AUDIO_VOICES    comma-separated voice (model) ids; defaults below
  *   FISH_AUDIO_MODEL     TTS model header (default "s1")
+ *   FISH_AUDIO_PODCAST_MODEL  model for LinguABC library podcasts (default: FISH_AUDIO_MODEL)
  *   FISH_AUDIO_TEMPERATURE  sampling temperature, 0-1 (default 0.3)
  *   FISH_AUDIO_BASE_URL  only for local testing
  *
@@ -65,7 +66,7 @@ export async function voiceOptions(): Promise<Voice[]> {
 const MAX_SEGMENTS = 140;
 const PARALLEL = 4;
 
-export type Speech = { audio: Buffer; bytes: number; model: string; segments: number };
+export type Speech = { audio: Buffer; bytes: number; model: string; segments: number; seconds: number };
 
 /** Strips a leading ID3v2 tag so joined MP3 pieces play as one stream. */
 function stripId3(buf: Buffer): Buffer {
@@ -116,6 +117,19 @@ function audioFrames(buf: Buffer): Buffer {
   if (!f) return stripId3(buf);
   const head = buf.subarray(f.at, Math.min(buf.length, f.at + f.length)).toString("latin1");
   return buf.subarray(head.includes("Xing") || head.includes("Info") ? f.at + f.length : f.at);
+}
+
+/** Playing time of an MP3 made of whole frames (as speakScript builds them). */
+function mp3Seconds(buf: Buffer): number {
+  let at = firstFrame(buf)?.at ?? -1;
+  let seconds = 0;
+  while (at >= 0) {
+    const f = frameAt(buf, at);
+    if (!f) break;
+    seconds += f.samples / f.rate;
+    at += f.length;
+  }
+  return Math.round(seconds);
 }
 
 /**
@@ -179,9 +193,9 @@ async function tts(text: string, voice: string | undefined, model: string): Prom
 }
 
 /** Turns a listening script into one MP3, each speaker read by their voice. */
-export async function speakScript(script: string, chosen: Cast = {}): Promise<Speech> {
+export async function speakScript(script: string, chosen: Cast = {}, opts: { model?: string } = {}): Promise<Speech> {
   if (!fishConfigured()) throw new AiUnavailable("Audio is not configured yet. Add a Fish Audio key in the hosting settings.");
-  const model = process.env.FISH_AUDIO_MODEL || "s1";
+  const model = opts.model || process.env.FISH_AUDIO_MODEL || "s1";
   const segments = splitScript(script);
   const spoken = segments.filter((s) => !s.pause);
   if (spoken.length === 0) throw new AiUnavailable("Write the script first.");
@@ -208,5 +222,9 @@ export async function speakScript(script: string, chosen: Cast = {}): Promise<Sp
     bytes: Buffer.byteLength(spoken.map((s) => s.text).join(""), "utf8"),
     model: `fish/${model}`,
     segments: spoken.length,
+    seconds: mp3Seconds(audio),
   };
 }
+
+/** The model LinguABC podcasts are recorded with (the owner chose S2.1 Pro; its id is set in the hosting settings). */
+export const podcastModel = () => process.env.FISH_AUDIO_PODCAST_MODEL || process.env.FISH_AUDIO_MODEL || "s1";

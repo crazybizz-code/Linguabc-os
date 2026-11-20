@@ -15,7 +15,7 @@ V1 is **not given to any centre** until every item below is done. All of it is d
 **2. Library content at launch:**
 - [ ] **At least 5 full mock tests** for reading and 5 for listening: IELTS Academic, 40 questions each, published in `library_tests`. Today there is 1 of each.
 - [ ] Listening mocks sound like the real exam: each part opens with the spoken instructions ("This is an IELTS Listening test... Part One... you have some time to look at questions 1 to 5"), has silent reading time, a break in the middle (Parts 1-3) and check time at the end. A part lasts about 6-8 minutes. The existing test's parts are about 3 minutes and start straight away: add the instructions in the editor and record again.
-- [ ] **As many podcasts as articles** (owner, 2026-11-20). Articles (236 published) are good as they are; the 41 podcasts are good too. The rest are **made by LinguABC with Fish Audio**, at every level from A1 to C2, with enough variety at each level.
+- [ ] **As many podcasts as articles** (owner, 2026-11-20). Tool built: `/admin/podcasts` (0025), AI drafts the episode, Fish records it with `FISH_AUDIO_PODCAST_MODEL` (owner chose S2.1 Pro), admin checks and publishes. Library today has no A1, C1 or C2 items at all. Articles (236 published) are good as they are; the 41 podcasts are good too. The rest are **made by LinguABC with Fish Audio**, at every level from A1 to C2, with enough variety at each level.
 - [ ] Reading and listening sections and passages with questions for homework. Target count: to be set by the owner.
 
 **3. Homework creation works well in all 3 ways:**
