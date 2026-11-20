@@ -25,6 +25,7 @@
 | #20 | 2026-11-20 | Listening: Fish Audio recordings in a private bucket, voice per speaker |
 | #21 | 2026-11-20 | AI drafts always carry their answers (required `key` field) |
 | #22 | 2026-11-20 | Mock engine A: LinguABC library tests (admin tool, 0018) |
+| #23 | 2026-11-20 | Fish Audio: lower sampling (temperature 0.3) so a voice stays steady across lines |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production

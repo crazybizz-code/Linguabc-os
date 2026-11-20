@@ -75,7 +75,7 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Listening UI check passed (2026-11-20):** the owner created a B2 gap-fill listening (6 questions) with AI in Convora, and Fish Audio recorded the conversation. This was the first live Fish call.
 
-**Mock engine part A merged and live (2026-11-20):** #22. 0018 applied; the Convora owner's auth user is the only row in `platform_admins` (checked: `am_platform_admin()` returns true as that user). No library tests yet.
+**Mock engine part A merged and live (2026-11-20):** #22. 0018 applied; the Convora owner's auth user is the only row in `platform_admins` (checked: `am_platform_admin()` returns true as that user). First listening test in progress (draft, Part 1 done). Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
 
 ## Exact next task
 1. The owner writes the first listening and reading tests at `/admin/tests` and publishes them. This is the first live run of section drafting.
