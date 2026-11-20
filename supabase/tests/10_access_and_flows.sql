@@ -971,4 +971,22 @@ select app.send_payment_reminders();
 :as_parent
 select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 3, 'no reminder once paid');
 
+\echo '27. centre report'
+:as_mentor
+select tests.expect_fail(format($$select center_report(%L, current_date - 30, current_date)$$, :'center_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select center_report(%L, current_date - 30, current_date)$$, :'center_a'), 'forbidden');
+:as_ownerA
+select tests.expect_fail(format($$select center_report(%L, current_date, current_date - 1)$$, :'center_a'), 'period');
+select center_report(:'center_a', (current_date - 365), current_date + 1) as rep \gset
+:as_superuser
+select tests.assert((:'rep'::jsonb->'money'->>'collected')::bigint =
+  (select coalesce(sum(case when kind = 'payment' then amount else -amount end), 0) from payments
+   where center_id = :'center_a' and paid_at >= ((current_date - 365)::timestamp at time zone 'Asia/Tashkent')), 'collections match the ledger');
+select tests.assert((:'rep'::jsonb->'students'->>'active')::int = (select count(*) from students where center_id = :'center_a' and status = 'active'), 'active students counted');
+select tests.assert(jsonb_array_length(:'rep'::jsonb->'months') = 6, 'six months of collections');
+select tests.assert((:'rep'::jsonb->'attendance'->>'present')::int > 0, 'attendance counted');
+:as_admin
+select tests.assert(center_report(:'center_a', current_date - 30, current_date) ? 'capacity', 'admin can read the report');
+
 \echo 'ALL TESTS PASSED'

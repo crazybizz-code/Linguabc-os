@@ -2082,6 +2082,7 @@ export type Database = {
         Returns: number
       }
       reissue_invite: { Args: { p_membership: string }; Returns: string }
+      center_report: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       remind_payment: { Args: { p_invoice: string }; Returns: number }
       save_library_podcast: {
         Args: {
