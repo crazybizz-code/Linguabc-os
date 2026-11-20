@@ -4,7 +4,9 @@
  * current speaker; "[stage directions]" are not read out. A line that is
  * only "[pause 30]" (or "[pause 30s]") becomes that many seconds of silence,
  * as in the real exam when students read the questions; "[short pause]"
- * inside a line is a one-second break in the speech.
+ * inside a line is a one-second break in the speech. An expression tag such
+ * as "[excited]" or "[surprised]" before a sentence tells the voice how to
+ * say it (voices that support it); other "[...]" notes are not read.
  */
 export type Segment = { speaker: string | null; text: string; pause?: number };
 export type Voice = { id: string; label: string };
@@ -37,7 +39,7 @@ export function splitScript(script: string): Segment[] {
     current = speaker;
     (m ? m[2] : line).split(SHORT_PAUSE).forEach((chunk, i) => {
       if (i > 0) out.push({ speaker: null, text: "", pause: 1 });
-      const spoken = chunk.replace(/\[[^\]]*\]/g, "").trim();
+      const spoken = chunk.replace(/\[([^\]]*)\]/g, (_, tag: string) => (isExpression(tag) ? `[${tag.trim().toLowerCase()}]` : "")).replace(/\s{2,}/g, " ").trim();
       if (!spoken) return;
       const last = out[out.length - 1];
       if (last && !last.pause && last.speaker === speaker) last.text += `\n${spoken}`;
@@ -48,13 +50,46 @@ export function splitScript(script: string): Segment[] {
 }
 
 /**
+ * How a line can be said. Writers (and the AI) put one before a sentence,
+ * e.g. "Kate: [surprised] Really? [laughing] I had no idea!".
+ */
+export const EXPRESSIONS = [
+  "excited", "surprised", "happy", "amused", "laughing", "chuckling", "curious", "confident", "enthusiastic",
+  "relieved", "sad", "disappointed", "worried", "nervous", "confused", "hesitant", "thoughtful", "doubtful",
+  "annoyed", "frustrated", "apologetic", "sympathetic", "sarcastic", "serious", "calm", "polite", "friendly",
+  "sighing", "whispering", "shouting", "in a hurry",
+] as const;
+const EXPRESSION_SET = new Set<string>(EXPRESSIONS);
+export const isExpression = (tag: string) => EXPRESSION_SET.has(tag.trim().toLowerCase());
+
+/** A script as people read it: no pauses, break markers or expression tags. */
+export function readableScript(script: string): string {
+  return script.replace(/\r/g, "").split("\n")
+    .filter((l) => !PAUSE.test(l.trim()) && !/^\s*\[\s*break\s*\]\s*$/i.test(l))
+    .map((l) => l.replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s{2,}/g, " ").trimEnd())
+    .join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
  * Words voices tend to misread, and how to spell them so they are said
  * right. Only the audio uses this; the transcript keeps the real spelling.
  */
 const SAY: [RegExp, string][] = [
   [/\bIELTS\b/g, "eye-elts"],
 ];
-export const speakable = (text: string) => SAY.reduce((s, [re, say]) => s.replace(re, say), text);
+/**
+ * Text as a voice model receives it: misread words respelled, and expression
+ * tags in the form the model understands: "[excited]" for Fish S2 models,
+ * "(excited)" for the older s1, none for models without expression control.
+ */
+export function speakable(text: string, expressions: "bracket" | "paren" | "none" = "bracket"): string {
+  const said = SAY.reduce((s, [re, say]) => s.replace(re, say), text);
+  return said.replace(/\[([^\]]*)\]\s*/g, (all, tag: string) => {
+    if (!isExpression(tag)) return all;
+    const t = tag.trim().toLowerCase();
+    return expressions === "bracket" ? `[${t}] ` : expressions === "paren" ? `(${t}) ` : "";
+  }).trim();
+}
 
 /**
  * The natural break before a turn, in seconds: longer around the narrator's

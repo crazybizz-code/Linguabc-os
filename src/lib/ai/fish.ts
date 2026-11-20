@@ -213,7 +213,7 @@ export async function speakScript(script: string, chosen: Cast = {}, opts: { mod
   await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, async () => {
     while (next < todo.length) {
       const i = todo[next++];
-      pieces[i] = await tts(speakable(segments[i].text), cast[segments[i].speaker ?? ""] || undefined, model);
+      pieces[i] = await tts(speakable(segments[i].text, /^s1$|^speech-/.test(model) ? "paren" : "bracket"), cast[segments[i].speaker ?? ""] || undefined, model);
     }
   }));
 

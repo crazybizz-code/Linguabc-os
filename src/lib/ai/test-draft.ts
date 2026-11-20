@@ -48,7 +48,8 @@ const PART_RULES = `This is one section of a full IELTS Academic test, not homew
 - Difficulty rises through the test: Part 1 / Passage 1 is the easiest, Part 4 / Passage 3 the hardest (denser language, abstract ideas, more paraphrase). Within this section, start with easier questions and end with harder ones.
 - Questions follow the order of the information in the text.
 - Each question is answerable from the text alone; distractors are plausible.
-- Listening: "passage" is the script to be recorded, one line per turn as "Name: words"; spell out anything a speaker spells ("That's S-M-I-T-H"). No stage directions except [short pause].
+- Listening: "passage" is the script to be recorded, one line per turn as "Name: words"; spell out anything a speaker spells ("That's S-M-I-T-H"). No stage directions except [short pause] and expression tags.
+- Listening: make the speakers sound like real people. Put an expression tag in square brackets before a sentence where the feeling changes, about one turn in three, e.g. "Anna: [surprised] Oh, really? [laughing] I didn't know that." Use only: excited, surprised, happy, amused, laughing, curious, relieved, disappointed, worried, confused, hesitant, thoughtful, apologetic, polite, friendly, serious, sighing. Never tag the Narrator.
 - Listening: the first line is "Narrator: You will hear ..." saying who is talking and about what, in one sentence (e.g. "Narrator: You will hear a woman phoning a sports centre to book a course."). Write nothing else for the narrator: the exam instructions and the time to read the questions are added afterwards.
 - Listening Parts 1-3: put a line "[break]" alone where the information for the second half of the questions begins. Part 4 has no break.
 - Listening: a real part lasts several minutes. Reach the full word count: natural turns, small talk, corrections and second thoughts that the questions test ("No, sorry, it's the fifteenth, not the fifth").`;

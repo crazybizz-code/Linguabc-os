@@ -24,6 +24,7 @@ export const FORMATS = [
 export const scriptToTranscript = (script: string) =>
   splitScript(script).filter((s) => !s.pause).map((s) => ({ ...(s.speaker ? { speaker: s.speaker } : {}), text: s.text.replace(/\n/g, " ") }));
 
+
 /** Back from a stored transcript to an editable script. */
 export const transcriptToScript = (lines: { speaker?: string; text?: string }[]) =>
   lines.map((l) => (l.speaker ? `${l.speaker}: ${l.text ?? ""}` : l.text ?? "")).join("\n");

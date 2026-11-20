@@ -165,7 +165,7 @@ export async function generateDraft(input: {
     input.focus && `Focus: ${input.focus}.`,
     input.topic && `Topic: ${input.topic}.`,
     needsPassage
-      ? `Write an original ${passageWords(input.level)}-word ${input.skill === "listening" ? "dialogue or short talk, as it would be spoken, written as a script with one line per turn as \"Name: words\" (a talk has one speaker)" : "passage"}, then ${input.count} questions on it.`
+      ? `Write an original ${passageWords(input.level)}-word ${input.skill === "listening" ? "dialogue or short talk, as it would be spoken, written as a script with one line per turn as \"Name: words\" (a talk has one speaker); put an expression tag such as [surprised], [excited], [laughing], [worried] or [thoughtful] before a sentence where the feeling changes, about one turn in three" : "passage"}, then ${input.count} questions on it.`
       : `Write ${input.count} questions, mostly "open" tasks; leave "passage" empty unless a short stimulus is needed.`,
     input.focus
       ? `Use question types that suit the focus.`

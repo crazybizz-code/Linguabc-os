@@ -41,6 +41,7 @@ const PODCAST_SCHEMA = {
 
 const RULES = `This is an episode of "The LinguABC English Podcast" for learners of English in Uzbekistan and elsewhere.
 - "passage" is the script to be recorded: one line per turn as "Name: words", first names only (e.g. "Kate:", "Daniel:"). No stage directions, sound effects or music cues.
+- Make it lively, not flat: put an expression tag in square brackets before a sentence where the feeling changes, about one turn in three, e.g. "Kate: [surprised] Wait, really? [laughing] That's amazing!" Use only: excited, surprised, happy, amused, laughing, chuckling, curious, enthusiastic, relieved, sad, disappointed, worried, nervous, confused, hesitant, thoughtful, doubtful, apologetic, sympathetic, sarcastic, serious, calm, sighing, whispering. Match the level: simple, clear feelings for A1-A2, subtler ones for C1-C2.
 - The host opens by naming the show and the topic and closes with a short goodbye.
 - Original content only; nothing copied from real podcasts or broadcasters. Everyday, study, work, travel, culture, science and nature topics; nothing political, religious, sexual or harmful.
 - Write exactly at the requested CEFR level: vocabulary, grammar and ideas must suit it.
