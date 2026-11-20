@@ -34,7 +34,7 @@ type Item = { href: string; label: string; icon: LucideIcon };
 type Section = { title: string; items: Item[] };
 type StaffRole = "owner" | "admin" | "academic_manager" | "mentor";
 
-const SOON = new Set(["/parents", "/reports", "/mentors", "/analytics", "/settings"]);
+const SOON = new Set(["/reports", "/settings"]);
 
 const I = {
   overview: { href: "/dashboard", label: "Overview", icon: LayoutGrid },
