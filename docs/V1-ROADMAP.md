@@ -2,6 +2,27 @@
 
 **Target: V1 by 15 January 2027** (confirmed by the owner on 2026-11-19).
 
+## Launch gate (owner, 2026-11-20)
+V1 is **not given to any centre** until every item below is done. All of it is due by 15 January 2027.
+
+**1. Every section of the Base44 prototype** (`lingu-core-flow.base44.app`) exists in the real app. Missing as of 2026-11-20:
+- Staff: Parents, Reports, Settings, Notifications inbox page, Schedule, Mentors, Academic analytics, Profile, MFA (two-step sign-in), a page per group (`/groups/[id]`), a page per branch (`/branches/[id]`)
+- Student: My plan, Practice (reading and listening drills)
+- Parent: Homework, Notifications, Child
+- Per-role menus as in the prototype (Owner, Administrator, Academic manager, Mentor), instead of one shared menu with items hidden per role
+
+**2. Library content at launch:**
+- [ ] **At least 5 full mock tests** for reading and 5 for listening: IELTS Academic, 40 questions each, published in `library_tests`. Today there is 1 of each.
+- [ ] Enough podcasts, articles, and reading and listening sections and passages with questions for homework. Today there are 236 published articles, 41 podcasts and no single sections or passages outside the 2 tests. Target counts: to be set by the owner.
+
+**3. Homework creation works well in all 3 ways:**
+- [ ] Upload a worksheet (PDF, DOCX, TXT): questions are extracted correctly
+- [ ] Pick from the LinguABC library
+- [ ] Create with AI (skill, level, question count), with answers, and audio for listening
+Each one is checked end to end in a QA centre before launch.
+
+**4. Security:** the two pre-launch blockers below.
+
 ## Done (merged to `main`)
 | PR | Merged | What |
 |---|---|---|

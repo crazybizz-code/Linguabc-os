@@ -60,7 +60,9 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 - Unused invite codes never expire.
 - Every mentor in a centre can read and write answer keys, not only the mentor of the group.
 
-**Open decisions:** none.
+**Launch gate (owner, 2026-11-20):** V1 goes to no centre until all Base44 prototype sections exist, the library has at least 5 full reading and 5 full listening mocks plus enough homework content, and all 3 ways of creating homework work. See `V1-ROADMAP.md` → Launch gate.
+
+**Open decisions:** target counts for library podcasts, articles, sections and passages at launch.
 
 **Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner set `FISH_AUDIO_API_KEY` in Vercel and chose six voices (now the defaults in `src/lib/ai/fish.ts`).
 
