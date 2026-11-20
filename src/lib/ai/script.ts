@@ -62,8 +62,9 @@ export const speakable = (text: string) => SAY.reduce((s, [re, say]) => s.replac
  */
 export function turnGap(prev: string | null, next: string | null, i: number): number {
   const narrator = (s: string | null) => !s || /^narrator$/i.test(s);
-  const base = narrator(prev) || narrator(next) ? 0.75 : 0.45;
-  return base + (((i * 7919) % 13) / 13) * 0.2 - 0.08;
+  // Short, like real conversation; a long fixed gap sounds staged.
+  const base = narrator(prev) || narrator(next) ? 0.6 : 0.3;
+  return base + (((i * 7919) % 13) / 13) * 0.1;
 }
 
 /** Speakers in the order they first talk ("" for unnamed narration). */
