@@ -687,4 +687,9 @@ export const ru: Record<string, string> = {
   "Students have already started this test, so it can no longer be changed.": "Ученики уже начали этот тест, его больше нельзя изменить.",
   "This session is closed.": "Эта сессия закрыта.",
   "Results sent": "Результаты отправлены",
+  "Notifications": "Уведомления",
+  "Nothing new.": "Ничего нового.",
+  "A student left a mock test": "Ученик покинул пробный тест",
+  "removed: left the test screen": "снят: покинул экран теста",
+  "Removed (0)": "Снят (0)",
 };

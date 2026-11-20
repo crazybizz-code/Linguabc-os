@@ -687,4 +687,9 @@ export const uz: Record<string, string> = {
   "Students have already started this test, so it can no longer be changed.": "O'quvchilar bu testni boshlagan, endi uni o'zgartirib bo'lmaydi.",
   "This session is closed.": "Bu sessiya yopilgan.",
   "Results sent": "Natijalar yuborilgan",
+  "Notifications": "Bildirishnomalar",
+  "Nothing new.": "Yangi narsa yo'q.",
+  "A student left a mock test": "O'quvchi mock testdan chiqib ketdi",
+  "removed: left the test screen": "chetlatildi: test ekranidan chiqdi",
+  "Removed (0)": "Chetlatilgan (0)",
 };
