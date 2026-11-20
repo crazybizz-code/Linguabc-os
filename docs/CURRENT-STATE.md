@@ -10,7 +10,7 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
   - #17 IELTS engine and cue cards
   - #16 Settings marked "Soon"
   - #15 Frankfurt region, loading states, owner menu
-- **Merged 2026-11-20:** #20, Fish Audio / AI listening (migration 0017, `src/lib/ai/fish.ts`, `src/lib/audio.ts`, listening editor and playback).
+- **Merged 2026-11-20:** #21, AI drafts always carry their answers (the owner had to type gap-fill answers by hand: Gemini drops optional fields). #20, Fish Audio / AI listening (migration 0017, `src/lib/ai/fish.ts`, `src/lib/audio.ts`, listening editor and playback).
 - Old feature branches are still on the remote: `feat/*`, `fix/*`, `docs/*`, `backend/v1-schema`, `frontend/auth`, `chore/env-defaults`. They're all merged.
 
 ## Production
@@ -50,7 +50,7 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 
 ## Not yet verified
 Checked 2026-11-20. None of these can be seen from the agent's environment: the Supabase token can't read auth settings, and Vercel and `app.linguabc.xyz` are blocked by its network. The owner has to check them in the dashboards.
-- **AI keys in Vercel:** whether `OPENROUTER_API_KEY` or `GEMINI_API_KEY` is set in production. Earlier AI checks used mock servers.
+- ~~AI keys in Vercel~~: **confirmed 2026-11-20.** OpenRouter is set: `ai_requests` shows a live `google/gemini-3.7-flash` call from the owner. Fish Audio is set too (a live `fish/s1` call).
 - **Phone sign-in key:** whether `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) is set in Vercel. Phone sign-in needs it.
 - **Domain:** whether `app.linguabc.xyz` is attached to the Vercel project as the production domain. The auth email config says it's the Site URL.
 - **Custom SMTP** in the Supabase dashboard.
@@ -76,4 +76,4 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 **Listening UI check passed (2026-11-20):** the owner created a B2 gap-fill listening (6 questions) with AI in Convora, and Fish Audio recorded the conversation. This was the first live Fish call.
 
 ## Exact next task
-**Step 2: the mock engine** (online mocks with reading and listening taken in the app; see `V1-ROADMAP.md`). Don't start until the owner says go.
+**Step 2: the mock engine** (online mocks with reading and listening taken in the app). The owner's rules are in `V1-ROADMAP.md`: reading and listening are auto-marked but go to the mentor first; the mentor adds speaking and writing and releases the full result. Homework results stay instant. Don't start until the owner says go.

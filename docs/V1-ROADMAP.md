@@ -23,6 +23,7 @@
 | #16 | 2026-11-19 | Settings marked "Soon" |
 | #17 | 2026-11-19 | IELTS question types with database marking; vocabulary cue cards |
 | #20 | 2026-11-20 | Listening: Fish Audio recordings in a private bucket, voice per speaker |
+| #21 | 2026-11-20 | AI drafts always carry their answers (required `key` field) |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
@@ -48,6 +49,10 @@ The owner confirmed this order on 2026-11-19.
 
 1. **Fish Audio / AI listening.** Fish Audio integration; AI-generated listening sections with audio.
 2. **Mock engine:** online mocks, with reading and listening taken in the app. Today mocks are scheduled and band results are typed in by hand.
+   Owner's rules (2026-11-20):
+   - Reading and listening are marked by the database the moment the student submits, **but the result goes to the mentor first, not the student.**
+   - The mentor sees the reading and listening bands, adds the speaking and writing bands they marked themselves, then **releases the full result** (all four bands and the overall band) to the student and parent.
+   - Homework is different: when a full listening or reading test, a single section or a single passage is set as homework, the student sees the result as soon as they submit (as today).
 3. **Basic progress:**
    - Student 360 academic and administrative history
    - homework completion and results
