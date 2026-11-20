@@ -24,6 +24,7 @@
 | #17 | 2026-11-19 | IELTS question types with database marking; vocabulary cue cards |
 | #20 | 2026-11-20 | Listening: Fish Audio recordings in a private bucket, voice per speaker |
 | #21 | 2026-11-20 | AI drafts always carry their answers (required `key` field) |
+| #22 | 2026-11-20 | Mock engine A: LinguABC library tests (admin tool, 0018) |
 
 ## Current milestone: wrapping up the IELTS engine
 - [x] PR #17 merged and deployed to production
