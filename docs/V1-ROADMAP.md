@@ -39,7 +39,9 @@ The milestone is complete.
 - [x] 0017 applied to production (2026-11-20)
 - [x] `FISH_AUDIO_API_KEY` set in Vercel (owner, 2026-11-20); six voices chosen, defaults in code
 - [x] SQL check as each role on production, in one transaction that was rolled back (nothing left behind)
-- [ ] Owner's UI check: a real Fish Audio recording from the listening editor (first live call to Fish)
+- [x] Owner's UI check (2026-11-20): a B2 gap-fill listening with 6 questions, a two-speaker conversation recorded by Fish Audio. The live API works.
+
+The milestone is complete. Next: the mock engine.
 
 ## Remaining V1 work, in order
 The owner confirmed this order on 2026-11-19.
@@ -68,7 +70,7 @@ Both must be fixed before V1 goes live. Details in `SECURITY.md`.
 ## Known dependencies
 **Fish Audio**
 - The owner has an account; the key goes in Vercel as `FISH_AUDIO_API_KEY`. The six voices the owner chose are the defaults in `src/lib/ai/fish.ts`; `FISH_AUDIO_VOICES` overrides them.
-- The request format (`POST /v1/tts`, `model` header, JSON body) was written from memory: the docs site was unreachable from the build environment. It was tested only against a mock server, so the first live call is the real test.
+- The request format (`POST /v1/tts`, `model` header, JSON body) was written from memory: the docs site was unreachable from the build environment. It worked on the first live call (2026-11-20).
 - Audio is stored in the private `listening-audio` bucket (see `ARCHITECTURE.md` → Storage).
 
 **Click payments**

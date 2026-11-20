@@ -73,6 +73,7 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Documentation debt:** `README.md` is out of date. It lists migrations only up to 0008 and an `app/(workspace)/` folder that is now `app/(portal)/`. It hasn't been edited yet.
 
+**Listening UI check passed (2026-11-20):** the owner created a B2 gap-fill listening (6 questions) with AI in Convora, and Fish Audio recorded the conversation. This was the first live Fish call.
+
 ## Exact next task
-1. **Owner's UI check of listening:** as a mentor, Homework → Create with AI → Listening → Generate audio. This is the first live Fish Audio call. If it fails, check the Vercel function logs for a "Fish Audio" line.
-2. Then: **the mock engine** (online mocks with reading and listening).
+**Step 2: the mock engine** (online mocks with reading and listening taken in the app; see `V1-ROADMAP.md`). Don't start until the owner says go.
