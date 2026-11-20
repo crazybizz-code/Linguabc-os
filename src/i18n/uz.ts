@@ -597,7 +597,7 @@ export const uz: Record<string, string> = {
   "Invite an administrator to enrol students": "O'quvchilarni qo'shish uchun administrator taklif qiling",
   "Audio is not configured yet. Add a Fish Audio key in the hosting settings.": "Audio hali sozlanmagan. Hosting sozlamalariga Fish Audio kalitini qo'shing.",
   "Write the script first.": "Avval skriptni yozing.",
-  "The script is too long for one recording (8,000 characters at most).": "Skript bitta yozuv uchun juda uzun (ko'pi bilan 8 000 belgi).",
+  "The script is too long for one recording (12,000 characters at most).": "Skript bitta yozuv uchun juda uzun (ko'pi bilan 12 000 belgi).",
   "The audio could not be saved. Try again.": "Audioni saqlab bo'lmadi. Qayta urinib ko'ring.",
   "The voice service took too long. Try a shorter script.": "Ovoz xizmati juda uzoq javob berdi. Qisqaroq skript bilan urinib ko'ring.",
   "Could not reach the voice service.": "Ovoz xizmatiga ulanib bo'lmadi.",
@@ -752,4 +752,7 @@ export const uz: Record<string, string> = {
   "The {group} lesson on {date} is cancelled.": "{date} kungi {group} darsi bekor qilindi.",
   "Lesson moved": "Dars ko'chirildi",
   "The {group} lesson on {from} moved to {date}.": "{from} dagi {group} darsi {date} ga ko'chirildi.",
+  "Write one line per turn as \"Name: words\". A line [pause 30] is 30 seconds of silence. Students hear the recording and see this script only after they submit.": "Har bir navbatni alohida qatorga \"Ism: so'zlar\" ko'rinishida yozing. [pause 30] qatori 30 soniya jimlik bo'ladi. O'quvchilar yozuvni eshitadi, skriptni esa faqat topshirgandan keyin ko'radi.",
+  "This script has no exam instructions. Add them so the recording opens like the real test, with time to read the questions. To add the break in the middle of the part, first put a line [break] where the second set of questions starts.": "Bu skriptda imtihon yo'riqnomalari yo'q. Yozuv haqiqiy imtihondagidek boshlanishi va savollarni o'qishga vaqt berilishi uchun ularni qo'shing. Qism o'rtasidagi tanaffusni qo'shish uchun avval ikkinchi savollar to'plami boshlanadigan joyga [break] qatorini qo'ying.",
+  "Add exam instructions": "Imtihon yo'riqnomalarini qo'shish",
 };

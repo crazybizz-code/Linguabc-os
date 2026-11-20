@@ -64,7 +64,7 @@ export async function recordSection(testId: string, script: string, previous?: s
   if (!fishConfigured()) return { error: "Audio is not configured yet. Add a Fish Audio key in the hosting settings." };
   const text = String(script ?? "").trim();
   if (text.length < 20) return { error: "Write the script first." };
-  if (text.length > MAX_SCRIPT_CHARS) return { error: "The script is too long for one recording (8,000 characters at most)." };
+  if (text.length > MAX_SCRIPT_CHARS) return { error: "The script is too long for one recording (12,000 characters at most)." };
   const { supabase } = await getPlatformContext();
   const r = await withAdminAi("audio", async () => {
     const speech = await speakScript(text, cast && typeof cast === "object" ? cast : {});

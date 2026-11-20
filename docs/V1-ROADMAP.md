@@ -10,10 +10,13 @@ V1 is **not given to any centre** until every item below is done. All of it is d
 - Student: My plan, Practice (reading and listening drills)
 - Parent: Homework, Notifications, Child
 - Per-role menus as in the prototype (Owner, Administrator, Academic manager, Mentor), instead of one shared menu with items hidden per role
+- **Roles in order (owner, 2026-11-20):** set up the owner, admin, mentor, student and parent sections one by one, and review how each role gets into the platform (sign-up, invite code, sign-in by email or phone, where each lands).
 
 **2. Library content at launch:**
 - [ ] **At least 5 full mock tests** for reading and 5 for listening: IELTS Academic, 40 questions each, published in `library_tests`. Today there is 1 of each.
-- [ ] Enough podcasts, articles, and reading and listening sections and passages with questions for homework. Today there are 236 published articles, 41 podcasts and no single sections or passages outside the 2 tests. Target counts: to be set by the owner.
+- [ ] Listening mocks sound like the real exam: each part opens with the spoken instructions ("This is an IELTS Listening test... Part One... you have some time to look at questions 1 to 5"), has silent reading time, a break in the middle (Parts 1-3) and check time at the end. A part lasts about 6-8 minutes. The existing test's parts are about 3 minutes and start straight away: add the instructions in the editor and record again.
+- [ ] **As many podcasts as articles** (owner, 2026-11-20). Articles (236 published) are good as they are; the 41 podcasts are good too. The rest are **made by LinguABC with Fish Audio**, at every level from A1 to C2, with enough variety at each level.
+- [ ] Reading and listening sections and passages with questions for homework. Target count: to be set by the owner.
 
 **3. Homework creation works well in all 3 ways:**
 - [ ] Upload a worksheet (PDF, DOCX, TXT): questions are extracted correctly
@@ -105,9 +108,7 @@ The owner confirmed this order on 2026-11-19.
    **Merged on 2026-11-20 (#29):** Student 360 Progress tab, student and parent Progress pages, staff `/progress` list. No migration.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
    **Built on 2026-11-20:** 0022 triggers and a bell for staff, students and parents (live, translated). PR pending.
-5. **Click payments.**
-   - Flow: Parent app → Pay now → Click → payment verified → invoice and payment records updated.
-   - Design it so the provider is one part that can be swapped: Payme and Uzum must be addable later without rewriting the core payment model.
+5. ~~**Click payments.**~~ **Not in V1** (owner, 2026-11-20). In V1 parents are only **told about payments**: in-app reminders before a fee is due and when it is overdue. The centre records payments at the desk as today. Online payment (Click first, then Payme and Uzum behind one provider interface) moves to V2.
 6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page, reports, and whatever else V1 still needs.
 
 ### Pre-launch blockers (security)

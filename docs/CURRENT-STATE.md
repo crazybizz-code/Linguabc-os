@@ -62,6 +62,8 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 
 **Launch gate (owner, 2026-11-20):** V1 goes to no centre until all Base44 prototype sections exist, the library has at least 5 full reading and 5 full listening mocks plus enough homework content, and all 3 ways of creating homework work. See `V1-ROADMAP.md` → Launch gate.
 
+**Owner, 2026-11-20 (later):** no online payment in V1, only payment reminders for parents. Podcasts: as many as articles, the new ones made with Fish Audio from A1 to C2. Listening mock parts must open with the exam's spoken instructions. Roles to be set up in order, with a review of how each role signs in.
+
 **Open decisions:** target counts for library podcasts, articles, sections and passages at launch.
 
 **Settled on 2026-11-20:** listening audio lives in a private Supabase Storage bucket and plays through signed URLs (`ARCHITECTURE.md` → Storage). The owner set `FISH_AUDIO_API_KEY` in Vercel and chose six voices (now the defaults in `src/lib/ai/fish.ts`).

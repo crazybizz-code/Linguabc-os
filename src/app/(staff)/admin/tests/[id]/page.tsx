@@ -12,7 +12,7 @@ import { TestEditor } from "./test-editor";
 
 export const metadata = { title: "LinguABC test" };
 // Drafting a section and recording it can take a minute or two.
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 type StoredSection = { id: string; title?: string; passage?: string; audio_path?: string; groups?: QuestionGroup[]; questions?: Question[] };
 

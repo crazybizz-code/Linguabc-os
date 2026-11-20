@@ -1,8 +1,8 @@
 import "server-only";
 import { AiUnavailable } from "./gemini";
-import { defaultCast, splitScript, type Cast, type Voice } from "./script";
+import { defaultCast, MAX_SCRIPT_CHARS, splitScript, type Cast, type Voice } from "./script";
 
-export { splitScript };
+export { MAX_SCRIPT_CHARS, splitScript };
 
 /**
  * Fish Audio text-to-speech (REST, no SDK). Server-only: the key never
@@ -58,10 +58,12 @@ export async function voiceOptions(): Promise<Voice[]> {
   }));
 }
 
-/** Keeps one listening section to a few minutes of audio (and its cost bounded). */
-export const MAX_SCRIPT_CHARS = 8000;
-const MAX_SEGMENTS = 60;
-const PARALLEL = 3;
+/**
+ * Keeps one listening section (an exam part is 6-8 minutes with its
+ * instructions) to a bounded cost. Pauses are silence made here, not speech.
+ */
+const MAX_SEGMENTS = 140;
+const PARALLEL = 4;
 
 export type Speech = { audio: Buffer; bytes: number; model: string; segments: number };
 
@@ -70,6 +72,67 @@ function stripId3(buf: Buffer): Buffer {
   if (buf.length < 10 || buf.toString("latin1", 0, 3) !== "ID3") return buf;
   const size = ((buf[6] & 0x7f) << 21) | ((buf[7] & 0x7f) << 14) | ((buf[8] & 0x7f) << 7) | (buf[9] & 0x7f);
   return buf.subarray(10 + size + (buf[5] & 0x10 ? 10 : 0));
+}
+
+/** MPEG audio frame header facts needed to cut and pad Fish's MP3s. */
+type Frame = { at: number; length: number; samples: number; rate: number; header: Buffer };
+const BITRATES: Record<string, number[]> = {
+  "1": [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
+  "2": [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
+};
+const RATES: Record<number, number[]> = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] };
+
+/** Reads the Layer III frame header at `at`, or null if there is none. */
+function frameAt(buf: Buffer, at: number): Frame | null {
+  if (at + 4 > buf.length || buf[at] !== 0xff || (buf[at + 1] & 0xe0) !== 0xe0) return null;
+  const version = (buf[at + 1] >> 3) & 3; // 3 = MPEG1, 2 = MPEG2, 0 = MPEG2.5
+  if (version === 1 || ((buf[at + 1] >> 1) & 3) !== 1) return null; // Layer III only
+  const kbps = BITRATES[version === 3 ? "1" : "2"][(buf[at + 2] >> 4) & 15];
+  const rate = RATES[version]?.[(buf[at + 2] >> 2) & 3];
+  if (!kbps || !rate) return null;
+  const padding = (buf[at + 2] >> 1) & 1;
+  const samples = version === 3 ? 1152 : 576;
+  const length = Math.floor(((samples / 8) * kbps * 1000) / rate) + padding;
+  return { at, length, samples, rate, header: buf.subarray(at, at + 4) };
+}
+
+/** The first audio frame after any ID3 tag. */
+function firstFrame(buf: Buffer): Frame | null {
+  let at = 0;
+  if (buf.length >= 10 && buf.toString("latin1", 0, 3) === "ID3") {
+    at = 10 + (((buf[6] & 0x7f) << 21) | ((buf[7] & 0x7f) << 14) | ((buf[8] & 0x7f) << 7) | (buf[9] & 0x7f)) + (buf[5] & 0x10 ? 10 : 0);
+  }
+  for (let i = at; i < Math.min(buf.length - 4, at + 4096); i++) { const f = frameAt(buf, i); if (f && frameAt(buf, i + f.length)) return f; }
+  return null;
+}
+
+/**
+ * One piece's audio frames: the ID3 tag and any Xing/Info header frame are
+ * dropped, so joined pieces play as one stream and players read the true
+ * length of the whole recording, not of its first line.
+ */
+function audioFrames(buf: Buffer): Buffer {
+  const f = firstFrame(buf);
+  if (!f) return stripId3(buf);
+  const head = buf.subarray(f.at, Math.min(buf.length, f.at + f.length)).toString("latin1");
+  return buf.subarray(head.includes("Xing") || head.includes("Info") ? f.at + f.length : f.at);
+}
+
+/**
+ * Seconds of silence in the same MP3 format as `sample`: frames with an
+ * all-zero body decode as silence. Built here, so pauses cost no voice credits.
+ */
+function silence(sample: Buffer, seconds: number): Buffer {
+  const f = firstFrame(sample);
+  if (!f) return Buffer.alloc(0);
+  const header = Buffer.from(f.header);
+  header[1] |= 1;     // no CRC
+  header[2] &= ~0x02; // no padding, so every frame has the same length
+  const length = frameAt(header, 0)!.length;
+  const frame = Buffer.alloc(length);
+  header.copy(frame, 0);
+  const count = Math.ceil((seconds * f.rate) / f.samples);
+  return Buffer.concat(Array.from({ length: count }, () => frame));
 }
 
 /**
@@ -120,25 +183,30 @@ export async function speakScript(script: string, chosen: Cast = {}): Promise<Sp
   if (!fishConfigured()) throw new AiUnavailable("Audio is not configured yet. Add a Fish Audio key in the hosting settings.");
   const model = process.env.FISH_AUDIO_MODEL || "s1";
   const segments = splitScript(script);
-  if (segments.length === 0) throw new AiUnavailable("Write the script first.");
-  if (segments.length > MAX_SEGMENTS) throw new AiUnavailable("The dialogue has too many turns. Merge some lines and try again.");
+  const spoken = segments.filter((s) => !s.pause);
+  if (spoken.length === 0) throw new AiUnavailable("Write the script first.");
+  if (spoken.length > MAX_SEGMENTS) throw new AiUnavailable("The dialogue has too many turns. Merge some lines and try again.");
 
   // Only configured voices may be used, whatever the browser sent.
-  const cast = defaultCast([...new Set(segments.map((s) => s.speaker ?? ""))], configuredVoices(), chosen);
+  const cast = defaultCast([...new Set(spoken.map((s) => s.speaker ?? ""))], configuredVoices(), chosen);
 
   const pieces: Buffer[] = new Array(segments.length);
+  const todo = segments.map((s, i) => i).filter((i) => !segments[i].pause);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(PARALLEL, segments.length) }, async () => {
-    while (next < segments.length) {
-      const i = next++;
+  await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, async () => {
+    while (next < todo.length) {
+      const i = todo[next++];
       pieces[i] = await tts(segments[i].text, cast[segments[i].speaker ?? ""] || undefined, model);
     }
   }));
 
+  // Pauses copy the format of the first spoken piece.
+  const sample = pieces.find(Boolean)!;
+  const audio = Buffer.concat(segments.map((s, i) => (s.pause ? silence(sample, s.pause) : audioFrames(pieces[i]))));
   return {
-    audio: Buffer.concat(pieces.map((p, i) => (i === 0 ? p : stripId3(p)))),
-    bytes: Buffer.byteLength(segments.map((s) => s.text).join(""), "utf8"),
+    audio,
+    bytes: Buffer.byteLength(spoken.map((s) => s.text).join(""), "utf8"),
     model: `fish/${model}`,
-    segments: segments.length,
+    segments: spoken.length,
   };
 }

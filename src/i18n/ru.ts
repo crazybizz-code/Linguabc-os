@@ -597,7 +597,7 @@ export const ru: Record<string, string> = {
   "Invite an administrator to enrol students": "Пригласите администратора для зачисления учеников",
   "Audio is not configured yet. Add a Fish Audio key in the hosting settings.": "Аудио ещё не настроено. Добавьте ключ Fish Audio в настройках хостинга.",
   "Write the script first.": "Сначала напишите сценарий.",
-  "The script is too long for one recording (8,000 characters at most).": "Сценарий слишком длинный для одной записи (не более 8 000 символов).",
+  "The script is too long for one recording (12,000 characters at most).": "Сценарий слишком длинный для одной записи (не более 12 000 символов).",
   "The audio could not be saved. Try again.": "Не удалось сохранить аудио. Попробуйте ещё раз.",
   "The voice service took too long. Try a shorter script.": "Голосовой сервис отвечал слишком долго. Попробуйте сценарий покороче.",
   "Could not reach the voice service.": "Не удалось связаться с голосовым сервисом.",
@@ -752,4 +752,7 @@ export const ru: Record<string, string> = {
   "The {group} lesson on {date} is cancelled.": "Урок {group} {date} отменён.",
   "Lesson moved": "Урок перенесён",
   "The {group} lesson on {from} moved to {date}.": "Урок {group} перенесён с {from} на {date}.",
+  "Write one line per turn as \"Name: words\". A line [pause 30] is 30 seconds of silence. Students hear the recording and see this script only after they submit.": "Пишите каждую реплику с новой строки в виде «Имя: слова». Строка [pause 30] — это 30 секунд тишины. Ученики слушают запись, а сценарий видят только после сдачи.",
+  "This script has no exam instructions. Add them so the recording opens like the real test, with time to read the questions. To add the break in the middle of the part, first put a line [break] where the second set of questions starts.": "В сценарии нет инструкций экзамена. Добавьте их, чтобы запись начиналась как на настоящем тесте, со временем на чтение вопросов. Чтобы добавить паузу в середине части, сначала поставьте строку [break] там, где начинается второй блок вопросов.",
+  "Add exam instructions": "Добавить инструкции экзамена",
 };
