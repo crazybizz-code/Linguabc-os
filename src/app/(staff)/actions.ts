@@ -157,6 +157,17 @@ export async function reissueInvite(membershipId: string): Promise<{ link?: stri
   return { link: `${siteUrl()}/join?code=${data}`, expires: new Date(Date.now() + 14 * 86400_000).toISOString() };
 }
 
+/** The owner renames the centre (RLS: owner only). */
+export async function renameCentre(name: string): Promise<{ error?: string }> {
+  const { supabase, workspace } = await getStaffContext();
+  const v = String(name ?? "").trim();
+  if (v.length < 2 || v.length > 120) return { error: "Enter a name of 2 to 120 characters." };
+  const { data, error } = await supabase.from("centers").update({ name: v }).eq("id", workspace.centerId).select("id");
+  if (error || !data?.length) return { error: "You don't have permission to do that." };
+  revalidatePath("/", "layout");
+  return {};
+}
+
 /** Changes the signed-in person's password after checking the current one. */
 export async function changePassword(_: { ok?: boolean; error?: string } | undefined, form: FormData): Promise<{ ok?: boolean; error?: string }> {
   const { supabase } = await getStaffContext();
