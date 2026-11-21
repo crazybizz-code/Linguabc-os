@@ -5,7 +5,8 @@
 ## Launch gate (owner, 2026-11-20)
 V1 is **not given to any centre** until every item below is done. All of it is due by 15 January 2027.
 
-**1. Every section of the Base44 prototype** (`lingu-core-flow.base44.app`) exists in the real app. Missing as of 2026-11-20:
+**1. Every section of the Base44 prototype** (`lingu-core-flow.base44.app`) exists in the real app.
+   **Built 2026-11-20, merged in PR #32 and live 2026-11-21:** per-role menus; staff Notifications inbox, Schedule, Profile (password, two-step sign-in), group and branch pages, Parents, Mentors, Academic analytics, Reports (0027), Settings; student My plan and Practice (0028); parent Homework and Notifications; MFA. Not built: a separate parent "Child" tab (Home and Profile cover it). Missing as of the morning of 2026-11-20:
 - Staff: Parents, Reports, Settings, Notifications inbox page, Schedule, Mentors, Academic analytics, Profile, MFA (two-step sign-in), a page per group (`/groups/[id]`), a page per branch (`/branches/[id]`)
 - Student: My plan, Practice (reading and listening drills)
 - Parent: Homework, Notifications, Child
@@ -109,6 +110,7 @@ The owner confirmed this order on 2026-11-19.
 4. **In-app notifications** for attendance, payments, homework, mock sessions and schedule changes. SMS, Telegram and push delivery come later.
    **Built on 2026-11-20:** 0022 triggers and a bell for staff, students and parents (live, translated). PR pending.
 5. ~~**Click payments.**~~ **Not in V1** (owner, 2026-11-20). In V1 parents are only **told about payments**: in-app reminders before a fee is due and when it is overdue. The centre records payments at the desk as today. Online payment (Click first, then Payme and Uzum behind one provider interface) moves to V2.
+   **Built 2026-11-20 (0026):** reminders 3 days before the due date and weekly while overdue, sent daily at 09:00 Tashkent by pg_cron (`app.send_payment_reminders`); a Remind button on the payments desk (once a day per invoice); an amount-to-pay banner on the parent and student payments pages. SQL section 26.
 6. **Settings, reports and the rest of V1:** settings, Excel import, the staff-side parents page, reports, and whatever else V1 still needs.
 
 ### Pre-launch blockers (security)

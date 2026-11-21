@@ -53,6 +53,11 @@ A few specific rules:
 - Families see the mentor's name through `group_mentor_name()`, which is gated by `can_see_group`. They don't read staff memberships.
 - Verified on live (PR #8): parent B opening parent A's receipt gets a 404.
 
+## Two-step sign-in (MFA)
+- Optional TOTP (authenticator app) through Supabase Auth MFA, turned on per person on the staff Profile page.
+- Once on, `requireSecondStep` (staff and portal contexts) sends an `aal1` session to `/mfa` until the code is entered.
+- Limit: the database does not yet require `aal2` (RLS reads no `aal` claim), so a stolen password plus a hand-made API call could still read data under RLS. Adding `(auth.jwt()->>'aal') = 'aal2'` checks for people with a verified factor is a follow-up.
+
 ## Invite security
 - **Codes:** 6 random bytes as 12 hex characters (`gen_random_bytes`), single-use. Redeeming one sets `invite_code = null` and binds the membership to the signed-in user.
 - **Expiry (0023):** a code is good for 14 days (`invite_expires_at`). Expired codes are not shown on `/join` and can't be redeemed. Whoever may issue the invite can reissue it (`reissue_invite`: owner or admin, and only the owner for owners and admins); the old code stops working at once.

@@ -27,6 +27,8 @@ _Last updated: 2026-11-20. Update this file at the end of every working session.
 - Note: `finish_ai_request` takes token counts and cost from the caller. A mentor calling the RPC directly could under-report their own usage. The hourly and daily request limits still hold, so only the cost report is affected.
 
 ## Migrations applied to production
+**2026-11-21:** `0026_payment_reminders` (pg_cron job `payment-reminders`, `0 4 * * *` = 09:00 Tashkent, active), `0027_center_report`, `0028_practice`. Checked as roles in a rolled-back transaction: a stranger is refused `center_report`, `remind_payment`, `practice_library_item` ("students only") and cannot run `app.send_payment_reminders`; the Convora owner gets the full report (8 sections, 6 months); the daily job runs and sent 0 (no invoices yet). Nothing left behind.
+
 **2026-11-20 (later), with the owner's go-ahead:** `0023_invite_expiry`, `0024_answer_key_scope`, `0025_library_podcasts`. Checked as roles in one rolled-back transaction: a stranger is not a platform admin, sees no answer keys or drafts, and is refused `save_library_podcast` and `reissue_invite`; the Convora owner (platform admin) can save a draft podcast and sees it; nothing was left behind (295 library items, 277 published, as before). The `library-podcasts` bucket is public.
 
 `0017_listening_audio` applied on 2026-11-20. The `listening-audio` bucket and its 3 storage policies exist.
@@ -65,6 +67,10 @@ Checked 2026-11-20. None of these can be seen from the agent's environment: the 
 **Launch gate (owner, 2026-11-20):** V1 goes to no centre until all Base44 prototype sections exist, the library has at least 5 full reading and 5 full listening mocks plus enough homework content, and all 3 ways of creating homework work. See `V1-ROADMAP.md` → Launch gate.
 
 **Owner, 2026-11-20 (later):** no online payment in V1, only payment reminders for parents. Podcasts: as many as articles, the new ones made with Fish Audio from A1 to C2. Listening mock parts must open with the exam's spoken instructions. Roles to be set up in order, with a review of how each role signs in.
+
+**Fish Audio credits (owner, 2026-11-20):** parked. Balance $0.43; no top-up for now. Library audio (podcasts, the 4 missing listening mocks) waits for a decision: Fish (~$25-30 in total) or a free model (Kokoro was tried: free but flat and blurry; Chatterbox on a free Colab GPU not tried yet).
+
+**PR #32 (merged 2026-11-21, owner's go-ahead):** 0026 payment reminders (pg_cron), 0027 centre report, 0028 practice; per-role menus and every Base44 section (see `V1-ROADMAP.md`); two-step sign-in. SQL suite: 28 sections pass locally. tsc, eslint and build clean. No page was clicked through in a browser: the agent can't sign in to production.
 
 **Open decisions:** target counts for library podcasts, articles, sections and passages at launch.
 

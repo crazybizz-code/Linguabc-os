@@ -3,7 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { translator } from "@/i18n";
-import { localeFor } from "@/lib/auth/current";
+import { localeFor, requireSecondStep } from "@/lib/auth/current";
 import { getWorkspaces, homePath, type Role } from "@/lib/auth/workspace";
 
 export type PortalKind = "parent" | "student";
@@ -18,6 +18,7 @@ export const getPortalContext = cache(async (kind: PortalKind) => {
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
   if (!userId) redirect("/login");
+  await requireSecondStep(supabase);
 
   const [workspaces, profile] = await Promise.all([
     getWorkspaces(supabase, userId),

@@ -923,4 +923,98 @@ select save_library_podcast(null, 'Spare', '', 'C1', 'C2', '{}', '[]', '[]', '{}
 select delete_library_podcast(:'pod2');
 select tests.expect_count(format($$select * from library_items where id = %L$$, :'pod2'), 0);
 
+\echo '26. payment reminders'
+:as_superuser
+select b.id as inv_r from invoice_balances b join invoices i on i.id = b.id
+ where b.student_id = :'st1' and i.status = 'open' and b.balance > 0 order by b.period desc limit 1 \gset
+update invoices set last_reminded_at = now() where id <> :'inv_r';
+update invoices set due_date = app.local_today() + 2, last_reminded_at = null where id = :'inv_r';
+select app.send_payment_reminders();
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_due' and data->>'invoice_id' = :'inv_r') = 1, 'parent told once that a fee is due soon');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_due' and data->>'invoice_id' = :'inv_r') = 1, 'student told too');
+:as_mentor
+select tests.expect_count($$select * from notifications where data->>'kind' in ('payment_due','payment_overdue')$$, 0);
+:as_superuser
+-- the due-soon reminder went out before the due date; now it is a day late
+update invoices set due_date = app.local_today() - 1, last_reminded_at = now() - interval '3 days' where id = :'inv_r';
+select app.send_payment_reminders();
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 1, 'overdue reminder once');
+:as_superuser
+update invoices set last_reminded_at = now() - interval '8 days' where id = :'inv_r';
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 2, 'overdue again after a week');
+-- by hand: owner or admin only, once a day
+:as_admin
+select tests.expect_fail(format($$select remind_payment(%L)$$, :'inv_r'), 'already reminded today');
+:as_superuser
+update invoices set last_reminded_at = now() - interval '2 days' where id = :'inv_r';
+:as_mentor
+select tests.expect_fail(format($$select remind_payment(%L)$$, :'inv_r'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select remind_payment(%L)$$, :'inv_r'), 'forbidden');
+:as_admin
+select tests.assert(remind_payment(:'inv_r') >= 1, 'admin reminded the family');
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 3, 'manual reminder delivered');
+-- a paid fee is never chased
+:as_admin
+select * from record_payment(:'inv_r', (select balance from invoice_balances where id = :'inv_r')::bigint, 'cash');
+:as_superuser
+update invoices set last_reminded_at = now() - interval '30 days' where id = :'inv_r';
+select app.send_payment_reminders();
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'payment_overdue' and data->>'invoice_id' = :'inv_r') = 3, 'no reminder once paid');
+
+\echo '27. centre report'
+:as_mentor
+select tests.expect_fail(format($$select center_report(%L, current_date - 30, current_date)$$, :'center_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select center_report(%L, current_date - 30, current_date)$$, :'center_a'), 'forbidden');
+:as_ownerA
+select tests.expect_fail(format($$select center_report(%L, current_date, current_date - 1)$$, :'center_a'), 'period');
+select center_report(:'center_a', (current_date - 365), current_date + 1) as rep \gset
+:as_superuser
+select tests.assert((:'rep'::jsonb->'money'->>'collected')::bigint =
+  (select coalesce(sum(case when kind = 'payment' then amount else -amount end), 0) from payments
+   where center_id = :'center_a' and paid_at >= ((current_date - 365)::timestamp at time zone 'Asia/Tashkent')), 'collections match the ledger');
+select tests.assert((:'rep'::jsonb->'students'->>'active')::int = (select count(*) from students where center_id = :'center_a' and status = 'active'), 'active students counted');
+select tests.assert(jsonb_array_length(:'rep'::jsonb->'months') = 6, 'six months of collections');
+select tests.assert((:'rep'::jsonb->'attendance'->>'present')::int > 0, 'attendance counted');
+:as_admin
+select tests.assert(center_report(:'center_a', current_date - 30, current_date) ? 'capacity', 'admin can read the report');
+
+\echo '28. self-practice'
+:as_superuser
+insert into library_items (id, kind, title, skill, level_min, level_max, body_html, questions)
+  values ('lib-p', 'article', 'Practice me', 'reading', 'B1', 'B2', 'Text',
+          '[{"id":"q1","type":"mc","prompt":"Why?","options":["a","b"]},{"id":"q2","type":"gap","prompt":"It is ____.","max_words":1}]');
+insert into library_answer_keys (item_id, answers) values ('lib-p', '{"q1":{"answer":1},"q2":{"accepted":["red"]}}');
+:as_mentor
+select tests.expect_fail($$select practice_library_item('lib-p', '{}')$$, 'students only');
+:as_student
+select tests.expect_fail($$select practice_library_item('lib-1', '{}')$$, 'set this as homework');
+select tests.assert('lib-1' in (select my_practice_blocked()), 'homework items are blocked');
+select practice_library_item('lib-p', '{"q1":1,"q2":"Red"}') as pr \gset
+select tests.assert((:'pr'::jsonb->>'score')::numeric = 100, 'all correct scores 100');
+select tests.assert(not (:'pr'::jsonb ? 'key') and (:'pr'::jsonb->'correct'->>'q2')::boolean, 'marks without the key');
+select tests.assert((practice_library_item('lib-p', '{"q1":0}')->>'score')::numeric = 0, 'wrong scores 0');
+select practice_library_item('lib-p', '{}');
+select tests.expect_fail($$select practice_library_item('lib-p', '{}')$$, '3 times today');
+select tests.expect_count('select * from practice_attempts', 3);
+:as_parent
+select tests.expect_count('select * from practice_attempts', 3);
+:as_mentor
+select tests.expect_count('select * from practice_attempts', 3);
+:as_student2
+select tests.expect_count('select * from practice_attempts', 0);
+:as_ownerB
+select tests.expect_count('select * from practice_attempts', 0);
+select tests.expect_fail($$insert into practice_attempts (center_id, student_id, item_id, skill) values (gen_random_uuid(), gen_random_uuid(), 'lib-p', 'reading')$$, 'row-level security|permission denied');
+
 \echo 'ALL TESTS PASSED'

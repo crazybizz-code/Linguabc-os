@@ -203,8 +203,21 @@ export function AttendanceView({ ctx, s }: { ctx: PortalContext; s: Summary }) {
 export function PaymentsView({ ctx, s, base }: { ctx: PortalContext; s: Summary; base: string }) {
   const { t } = ctx;
   const L = intlLocale(ctx.locale);
+  const open = s.invoices.filter((i) => Number(i.balance) > 0 && i.payment_status !== "void");
+  const owed = open.reduce((n, i) => n + Number(i.balance), 0);
+  const overdue = open.filter((i) => i.payment_status === "overdue");
+  const next = [...open].sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0];
   return (
     <>
+      {owed > 0 && (
+        <div className={`rounded-[16px] border px-4 py-3.5 ${overdue.length ? "border-[#E8C4BE] bg-[#FBEDEA]" : "border-[#E7D3B5] bg-[#FBF3E6]"}`}>
+          <p className={`text-[12px] font-medium uppercase tracking-[0.08em] ${overdue.length ? "text-[#B4483D]" : "text-[#8A5A26]"}`}>
+            {t(overdue.length ? "Payment overdue" : "To pay")}
+          </p>
+          <p className="mt-1 text-[22px] font-semibold tracking-[-0.02em]">{formatUZS(owed)}</p>
+          {next && <p className="mt-0.5 text-[12px] text-muted-foreground">{t(overdue.length ? "was due {date}" : "due {date}", { date: day(next.due_date, L) })} · {t("Pay at the centre's front desk.")}</p>}
+        </div>
+      )}
       <PortalCard title={t("Invoices")}>
         {s.invoices.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No invoices yet.")}</p> : (
           <ul className="divide-y divide-border/60">

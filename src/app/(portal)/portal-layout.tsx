@@ -9,14 +9,18 @@ import { markParentNotificationsRead, markStudentNotificationsRead, parentNotifi
 const NAV: Record<PortalKind, { key: string; href: string; label: string }[]> = {
   parent: [
     { key: "home", href: "/parent", label: "Home" },
-    { key: "progress", href: "/parent/progress", label: "Progress" },
+    { key: "homework", href: "/parent/homework", label: "Homework" },
     { key: "attendance", href: "/parent/attendance", label: "Attendance" },
+    { key: "progress", href: "/parent/progress", label: "Results" },
     { key: "payments", href: "/parent/payments", label: "Payments" },
+    { key: "notifications", href: "/parent/notifications", label: "Notifications" },
     { key: "profile", href: "/parent/profile", label: "Profile" },
   ],
   student: [
     { key: "home", href: "/student", label: "Home" },
+    { key: "plan", href: "/student/plan", label: "My plan" },
     { key: "homework", href: "/student/homework", label: "Homework" },
+    { key: "practice", href: "/student/practice", label: "Practice" },
     { key: "mocks", href: "/student/mocks", label: "Mocks" },
     { key: "progress", href: "/student/progress", label: "Progress" },
     { key: "schedule", href: "/student/schedule", label: "Schedule" },

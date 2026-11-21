@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, GraduationCap, Layers, Users } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
@@ -50,7 +51,7 @@ export default async function BranchesPage() {
             return (
               <Card key={b.id} className="p-5">
                 <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">{t("Branch")}</p>
-                <h3 className="mt-1 text-[17px] font-semibold tracking-[-0.02em]">{b.name}</h3>
+                <h3 className="mt-1 text-[17px] font-semibold tracking-[-0.02em]"><Link href={`/branches/${b.id}`} className="hover:underline">{b.name}</Link></h3>
                 {b.address && <p className="mt-0.5 text-[12px] text-muted-foreground">{b.address}</p>}
                 <div className="mt-4 flex items-end justify-between">
                   <div>

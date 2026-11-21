@@ -39,6 +39,12 @@ function describeRaw(n: Note, t: T, locale: string, audience: Audience): { title
     case "invoice":
       return { title: t("New invoice"), body: t("{student}: {amount} UZS for {month}, due {date}.", {
         student: s("student"), amount: money("amount"), month: month("period"), date: day("due") }), href: `${base}/payments${child}` };
+    case "payment_due":
+      return { title: t("Payment due soon"), body: t("{student}: {amount} UZS for {month} is due on {date}.", {
+        student: s("student"), amount: money("amount"), month: month("period"), date: day("due") }), href: `${base}/payments${child}` };
+    case "payment_overdue":
+      return { title: t("Payment overdue"), body: t("{student}: {amount} UZS for {month} was due on {date}. Please pay at the centre.", {
+        student: s("student"), amount: money("amount"), month: month("period"), date: day("due") }), href: `${base}/payments${child}` };
     case "payment":
       return { title: t("Payment received"), body: t("{amount} UZS received for {student}.", { amount: money("amount"), student: s("student") }), href: `${base}/payments${child}` };
     case "homework_new":
