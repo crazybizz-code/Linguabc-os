@@ -1,6 +1,7 @@
 import "server-only";
 import { AiUnavailable } from "./gemini";
 import { defaultCast, MAX_SCRIPT_CHARS, speakable, splitScript, turnGap, type Cast, type Segment, type Voice } from "./script";
+import { describeStats, expressionsIn, renderSegments, SegmentFailed, type CacheStats, type SegmentStore } from "./segment-cache";
 
 export { MAX_SCRIPT_CHARS, splitScript };
 
@@ -69,7 +70,18 @@ export async function voiceOptions(): Promise<Voice[]> {
 const MAX_SEGMENTS = 140;
 const PARALLEL = 4;
 
-export type Speech = { audio: Buffer; bytes: number; model: string; segments: number; seconds: number };
+/**
+ * bytes: UTF-8 bytes actually sent to the voice API (what Fish bills);
+ * turns served from the segment cache are not counted.
+ */
+export type Speech = { audio: Buffer; bytes: number; model: string; segments: number; seconds: number; cache?: CacheStats };
+
+/** Fish S2.1 Pro list price, for the cache savings log only. */
+const PRICE_PER_MILLION_BYTES = 15;
+
+/** Every request setting that changes the sound, for the segment hash. */
+const FIXED_PARAMS = { format: "mp3", mp3_bitrate: 128, normalize: true, latency: "normal" } as const;
+const requestParams = () => ({ ...FIXED_PARAMS, ...sampling() });
 
 /** Strips a leading ID3v2 tag so joined MP3 pieces play as one stream. */
 function stripId3(buf: Buffer): Buffer {
@@ -165,7 +177,7 @@ function sampling() {
 
 async function tts(text: string, voice: string | undefined, model: string): Promise<Buffer> {
   const base = process.env.FISH_AUDIO_BASE_URL || "https://api.fish.audio";
-  const plain = { text, format: "mp3", mp3_bitrate: 128, normalize: true, latency: "normal", ...(voice && { reference_id: voice }) };
+  const plain = { text, ...FIXED_PARAMS, ...(voice && { reference_id: voice }) };
   let body: Record<string, unknown> = { ...plain, ...sampling() };
   let tuned = true;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -195,8 +207,13 @@ async function tts(text: string, voice: string | undefined, model: string): Prom
   throw new AiUnavailable("The voice service is busy. Try again in a minute.");
 }
 
-/** Turns a listening script into one MP3, each speaker read by their voice. */
-export async function speakScript(script: string, chosen: Cast = {}, opts: { model?: string } = {}): Promise<Speech> {
+/**
+ * Turns a listening script into one MP3, each speaker read by their voice.
+ * With a segment cache, turns already spoken in this scope (same text, voice,
+ * model and settings) are reused instead of paid for again, and every new
+ * turn is kept as soon as it is spoken.
+ */
+export async function speakScript(script: string, chosen: Cast = {}, opts: { model?: string; cache?: { store: SegmentStore; scope: string } } = {}): Promise<Speech> {
   if (!fishConfigured()) throw new AiUnavailable("Audio is not configured yet. Add a Fish Audio key in the hosting settings.");
   const model = opts.model || process.env.FISH_AUDIO_MODEL || DEFAULT_MODEL;
   const segments = splitScript(script);
@@ -209,13 +226,29 @@ export async function speakScript(script: string, chosen: Cast = {}, opts: { mod
 
   const pieces: Buffer[] = new Array(segments.length);
   const todo = segments.map((s, i) => i).filter((i) => !segments[i].pause);
-  let next = 0;
-  await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, async () => {
-    while (next < todo.length) {
-      const i = todo[next++];
-      pieces[i] = await tts(speakable(segments[i].text, /^s1$|^speech-/.test(model) ? "paren" : "bracket"), cast[segments[i].speaker ?? ""] || undefined, model);
+  const style = /^s1$|^speech-/.test(model) ? "paren" : "bracket";
+  const params = requestParams();
+  const jobs = todo.map((i) => {
+    const text = speakable(segments[i].text, style);
+    const voice = cast[segments[i].speaker ?? ""] || "";
+    return {
+      key: { provider: "fish", model, voice, expression: expressionsIn(segments[i].text), text, params, scope: opts.cache?.scope ?? "none" },
+      synth: () => tts(text, voice || undefined, model),
+    };
+  });
+  let rendered: Awaited<ReturnType<typeof renderSegments>>;
+  try {
+    rendered = await renderSegments(jobs, opts.cache?.store ?? null, { parallel: PARALLEL });
+  } catch (e) {
+    if (e instanceof SegmentFailed) {
+      console.warn(describeStats(e.stats, PRICE_PER_MILLION_BYTES));
+      const cause = e.causes.find((c) => c instanceof AiUnavailable) ?? e.causes[0];
+      throw cause instanceof AiUnavailable ? cause : new AiUnavailable(cause instanceof Error && /still running/.test(cause.message) ? cause.message : "The voice service had a problem. Try again shortly.");
     }
-  }));
+    throw e;
+  }
+  if (opts.cache) console.info(describeStats(rendered.stats, PRICE_PER_MILLION_BYTES));
+  todo.forEach((i, n) => { pieces[i] = rendered.audio[n]; });
 
   // Pauses copy the format of the first spoken piece.
   const sample = pieces.find(Boolean)!;
@@ -231,10 +264,11 @@ export async function speakScript(script: string, chosen: Cast = {}, opts: { mod
   const audio = Buffer.concat(out);
   return {
     audio,
-    bytes: Buffer.byteLength(spoken.map((s) => s.text).join(""), "utf8"),
+    bytes: rendered.stats.spokenBytes,
     model: `fish/${model}`,
     segments: spoken.length,
     seconds: mp3Seconds(audio),
+    cache: opts.cache ? rendered.stats : undefined,
   };
 }
 

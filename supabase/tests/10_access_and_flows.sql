@@ -1017,4 +1017,91 @@ select tests.expect_count('select * from practice_attempts', 0);
 select tests.expect_count('select * from practice_attempts', 0);
 select tests.expect_fail($$insert into practice_attempts (center_id, student_id, item_id, skill) values (gen_random_uuid(), gen_random_uuid(), 'lib-p', 'reading')$$, 'row-level security|permission denied');
 
+\echo '29. audio segment cache'
+select repeat('a', 64) as seg_h, repeat('b', 64) as seg_h2, repeat('c', 64) as seg_hp \gset
+-- a miss is claimed by one caller; everyone else in the centre waits
+:as_mentor
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h', 'fish', 's2.1-pro', 'v1', 120) = jsonb_build_object('state', 'generate', 'path', :'center_a' || '/' || :'seg_h' || '.mp3'), 'first caller generates');
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h', 'fish', 's2.1-pro', 'v1', 120)->>'state' = 'wait', 'same user, second request waits (no double billing)');
+:as_acad
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h', 'fish', 's2.1-pro', 'v1', 120)->>'state' = 'wait', 'colleague waits too');
+-- only the claimer uploads the file, and only at its own path
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('audio-segments', %L)$$, :'center_a' || '/' || :'seg_h' || '.mp3'), 'row-level security');
+select tests.expect_fail($$select finish_audio_segment('$$ || :'center_a' || $$', '$$ || :'seg_h' || $$', 100)$$, 'segment file not found');
+:as_mentor
+select tests.expect_fail($$select finish_audio_segment('$$ || :'center_a' || $$', '$$ || :'seg_h' || $$', 100)$$, 'segment file not found');
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('audio-segments', %L)$$, :'center_a' || '/' || :'seg_h2' || '.mp3'), 'row-level security');
+select tests.expect_fail(format($$insert into storage.objects (bucket_id, name) values ('audio-segments', %L)$$, :'center_a' || '/x.mp3'), 'row-level security');
+insert into storage.objects (bucket_id, name) values ('audio-segments', :'center_a' || '/' || :'seg_h' || '.mp3');
+:as_acad
+select tests.expect_fail($$select finish_audio_segment('$$ || :'center_a' || $$', '$$ || :'seg_h' || $$', 100)$$, 'not claimed');
+:as_mentor
+select tests.assert(finish_audio_segment(:'center_a', :'seg_h', 4321) = :'center_a' || '/' || :'seg_h' || '.mp3', 'finished');
+-- a hit: no generation, counted
+:as_acad
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h', 'fish', 's2.1-pro', 'v1', 120) = jsonb_build_object('state', 'ready', 'path', :'center_a' || '/' || :'seg_h' || '.mp3'), 'cache hit');
+select tests.expect_count(format('select * from storage.objects where name = %L', :'center_a' || '/' || :'seg_h' || '.mp3'), 1);
+:as_superuser
+select tests.assert((select hits from audio_segments where center_id = :'center_a' and hash = :'seg_h') = 1, 'hit counted');
+-- cached files cannot be replaced or removed by callers
+:as_mentor
+delete from storage.objects where name = :'center_a' || '/' || :'seg_h' || '.mp3';
+update storage.objects set name = name || 'x' where bucket_id = 'audio-segments';
+:as_superuser
+select tests.assert(exists (select 1 from storage.objects where name = :'center_a' || '/' || :'seg_h' || '.mp3'), 'cached file is immutable');
+
+-- tenant isolation: another centre sees nothing, and the same hash there is a separate segment
+:as_ownerB
+select tests.expect_fail($$select claim_audio_segment('$$ || :'center_a' || $$', '$$ || :'seg_h' || $$', 'fish', 'm', 'v1', 1)$$, 'forbidden');
+select tests.expect_fail($$select finish_audio_segment('$$ || :'center_a' || $$', '$$ || :'seg_h' || $$', 1)$$, 'forbidden');
+select tests.expect_count('select * from audio_segments', 0);
+select tests.expect_count($$select * from storage.objects where bucket_id = 'audio-segments'$$, 0);
+select tests.assert(claim_audio_segment(:'center_b', :'seg_h', 'fish', 's2.1-pro', 'v1', 120) = jsonb_build_object('state', 'generate', 'path', :'center_b' || '/' || :'seg_h' || '.mp3'), 'same hash in another centre is a miss');
+select tests.expect_count('select * from audio_segments', 1);
+-- a failed generation is released, so the next request can try at once
+select release_audio_segment(:'center_b', :'seg_h');
+select tests.expect_count('select * from audio_segments', 0);
+select tests.assert(claim_audio_segment(:'center_b', :'seg_h', 'fish', 's2.1-pro', 'v1', 120)->>'state' = 'generate', 'claim again after release');
+:as_mentor
+select tests.expect_count('select * from audio_segments', 1);
+select release_audio_segment(:'center_a', :'seg_h');
+:as_superuser
+select tests.assert((select status from audio_segments where center_id = :'center_a' and hash = :'seg_h') = 'ready', 'release never drops a ready segment');
+-- students, parents and anonymous users get nothing
+:as_student
+select tests.expect_fail($$select claim_audio_segment('$$ || :'center_a' || $$', '$$ || :'seg_h2' || $$', 'fish', 'm', 'v1', 1)$$, 'forbidden');
+select tests.expect_count('select * from audio_segments', 0);
+select tests.expect_count($$select * from storage.objects where bucket_id = 'audio-segments'$$, 0);
+:as_parent
+select tests.expect_count('select * from audio_segments', 0);
+:as_anon
+select tests.expect_fail($$select claim_audio_segment(null, repeat('d', 64), 'fish', 'm', 'v', 1)$$, 'permission denied');
+-- no direct writes to the table
+:as_mentor
+select tests.expect_fail(format($$insert into audio_segments (center_id, hash, provider, model, text_bytes) values (%L, repeat('e', 64), 'fish', 'm', 1)$$, :'center_a'), 'permission denied');
+select tests.expect_fail($$select claim_audio_segment('$$ || :'center_a' || $$', 'not-a-hash', 'fish', 'm', 'v1', 1)$$, 'bad segment hash');
+-- a stale claim (crashed request) can be taken over
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h2', 'fish', 's2.1-pro', 'v2', 50)->>'state' = 'generate', 'mentor claims');
+:as_acad
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h2', 'fish', 's2.1-pro', 'v2', 50)->>'state' = 'wait', 'fresh claim is respected');
+:as_superuser
+update audio_segments set claimed_at = now() - interval '4 minutes' where hash = :'seg_h2';
+:as_acad
+select tests.assert(claim_audio_segment(:'center_a', :'seg_h2', 'fish', 's2.1-pro', 'v2', 50)->>'state' = 'generate', 'stale claim taken over');
+-- the LinguABC library scope belongs to platform admins
+:as_mentor
+select tests.expect_fail($$select claim_audio_segment(null, '$$ || :'seg_hp' || $$', 'fish', 'm', 'v1', 1)$$, 'forbidden');
+:as_ownerB
+select tests.expect_fail($$select claim_audio_segment(null, '$$ || :'seg_hp' || $$', 'fish', 'm', 'v1', 1)$$, 'forbidden');
+:as_ownerA
+select tests.assert(claim_audio_segment(null, :'seg_hp', 'fish', 's2.1-pro', 'v1', 10) = jsonb_build_object('state', 'generate', 'path', 'platform/' || :'seg_hp' || '.mp3'), 'platform admin claims a library segment');
+insert into storage.objects (bucket_id, name) values ('audio-segments', 'platform/' || :'seg_hp' || '.mp3');
+select tests.assert(finish_audio_segment(null, :'seg_hp', 10) = 'platform/' || :'seg_hp' || '.mp3', 'library segment finished');
+:as_mentor
+select tests.expect_count($$select * from storage.objects where name like 'platform/%'$$, 0);
+select tests.expect_count('select * from audio_segments where center_id is null', 0);
+-- the existing audio buckets are untouched
+:as_superuser
+select tests.assert((select count(*) from storage.buckets where id in ('listening-audio', 'library-audio', 'library-podcasts', 'audio-segments') and not public) = 3, 'buckets: three private, podcasts public');
+
 \echo 'ALL TESTS PASSED'

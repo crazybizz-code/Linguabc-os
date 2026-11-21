@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getPlatformContext } from "@/lib/auth/platform";
-import { voiceOptions } from "@/lib/ai/fish";
+import { voiceOptions } from "@/lib/ai/voice";
 import { toDraftQuestion } from "@/lib/ai/draft-store";
 import { transcriptToScript, type VocabWord } from "@/lib/ai/podcast";
 import type { Level } from "@/lib/ai/draft";

@@ -2092,6 +2092,12 @@ export type Database = {
       my_practice_blocked: { Args: Record<string, never>; Returns: string[] }
       center_report: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       remind_payment: { Args: { p_invoice: string }; Returns: number }
+      claim_audio_segment: {
+        Args: { p_center: string | null; p_hash: string; p_provider: string; p_model: string; p_voice: string; p_text_bytes: number }
+        Returns: Json
+      }
+      finish_audio_segment: { Args: { p_center: string | null; p_hash: string; p_audio_bytes: number }; Returns: string }
+      release_audio_segment: { Args: { p_center: string | null; p_hash: string }; Returns: undefined }
       save_library_podcast: {
         Args: {
           p_answers: Json

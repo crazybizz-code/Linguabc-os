@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getPlatformContext } from "@/lib/auth/platform";
-import { voiceOptions } from "@/lib/ai/fish";
+import { voiceOptions } from "@/lib/ai/voice";
 import { SPECS, type SectionDraft, type TestSkill } from "@/lib/ai/test-draft";
 import { toDraftQuestion } from "@/lib/ai/draft-store";
 import { audioUrl, LIBRARY_AUDIO } from "@/lib/audio";
