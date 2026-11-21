@@ -1,0 +1,69 @@
+import numpy as np
+
+from linguabc_tts import audio as A
+from linguabc_tts.qa import (critical_spans, missing_answers, missing_spans, normalize, ordinal_words,
+                             speaker_consistency, wer)
+
+
+def test_numbers_money_dates_times_normalise_alike():
+    assert normalize("It costs £12.50.") == normalize("it costs twelve pounds fifty")
+    assert normalize("on the 23rd of March") == normalize("on the twenty-third of March")
+    assert normalize("at 7:45") == normalize("at seven forty-five")
+    assert normalize("double three") == ["three", "three"]
+    assert ordinal_words(1) == "first" and ordinal_words(12) == "twelfth" and ordinal_words(40) == "fortieth"
+
+
+def test_spelling_in_any_form():
+    target = normalize("That's S-M-Y-T-H-E.")
+    assert normalize("That's S M Y T H E") == target
+    assert normalize("that's smythe") == target
+
+
+def test_wer():
+    assert wer("The train leaves from platform four.", "the train leaves from platform 4") == 0
+    assert wer("one two three four", "one two four") == 0.25
+    assert wer("", "") == 0
+
+
+def test_critical_spans_and_misses():
+    line = "Call me on the 23rd of March at 7:45, it's £12.50, surname S-M-Y-T-H-E, room 204."
+    kinds = [s.kind for s in critical_spans(line)]
+    assert kinds == ["date", "time", "money", "spelling", "number"]
+    heard = "call me on the twenty third of march at seven forty five it's twelve pounds fifty surname s m y t h room two hundred four"
+    assert [s.kind for s in missing_spans(line, heard)] == ["spelling"]
+
+
+def test_answer_bearing_words():
+    transcript = "the train leaves from platform four and the ticket costs eight pounds"
+    assert missing_answers([["four", "4"], ["£8"], ["Smythe"]], transcript) == [["Smythe"]]
+
+
+def test_clipping_and_silence():
+    sr = 24000
+    tone = (0.5 * np.sin(np.linspace(0, 2000, sr))).astype(np.float32)
+    assert A.clipping_ratio(tone) == 0
+    assert A.clipping_ratio(np.clip(tone * 4, -1, 1)) > 0.1
+    gap = np.concatenate([tone, A.silence(2.0, sr), tone])
+    assert 1.9 <= A.longest_silence(gap, sr) <= 2.1
+    padded = np.concatenate([A.silence(1.0, sr), tone, A.silence(1.0, sr)])
+    assert abs(A.trim(padded, sr).size / sr - 1.0) < 0.15
+
+
+def test_speaker_consistency():
+    a = np.array([1.0, 0.0, 0.0])
+    s = speaker_consistency({"Ryan": [a, a * 2, np.array([0.9, 0.1, 0.0])], "Aiden": [a]})
+    assert s["Ryan"] > 0.95 and s["Aiden"] is None
+    drift = speaker_consistency({"Ryan": [a, np.array([0.0, 1.0, 0.0])]})
+    assert drift["Ryan"] < 0.8
+
+
+def test_loudness_normalisation_and_mp3():
+    sr = 24000
+    quiet = (0.05 * np.sin(np.linspace(0, 6000, sr * 3))).astype(np.float32)
+    out, before = A.normalize_loudness(quiet, sr)
+    after = A.measure_loudness(out, sr)
+    assert before["input_i"] < -25
+    assert abs(after["input_i"] - A.TARGET_LUFS) <= 1.0
+    mp3 = A.encode_mp3(out, sr)
+    assert mp3[:3] != b"ID3" and (mp3[0] == 0xFF)
+    assert abs(A.decode_mp3(mp3, sr).size / sr - 3.0) < 0.15

@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0022):
+Migrations live in `supabase/migrations/` (0001–0029):
 
 | # | Adds |
 |---|---|
@@ -64,6 +64,8 @@ Migrations live in `supabase/migrations/` (0001–0022):
 | 0020 | Mock lockdown: `leave_mock_module` ends a part with 0 when the student leaves the exam screen, `mock_attempts.disqualified_at`/`disqualify_reason`, in-app notifications to the session's staff (`app.notify_mock_staff`) |
 | 0021 | `notifications` in the `supabase_realtime` publication (live bell); the "left a mock" notice names the student and group |
 | 0022 | Notification triggers for families and students (attendance absent/late, invoice, payment, new homework, homework reviewed, mock scheduled, mock released, lesson cancelled or moved), `app.notify`, `app.family_of`, `app.group_audience`, `mark_my_notifications_read` |
+| 0023–0028 | Invite expiry, answer-key scope, library podcasts, payment reminders, centre report, self-practice (see `CURRENT-STATE.md`) |
+| 0029 | Audio segment cache: `audio_segments` (centre or platform scope), private `audio-segments` bucket (`{center_id|platform}/{hash}.mp3`, immutable), `claim_audio_segment` / `finish_audio_segment` / `release_audio_segment`. **Not applied to production yet.** |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -80,6 +82,13 @@ Other rules the database enforces:
 - Uploaded worksheets (PDF, DOCX, TXT, PNG/JPG/WEBP, up to 4 MB, PDFs up to 12 pages) are read in the server action and sent inline to the AI provider. They aren't kept.
 - Library audio (`library_items.audio_url`) and assignment `audio_url` are external URLs.
 - Cue-card progress is kept only in the browser's `localStorage`.
+- **Audio segment cache (0029, not applied yet):** every spoken turn is kept in the private `audio-segments` bucket, keyed by a SHA-256 of provider, model, voice, expression, exact text, settings and scope (`src/lib/ai/segment-cache.ts`).
+  - Scope is the centre, or `platform` for the LinguABC library (platform admins). The scope is in the hash, the path and the row, so no centre reads or claims another's segments. Students and parents never read segments; they hear the joined recording in the existing buckets, as before.
+  - `claim_audio_segment` gives a missing segment to one caller; others (even the same user in another tab) wait, so nobody pays twice. A claim older than 3 minutes can be taken over.
+  - Each new segment is uploaded and finished as soon as it is spoken (checkpoint), so a failure later loses nothing paid for; re-recording after an edit speaks only the changed turns.
+  - No update or delete policy: cached files are immutable. Rows go with their centre (`on delete cascade`); the files of a deleted centre stay in the bucket until removed with the service role.
+  - Each recording logs one line: hits, misses, repeats, failures, bytes spoken and saved (~$ at the Fish list price). `ai_requests.prompt_tokens` now holds only the bytes actually sent to Fish.
+  - Without the migration, or with `AUDIO_SEGMENT_CACHE=off`, recordings are spoken as before.
 
 ## LinguABC library tests (0018)
 - **Full IELTS Academic tests** for every centre: reading (3 passages: 13 + 13 + 14 questions) and listening (4 recorded parts, 10 questions each). All are numbered q1..q40 across sections.
@@ -152,6 +161,8 @@ Other rules the database enforces:
 | The Conversation | Republished articles carry their page-view pixel, as their guidelines require | Inside the content |
 | Click (online payments) | Not integrated yet. **Click is the V1 provider** (decided 2026-11-19). Payme and Uzum come later, and the payment model must allow adding them without a rewrite. The UI and server still refuse Click and Payme as "V2" (PR #7). The `payment_method` enum already includes `click`, `payme` and `uzum`, and the `(method, provider_txn_id)` unique index is ready for idempotent callbacks. | — |
 | Fish Audio | Text-to-speech for listening scripts (`src/lib/ai/fish.ts`). Scripts written as `Name: words` become a dialogue. Script markup: `[pause 30]` on its own line is silence (made locally, free), `[short pause]` is a 1 s break, `[break]` marks the mid-part break for the exam frame, and expression tags such as `[surprised]`, `[excited]`, `[laughing]` (list in `src/lib/ai/script.ts`) are sent to Fish S2 models as `[tag]` (s1: `(tag)`); other `[...]` notes are dropped and students never see tags. The AI prompts add a tag about every third turn. the mentor picks a voice per speaker from six voices the owner chose (defaults in the code; one has an Indian accent), each turn is one request and the MP3s are joined. Voice titles come from Fish (`GET /model/{id}`, cached a day). Counted as AI requests (kind `audio`, UTF-8 bytes in `prompt_tokens`). | `FISH_AUDIO_API_KEY`, `FISH_AUDIO_VOICES` (comma-separated ids, optional), `FISH_AUDIO_MODEL` (default `s2.1-pro`: Fish retires `s1` on 31 Dec 2026), `FISH_AUDIO_PODCAST_MODEL` (podcasts; defaults to `FISH_AUDIO_MODEL`), `FISH_AUDIO_BASE_URL` |
+| Voice provider switch | `src/lib/ai/voice.ts`: `AUDIO_PROVIDER` = `fish` (default; anything else or unset is Fish), `qwen` (pilot), `kokoro` (not available yet). Every recording (homework, library tests, podcasts) goes through `speak()`. | `AUDIO_PROVIDER`, `AUDIO_SEGMENT_CACHE` |
+| Qwen3-TTS worker (pilot) | `workers/tts` (Python): Qwen3-TTS-12Hz-1.7B-CustomVoice, expression tags as `instruct`, ASR check per segment (faster-whisper), segment retry, pauses, loudness (−16 LUFS), MP3. Modal config in `workers/tts/modal_app.py`. **Not deployed.** The app sends a plan (`planScript`) signed with HMAC (`src/lib/ai/qwen.ts`). | `QWEN_TTS_URL`, `QWEN_TTS_SECRET`, `QWEN_TTS_VOICES` |
 | Notifications | In-app (V1 step 4, 0022).
 - **Writing:** database triggers, so every path notifies.
   - Parents: absent or late.

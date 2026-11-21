@@ -1,0 +1,22 @@
+{
+  "about": "Accent and IELTS-answer test set. Each sentence is spoken by every voice under test; automatic checks run first, then people listen blind (see review sheet).",
+  "sentences": [
+    {"id": "rhotic-1", "category": "rhoticity", "listen_for": "British: no /r/ after vowels; American: /r/ pronounced", "text": "The car park is far from the theatre, near the river."},
+    {"id": "rhotic-2", "category": "rhoticity", "listen_for": "British: 'water' without r; American: flapped t and r", "text": "Could I have a glass of water, please? It's better than coffee."},
+    {"id": "flap-1", "category": "t-flapping", "listen_for": "American: 'butter', 'city' with a flap; British: clear t", "text": "The city library has a little garden behind the building."},
+    {"id": "bath-1", "category": "bath-trap", "listen_for": "British: long a in 'can't', 'dance', 'path'; American: short a", "text": "I can't find the path to the dance class after lunch."},
+    {"id": "lot-1", "category": "lot", "listen_for": "British: rounded o in 'hot', 'stop'; American: open a", "text": "It was too hot to stop at the shop, so we got a coffee."},
+    {"id": "goat-1", "category": "goat", "listen_for": "Vowel in 'go home', 'phone'", "text": "Please don't phone me before I go home at nine."},
+    {"id": "aus-1", "category": "australian", "listen_for": "Australian: FACE and PRICE diphthongs, rising terminal", "text": "Today the weather's great, so we might go to the beach later, mate."},
+    {"id": "spell-1", "category": "spelling", "listen_for": "Every letter clear and separate", "text": "My surname is Smythe. That's S-M-Y-T-H-E."},
+    {"id": "spell-2", "category": "spelling", "listen_for": "Letters, then the double letter", "text": "The street is Gillingham Road, G-I-L-L-I-N-G-H-A-M."},
+    {"id": "phone-1", "category": "numbers", "listen_for": "'double', 'oh' read naturally", "text": "You can call me on oh seven nine double three, four five six, one two eight."},
+    {"id": "postcode-1", "category": "numbers", "listen_for": "Letters and digits of a UK postcode", "text": "The postcode is CB2 1TN."},
+    {"id": "date-1", "category": "dates", "listen_for": "Ordinal and month", "text": "The course starts on the 23rd of March and ends on the 1st of June."},
+    {"id": "money-1", "category": "money", "listen_for": "Pounds and pence", "text": "The ticket costs £12.50, but students pay £8."},
+    {"id": "time-1", "category": "time", "listen_for": "Clock times", "text": "The coach leaves at 7:45 and arrives at half past four."},
+    {"id": "emotion-1", "category": "expression", "listen_for": "Is the expression heard?", "text": "[excited] We won the competition! [serious] But now the real work begins."},
+    {"id": "emotion-2", "category": "expression", "listen_for": "Whisper (experimental in Qwen)", "text": "[whispering] Let me tell you a secret. [curious] Have you ever wondered why?"},
+    {"id": "long-1", "category": "consistency", "listen_for": "Same voice through a long turn", "text": "Good morning, everyone, and welcome to the museum. Before we start the tour, I'd like to tell you a little about the building. It was built in 1863 as a railway station, and it became a museum in 1987. Today we'll visit three galleries, and the tour takes about forty minutes."}
+  ]
+}

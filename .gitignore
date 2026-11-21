@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 !.env.example
+
+# TTS worker (workers/tts)
+__pycache__/
+.pytest_cache/
+.segment-cache/
+.venv/

@@ -1,6 +1,6 @@
 # Current state
 
-_Last updated: 2026-11-20. Update this file at the end of every working session._
+_Last updated: 2026-11-21. Update this file at the end of every working session._
 
 ## Code
 - `main`: the last feature merge is **`8826a16`**, "IELTS question types, server marking and vocabulary cue cards (#17)". It's followed by docs-only commits: `4f02d1c` (#18, project memory) and this state update (#19).
@@ -96,6 +96,14 @@ Both are drafts waiting for the owner's review before publishing.
 **Known marking bug:** `app.norm_answer` strips the dot from decimals, so "1.5" becomes "1 5" (two words). A gap answer with a decimal can then break its word limit. Fix it in part B.
 
  Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
+
+## AI Audio Engine V2 (branch `claude/affectionate-gates-o40z82`, 2026-11-21, not merged)
+- **Segment cache for Fish (Phase 1):** migration `0029_audio_segments` (**not applied**), `src/lib/ai/segment-cache.ts` (hash, claim, checkpoint, retry), `segment-store.ts` (Supabase), `fish.ts` uses it. Re-recording speaks only changed turns; failures keep finished turns; parallel requests don't pay twice.
+- **Provider switch:** `src/lib/ai/voice.ts`, `AUDIO_PROVIDER` = fish (default) | qwen | kokoro (stub). All three record actions and four pages go through it.
+- **Qwen3-TTS worker (Phase 2-4):** `workers/tts` (Python). Tested only with a fake engine and fake ASR: no GPU here and huggingface.co is blocked, so **no real Qwen inference has run**. Modal config written, **not deployed**.
+- Production usage before the change (read-only, 2026-11-21): 9 Fish recordings, 26,870 bytes (~$0.40), 7 files kept (2 were re-takes). Fish dashboard said $0.57.
+- Tests: SQL suite 29 sections pass (new: 29. audio segment cache); `npm run test:ts` 17 pass; `workers/tts` pytest 40 pass; tsc, eslint, build clean.
+- **Before production:** owner approves applying 0029; the cache works without it (speaks as before) but saves nothing.
 
 ## Exact next task
 1. **V1 step 4, in-app notifications:** built on the branch (0022 triggers; a bell in the student and parent portals; translated text). With the owner's go-ahead: apply 0022, then merge.
