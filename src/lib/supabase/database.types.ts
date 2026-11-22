@@ -154,6 +154,87 @@ export type Database = {
           },
         ]
       }
+      audio_jobs: {
+        Row: {
+          id: string
+          center_id: string | null
+          created_by: string
+          purpose: string
+          provider: string
+          target_bucket: string
+          target_path: string
+          idempotency_key: string
+          status: string
+          progress: number
+          segments_done: number
+          segments_total: number | null
+          attempts: number
+          max_attempts: number
+          lease_until: string | null
+          seconds: number | null
+          qa: Json | null
+          error: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+          started_at: string | null
+          finished_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          center_id?: string | null
+          created_by?: string
+          purpose?: string
+          provider?: string
+          target_bucket?: string
+          target_path?: string
+          idempotency_key?: string
+          status?: string
+          progress?: number
+          segments_done?: number
+          segments_total?: number | null
+          attempts?: number
+          max_attempts?: number
+          lease_until?: string | null
+          seconds?: number | null
+          qa?: Json | null
+          error?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          started_at?: string | null
+          finished_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          center_id?: string | null
+          created_by?: string
+          purpose?: string
+          provider?: string
+          target_bucket?: string
+          target_path?: string
+          idempotency_key?: string
+          status?: string
+          progress?: number
+          segments_done?: number
+          segments_total?: number | null
+          attempts?: number
+          max_attempts?: number
+          lease_until?: string | null
+          seconds?: number | null
+          qa?: Json | null
+          error?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          started_at?: string | null
+          finished_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_requests: {
         Row: {
           center_id: string
@@ -2092,6 +2173,19 @@ export type Database = {
       my_practice_blocked: { Args: Record<string, never>; Returns: string[] }
       center_report: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       remind_payment: { Args: { p_invoice: string }; Returns: number }
+      enqueue_audio_job: {
+        Args: { p_center: string | null; p_purpose: string; p_provider: string; p_bucket: string; p_path: string; p_idempotency_key: string; p_token_hash: string }
+        Returns: Json
+      }
+      audio_job_update: {
+        Args: {
+          p_job: string; p_token_hash: string; p_attempt: number; p_status: string; p_progress: number
+          p_segments_done?: number | null; p_segments_total?: number | null; p_seconds?: number | null; p_qa?: Json | null; p_error?: string | null
+        }
+        Returns: Json
+      }
+      review_audio_job: { Args: { p_job: string; p_approve: boolean }; Returns: string }
+      retry_audio_job: { Args: { p_job: string; p_token_hash: string; p_path: string }; Returns: number }
       claim_audio_segment: {
         Args: { p_center: string | null; p_hash: string; p_provider: string; p_model: string; p_voice: string; p_text_bytes: number }
         Returns: Json

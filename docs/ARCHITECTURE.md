@@ -40,7 +40,7 @@ Pages are server components that read through the Supabase client using the **si
 - **Shared across centres:** `library_items` (published content, readable by any signed-in user) and `library_answer_keys` (readable by staff and mentors of any centre). Each centre gets its own copy as an `assignments` row plus `assignment_keys` when the content is assigned.
 
 ## Database
-Migrations live in `supabase/migrations/` (0001–0029):
+Migrations live in `supabase/migrations/` (0001–0030):
 
 | # | Adds |
 |---|---|
@@ -66,6 +66,7 @@ Migrations live in `supabase/migrations/` (0001–0029):
 | 0022 | Notification triggers for families and students (attendance absent/late, invoice, payment, new homework, homework reviewed, mock scheduled, mock released, lesson cancelled or moved), `app.notify`, `app.family_of`, `app.group_audience`, `mark_my_notifications_read` |
 | 0023–0028 | Invite expiry, answer-key scope, library podcasts, payment reminders, centre report, self-practice (see `CURRENT-STATE.md`) |
 | 0029 | Audio segment cache: `audio_segments` (centre or platform scope), private `audio-segments` bucket (`{center_id|platform}/{hash}.mp3`, immutable), `claim_audio_segment` / `finish_audio_segment` / `release_audio_segment`. **Not applied to production yet.** |
+| 0030 | Audio jobs: `audio_jobs` (+ `audio_job_tokens`, unreadable), `enqueue_audio_job`, `audio_job_update` (service role only), `review_audio_job`, `retry_audio_job`, `app.expire_audio_jobs` (pg_cron), Realtime publication. **Not applied to production yet.** See `docs/AUDIO-ENGINES.md`. |
 
 Other rules the database enforces:
 - Exclusion constraints (`btree_gist`) stop a room or mentor from being double-booked.
@@ -163,6 +164,7 @@ Other rules the database enforces:
 | Fish Audio | Text-to-speech for listening scripts (`src/lib/ai/fish.ts`). Scripts written as `Name: words` become a dialogue. Script markup: `[pause 30]` on its own line is silence (made locally, free), `[short pause]` is a 1 s break, `[break]` marks the mid-part break for the exam frame, and expression tags such as `[surprised]`, `[excited]`, `[laughing]` (list in `src/lib/ai/script.ts`) are sent to Fish S2 models as `[tag]` (s1: `(tag)`); other `[...]` notes are dropped and students never see tags. The AI prompts add a tag about every third turn. the mentor picks a voice per speaker from six voices the owner chose (defaults in the code; one has an Indian accent), each turn is one request and the MP3s are joined. Voice titles come from Fish (`GET /model/{id}`, cached a day). Counted as AI requests (kind `audio`, UTF-8 bytes in `prompt_tokens`). | `FISH_AUDIO_API_KEY`, `FISH_AUDIO_VOICES` (comma-separated ids, optional), `FISH_AUDIO_MODEL` (default `s2.1-pro`: Fish retires `s1` on 31 Dec 2026), `FISH_AUDIO_PODCAST_MODEL` (podcasts; defaults to `FISH_AUDIO_MODEL`), `FISH_AUDIO_BASE_URL` |
 | Voice provider switch | `src/lib/ai/voice.ts`: `AUDIO_PROVIDER` = `fish` (default; anything else or unset is Fish), `qwen` (pilot), `kokoro` (not available yet). Every recording (homework, library tests, podcasts) goes through `speak()`. | `AUDIO_PROVIDER`, `AUDIO_SEGMENT_CACHE` |
 | Qwen3-TTS worker (pilot) | `workers/tts` (Python): Qwen3-TTS-12Hz-1.7B-CustomVoice, expression tags as `instruct`, ASR check per segment (faster-whisper), segment retry, pauses, loudness (−16 LUFS), MP3. Modal config in `workers/tts/modal_app.py`. **Not deployed.** The app sends a plan (`planScript`) signed with HMAC (`src/lib/ai/qwen.ts`). | `QWEN_TTS_URL`, `QWEN_TTS_SECRET`, `QWEN_TTS_VOICES` |
+| Audio Studio engines | Platform admins pick Fish, Chatterbox Turbo, Chatterbox 0.5B or Qwen per recording (`src/lib/ai/engines.ts`, `AudioPanel`). Worker engines run as jobs (0030): signed dispatch, signed upload URL, signed webhook `/api/audio-jobs/callback`, Realtime progress, QA review. Centres' homework is unchanged. | `AUDIO_ENGINES`, `*_WORKER_URL`, `*_WORKER_SECRET`, `AUDIO_JOBS_CALLBACK_URL` |
 | Notifications | In-app (V1 step 4, 0022).
 - **Writing:** database triggers, so every path notifies.
   - Parents: absent or late.

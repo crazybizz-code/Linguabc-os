@@ -13,13 +13,15 @@ import { frameListening, hasFrame } from "@/lib/ai/listening-frame";
 import type { QuestionType } from "@/lib/questions";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "../../../homework/new/question-editor";
 import { deleteTest, draftSection, recordSection, saveTest, setTestStatus, type TestDraft } from "../actions";
+import { retryStudioJob, reviewStudioJob, startStudioJob, studioJobResult } from "../../audio-jobs/actions";
+import type { StudioEngineOption, StudioJobs } from "@/components/questions/audio-panel";
 
 const area = `${inputClass} h-auto py-2 leading-relaxed`;
 const TONE: Record<string, Tone> = { draft: "amber", published: "green", hidden: "neutral" };
 type Section = TestDraft["sections"][number];
 
-export function TestEditor({ id, status, initial, voices, audioUrls }: {
-  id: string; status: string; initial: TestDraft; voices: Voice[]; audioUrls: (string | undefined)[];
+export function TestEditor({ id, status, initial, voices, audioUrls, engines }: {
+  id: string; status: string; initial: TestDraft; voices: Voice[]; audioUrls: (string | undefined)[]; engines?: StudioEngineOption[];
 }) {
   const t = useT();
   const router = useRouter();
@@ -85,7 +87,7 @@ export function TestEditor({ id, status, initial, voices, audioUrls }: {
 
       {d.sections.map((s, i) => (
         <SectionCard key={i} index={i} section={s} first={firsts[i]} testId={id} skill={d.skill} level={d.level}
-          voices={voices} audioUrl={audioUrls[i]} locked={locked} busy={pending}
+          voices={voices} engines={engines} audioUrl={audioUrls[i]} locked={locked} busy={pending}
           onChange={(patch) => setSection(i, patch)} />
       ))}
 
@@ -105,10 +107,14 @@ export function TestEditor({ id, status, initial, voices, audioUrls }: {
   );
 }
 
-function SectionCard({ index, section: s, first, testId, skill, level, voices, audioUrl, locked, busy, onChange }: {
+function SectionCard({ index, section: s, first, testId, skill, level, voices, engines, audioUrl, locked, busy, onChange }: {
   index: number; section: Section; first: number; testId: string; skill: TestDraft["skill"]; level: Level;
-  voices: Voice[]; audioUrl?: string; locked: boolean; busy: boolean; onChange: (patch: Partial<Section>) => void;
+  voices: Voice[]; engines?: StudioEngineOption[]; audioUrl?: string; locked: boolean; busy: boolean; onChange: (patch: Partial<Section>) => void;
 }) {
+  const jobs: StudioJobs = {
+    start: (engine, script, cast) => startStudioJob(engine, script, cast, { kind: "test", testId }),
+    result: studioJobResult, review: reviewStudioJob, retry: retryStudioJob,
+  };
   const t = useT();
   const [topic, setTopic] = useState("");
   const [error, setError] = useState<string>();
@@ -177,7 +183,7 @@ function SectionCard({ index, section: s, first, testId, skill, level, voices, a
       {listening && (locked ? (audioUrl && <audio controls preload="none" src={audioUrl} className="w-full" />) : (
         <AudioPanel script={s.passage} audioPath={s.audio_path} initialUrl={audioUrl} voices={voices}
           record={(script, previous, cast) => recordSection(testId, script, previous, cast)}
-          onChange={(audio_path) => onChange({ audio_path })} />
+          onChange={(audio_path) => onChange({ audio_path })} engines={engines} jobs={jobs} />
       ))}
 
       {s.questions.map((q, k) => (

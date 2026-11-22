@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getPlatformContext } from "@/lib/auth/platform";
 import { voiceOptions } from "@/lib/ai/voice";
+import { studioEngines } from "@/lib/ai/engines";
 import { SPECS, type SectionDraft, type TestSkill } from "@/lib/ai/test-draft";
 import { toDraftQuestion } from "@/lib/ai/draft-store";
 import { audioUrl, LIBRARY_AUDIO } from "@/lib/audio";
@@ -46,6 +47,7 @@ export default async function LibraryTestPage({ params }: PageProps<"/admin/test
     <div className="space-y-5">
       <Link href="/admin/tests" className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground hover:text-[#17211D]"><ChevronLeft className="h-4 w-4" /> {t("LinguABC tests")}</Link>
       <TestEditor id={test.id} status={test.status} voices={skill === "listening" ? await voiceOptions() : []}
+        engines={skill === "listening" ? await studioEngines() : undefined}
         initial={{ title: test.title, skill, level: (test.level ?? "B2") as Level, sections }} audioUrls={urls.map((u) => u ?? undefined)} />
     </div>
   );

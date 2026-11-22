@@ -154,7 +154,7 @@ def _check(piece: PieceReport, clip: np.ndarray, sr: int, heard: str, qa: QaConf
 
 def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: SegmentCache,
            qa: QaConfig = QaConfig(), embedder: SpeakerEmbedder | None = None, params: dict | None = None,
-           sample_rate: int = 24000, spoken: bool = False) -> RenderResult:
+           sample_rate: int = 24000, spoken: bool = False, on_progress=None) -> RenderResult:
     """spoken=True: numbers, money, codes and times are said as words (spoken.to_spoken)
     before they reach the engine; QA still compares against the written script."""
     started = time.monotonic()
@@ -198,6 +198,8 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
                 pieces.append(piece)
 
     for idx, piece in enumerate(pieces):
+        if on_progress is not None and idx:
+            on_progress(idx, len(pieces))  # pieces finished so far (jobs report progress)
         if piece.status == "failed":
             continue
         with cache.lock(piece.hash):
@@ -246,6 +248,8 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
                 piece.status = "failed"
                 cache.put_failure(req.scope, piece.hash, tried + qa.max_attempts)
 
+    if on_progress is not None:
+        on_progress(len(pieces), len(pieces))
     failed = [p for p in pieces if p.status != "pass"]
     report: dict = {
         "engine": engine.provider, "model": engine.model_id, "scope": req.scope,

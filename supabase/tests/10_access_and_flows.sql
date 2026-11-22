@@ -1104,4 +1104,116 @@ select tests.expect_count('select * from audio_segments where center_id is null'
 :as_superuser
 select tests.assert((select count(*) from storage.buckets where id in ('listening-audio', 'library-audio', 'library-podcasts', 'audio-segments') and not public) = 3, 'buckets: three private, podcasts public');
 
+\echo '30. audio jobs'
+:as_superuser
+grant usage on schema tests to service_role;
+\set as_service_role 'reset role; select set_config(''request.jwt.claims'', '''', false); set role service_role;'
+select repeat('1', 64) as tok1, repeat('2', 64) as tok2, repeat('3', 64) as tok3, repeat('4', 64) as tok4,
+       repeat('a', 64) as idem1, repeat('b', 64) as idem2, repeat('c', 64) as idem3, repeat('d', 64) as idem4,
+       :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000001.mp3' as jp1,
+       :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000002.mp3' as jp2,
+       :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000003.mp3' as jp3,
+       :'center_b' || '/bbbbbbbb-0000-4000-8000-000000000001.mp3' as jpb \gset
+-- who may start a job, and only where that recording belongs
+:as_mentor
+select (enqueue_audio_job(:'center_a', 'homework', 'chatterbox-turbo', 'listening-audio', :'jp1', :'idem1', :'tok1'))->>'id' as job1 \gset
+select tests.assert(enqueue_audio_job(:'center_a', 'homework', 'chatterbox-turbo', 'listening-audio', :'jp1', :'idem1', :'tok1') =
+  jsonb_build_object('id', :'job1', 'status', 'queued', 'created', false, 'target_path', :'jp1'), 'same request twice -> same job (idempotent)');
+select tests.expect_fail(format($$select enqueue_audio_job(%L, 'homework', 'chatterbox', 'listening-audio', %L, %L, %L)$$, :'center_a', :'jpb', :'idem2', :'tok2'), 'bad target');
+select tests.expect_fail(format($$select enqueue_audio_job(%L, 'homework', 'chatterbox', 'library-audio', %L, %L, %L)$$, :'center_a', :'jp2', :'idem2', :'tok2'), 'bad target');
+select tests.expect_fail(format($$select enqueue_audio_job(%L, 'homework', 'fish', 'listening-audio', %L, %L, %L)$$, :'center_a', :'jp2', :'idem2', :'tok2'), 'unknown voice engine');
+select tests.expect_fail(format($$select enqueue_audio_job(%L, 'homework', 'chatterbox', 'listening-audio', %L, %L, %L)$$, :'center_b', :'jpb', :'idem2', :'tok2'), 'forbidden');
+select tests.expect_fail($$select enqueue_audio_job(null, 'podcast', 'chatterbox', 'library-podcasts', 'podcasts/aaaaaaaa-0000-4000-8000-0000000000aa.mp3', repeat('e', 64), repeat('5', 64))$$, 'forbidden');
+select tests.expect_count('select * from audio_jobs', 1);
+:as_student
+select tests.expect_fail(format($$select enqueue_audio_job(%L, 'homework', 'chatterbox', 'listening-audio', %L, %L, %L)$$, :'center_a', :'jp2', :'idem2', :'tok2'), 'forbidden');
+select tests.expect_count('select * from audio_jobs', 0);
+:as_parent
+select tests.expect_count('select * from audio_jobs', 0);
+:as_ownerB
+select tests.expect_count('select * from audio_jobs', 0);
+select tests.expect_fail(format($$select review_audio_job(%L, true)$$, :'job1'), 'forbidden');
+select tests.expect_fail(format($$select retry_audio_job(%L, %L, %L)$$, :'job1', :'tok3', :'jp2'), 'forbidden');
+:as_anon
+select tests.expect_fail($$select * from audio_jobs$$, 'permission denied');
+-- the token and the worker's channel are closed to users
+:as_acad
+select tests.expect_count('select * from audio_jobs', 1);
+select tests.expect_fail('select * from audio_job_tokens', 'permission denied');
+select tests.expect_fail(format($$select audio_job_update(%L, %L, 1, 'completed', 100)$$, :'job1', :'tok1'), 'permission denied');
+select tests.expect_fail(format($$update audio_jobs set status = 'completed' where id = %L$$, :'job1'), 'permission denied');
+
+-- library jobs: platform admins only, into the library buckets
+:as_ownerA
+select (enqueue_audio_job(null, 'test', 'chatterbox', 'library-audio', format('tests/%s/aaaaaaaa-0000-4000-8000-0000000000b1.mp3', :'lt'), :'idem3', :'tok3'))->>'id' as jobt \gset
+select tests.expect_fail(format($$select enqueue_audio_job(null, 'test', 'chatterbox', 'library-audio', 'tests/%s/aaaaaaaa-0000-4000-8000-0000000000b2.mp3', %L, %L)$$, gen_random_uuid(), :'idem4', :'tok4'), 'bad target');
+select (enqueue_audio_job(null, 'podcast', 'qwen', 'library-podcasts', 'podcasts/aaaaaaaa-0000-4000-8000-0000000000c1.mp3', :'idem4', :'tok4'))->>'id' as jobp \gset
+:as_mentor
+select tests.expect_count('select * from audio_jobs where center_id is null', 0);
+
+-- the worker's reports (service role, with the job's token)
+:as_service_role
+select tests.expect_fail(format($$select audio_job_update(%L, %L, 1, 'processing', 10)$$, :'job1', :'tok2'), 'unknown job or token');
+select tests.assert((audio_job_update(:'job1', :'tok1', 1, 'processing', 40, 4, 10))->>'applied' = 'true', 'progress accepted');
+select audio_job_update(:'job1', :'tok1', 1, 'processing', 20, 2, 10);
+select tests.assert((select progress = 40 and segments_done = 4 and status = 'processing' and lease_until > now() from audio_jobs where id = :'job1'), 'progress never goes back');
+select tests.expect_fail(format($$select audio_job_update(%L, %L, 1, 'completed', 100, 10, 10, 412.5)$$, :'job1', :'tok1'), 'not in storage');
+select tests.expect_fail(format($$select audio_job_update(%L, %L, 1, 'queued', 0)$$, :'job1', :'tok1'), 'bad status');
+:as_superuser
+insert into storage.objects (bucket_id, name, owner) values ('listening-audio', :'jp1', '00000000-0000-0000-0000-0000000000a4');
+:as_service_role
+select tests.assert((audio_job_update(:'job1', :'tok1', 1, 'completed', 100, 10, 10, 412.5, '{"status":"pass","wer":0.004}'))->>'applied' = 'true', 'completed');
+select tests.assert((audio_job_update(:'job1', :'tok1', 1, 'completed', 100))->>'applied' = 'false', 'a repeated report changes nothing');
+select tests.assert((audio_job_update(:'job1', :'tok1', 1, 'failed', 0, null, null, null, null, 'late'))->>'applied' = 'false', 'a finished job stays finished');
+:as_superuser
+select tests.assert((select status = 'completed' and progress = 100 and seconds = 412.5 and finished_at is not null and error is null from audio_jobs where id = :'job1'), 'job1 completed once');
+-- the finished recording is the mentor's file in the existing bucket: students hear it through the existing rules only
+:as_student
+select tests.expect_count(format('select * from storage.objects where name = %L', :'jp1'), 0);
+
+-- manual review of flagged recordings
+:as_mentor
+select (enqueue_audio_job(:'center_a', 'homework', 'chatterbox', 'listening-audio', :'jp2', :'idem2', :'tok2'))->>'id' as job2 \gset
+select tests.expect_fail(format($$select review_audio_job(%L, true)$$, :'job2'), 'waiting for review');
+:as_superuser
+insert into storage.objects (bucket_id, name, owner) values ('listening-audio', :'jp2', '00000000-0000-0000-0000-0000000000a4');
+:as_service_role
+select audio_job_update(:'job2', :'tok2', 1, 'needs_review', 100, 8, 8, 60, '{"status":"needs_review","problems":["recording WER 4% > 3%"]}');
+:as_ownerB
+select tests.expect_fail(format($$select review_audio_job(%L, true)$$, :'job2'), 'forbidden');
+:as_acad
+select tests.assert(review_audio_job(:'job2', true) = 'completed', 'a colleague approves after listening');
+select tests.assert((select reviewed_by = '00000000-0000-0000-0000-0000000000a3' from audio_jobs where id = :'job2'), 'reviewer recorded');
+
+-- retry: only stopped jobs, new token and file, limited attempts; old reports are ignored
+:as_mentor
+select (enqueue_audio_job(:'center_a', 'homework', 'qwen', 'listening-audio', :'jp3', repeat('f', 64), repeat('6', 64)))->>'id' as job3 \gset
+select tests.expect_fail(format($$select retry_audio_job(%L, %L, %L)$$, :'job3', repeat('7', 64), :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000004.mp3'), 'not stopped');
+:as_service_role
+select audio_job_update(:'job3', repeat('6', 64), 1, 'failed', 0, null, null, null, null, 'GPU out of memory');
+:as_mentor
+select tests.assert(retry_audio_job(:'job3', repeat('7', 64), :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000004.mp3') = 2, 'second attempt');
+select tests.expect_fail(format($$select retry_audio_job(%L, %L, %L)$$, :'job3', repeat('8', 64), :'jpb'), 'not stopped');
+:as_service_role
+select tests.expect_fail(format($$select audio_job_update(%L, %L, 2, 'processing', 5)$$, :'job3', repeat('6', 64)), 'unknown job or token');
+select tests.assert((audio_job_update(:'job3', repeat('7', 64), 1, 'processing', 50))->>'applied' = 'false', 'an older attempt is ignored');
+select tests.assert((audio_job_update(:'job3', repeat('7', 64), 2, 'processing', 10))->>'applied' = 'true', 'current attempt accepted');
+-- a worker that goes quiet: the job is failed after its lease, then retried until attempts run out
+:as_superuser
+update audio_jobs set lease_until = now() - interval '1 minute' where id = :'job3';
+select tests.assert(app.expire_audio_jobs() >= 1, 'stalled job expired');
+select tests.assert((select status = 'failed' and error like '%stopped responding%' from audio_jobs where id = :'job3'), 'expired job failed');
+:as_mentor
+select retry_audio_job(:'job3', repeat('9', 64), :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000005.mp3');
+:as_service_role
+select audio_job_update(:'job3', repeat('9', 64), 3, 'failed', 0, null, null, null, null, 'again');
+:as_mentor
+select tests.expect_fail(format($$select retry_audio_job(%L, %L, %L)$$, :'job3', repeat('0', 64), :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000006.mp3'), 'no attempts left');
+-- at most three running jobs per person
+:as_ownerA
+select enqueue_audio_job(null, 'podcast', 'chatterbox', 'library-podcasts', 'podcasts/aaaaaaaa-0000-4000-8000-0000000000c2.mp3', repeat('0', 63) || '1', repeat('1', 63) || '2');
+select tests.expect_fail($$select enqueue_audio_job(null, 'podcast', 'chatterbox', 'library-podcasts', 'podcasts/aaaaaaaa-0000-4000-8000-0000000000c3.mp3', repeat('0', 63) || '2', repeat('1', 63) || '3')$$, 'already running');
+:as_superuser
+select tests.assert((select count(*) from audio_jobs) = 6, 'six jobs in all');
+
 \echo 'ALL TESTS PASSED'
