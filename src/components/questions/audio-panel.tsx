@@ -17,7 +17,14 @@ export type StudioJobs = {
   result: (jobId: string) => Promise<{ status: string; path?: string; url?: string; seconds?: number; qa?: unknown; error?: string }>;
   review: (jobId: string, approve: boolean) => Promise<{ status?: string; error?: string }>;
   retry: (jobId: string, script: string, cast: Cast) => Promise<{ error?: string }>;
+  /** The editor's slot's earlier recording that the draft does not hold yet (after the page was closed). */
+  recover: (script: string, audioPath?: string) => Promise<RecoveredStudioJob | null>;
+  /** Marks a completed recording as put into the draft (once) and returns its file. */
+  attach: (jobId: string) => Promise<{ path?: string; error?: string }>;
+  dismiss: (jobId: string) => Promise<{ error?: string }>;
 };
+
+export type RecoveredStudioJob = { id: string; provider: string; status: string; attached: boolean; sameScript: boolean; startedAt: string };
 
 /**
  * Generates the recording for a listening script and previews it.
@@ -27,6 +34,11 @@ export type StudioJobs = {
  * admins), the admin picks an engine; Fish still records directly, and the
  * open-source engines run as a job with live progress, automatic QA and,
  * when QA flags something, a listen-and-approve step.
+ *
+ * Jobs survive the page: on opening, the panel asks for its slot's newest
+ * recording the draft does not hold yet and follows it again. A recording
+ * started here goes into the draft when it completes; one found again is
+ * offered ("Use this recording"), so nothing is re-recorded or re-charged.
  */
 export function AudioPanel({ script, audioPath, initialUrl, voices, record, onChange, engines, jobs, onSeconds }: {
   script: string; audioPath?: string; initialUrl?: string; voices: Voice[];
@@ -50,13 +62,38 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
   const [jobId, setJobId] = useState<string>();
   const [jobNonce, setJobNonce] = useState(0);
   const [review, setReview] = useState<{ path: string; problems: string[] }>();
+  const [recovered, setRecovered] = useState<RecoveredStudioJob>();
+  const [offer, setOffer] = useState<{ path: string; url?: string; seconds?: number }>();
   const job = useAudioJob(jobId, jobNonce);
+  const asked = useRef(false);
   const handled = useRef<string>("");
   const running = Boolean(job && (job.status === "queued" || job.status === "processing"));
   const busy = pending || running;
   const stale = audioPath && madeFrom !== undefined && madeFrom !== script;
 
-  // A finished job: fetch its file once; approved ones go straight into the draft.
+  // Once per opening: find a recording made for this slot while the page was closed.
+  useEffect(() => {
+    if (asked.current || !jobs) return;
+    asked.current = true;
+    void jobs.recover(script, audioPath).then((r) => {
+      if (!r) return;
+      setRecovered(r);
+      setJobId(r.id);
+      setJobNonce((n) => n + 1);
+      if (engines?.some((e) => e.id === r.provider)) setEngineId(r.provider);
+    }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the editor opens
+  }, []);
+
+  const use = (id: string, fallback?: string) => start(async () => {
+    const a = jobs ? await jobs.attach(id) : { error: "Something went wrong. Try again." };
+    if (a.error || !(a.path ?? fallback)) { setError(t(a.error ?? "Something went wrong. Try again.")); return; }
+    setReview(undefined); setOffer(undefined); setRecovered(undefined);
+    setMadeFrom(recovered && !recovered.sameScript ? "" : script);
+    onChange(a.path ?? fallback);
+  });
+
+  // A finished job: fetch its file once; one started here goes into the draft, one found again is offered.
   useEffect(() => {
     if (!jobId || !job || !jobs) return;
     const key = `${jobId}:${job.attempts}:${job.status}`;
@@ -67,18 +104,33 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
       if (!r.path) { setError(t(r.error ?? "Something went wrong. Try again.")); return; }
       setUrl(r.url);
       if (r.seconds) onSeconds?.(r.seconds);
-      if (job.status === "completed") { setReview(undefined); setMadeFrom(script); onChange(r.path); return; }
+      if (job.status === "completed") {
+        if (recovered) { setOffer({ path: r.path, url: r.url, seconds: r.seconds }); return; }
+        const path = r.path;
+        void jobs.attach(jobId).then((a) => {
+          if (a.error) { setError(t(a.error)); return; }
+          setReview(undefined); setMadeFrom(script); onChange(a.path ?? path);
+        });
+        return;
+      }
       const qa = (r.qa ?? {}) as { problems?: unknown };
       setReview({ path: r.path, problems: Array.isArray(qa.problems) ? qa.problems.map(String) : [] });
     });
-  }, [job, jobId, jobs, onChange, onSeconds, script, t]);
+  }, [job, jobId, jobs, onChange, onSeconds, recovered, script, t]);
+
+  // The admin chose another recording: the old finished one is not offered again.
+  const forget = () => {
+    if (jobId && jobs && job && !(job.status === "queued" || job.status === "processing")) void jobs.dismiss(jobId).catch(() => undefined);
+    setRecovered(undefined); setOffer(undefined); setReview(undefined); setJobId(undefined);
+  };
 
   const go = () => start(async () => {
     setError(undefined);
     setReview(undefined);
+    if (offer || (job && job.status !== "queued" && job.status !== "processing")) forget();
     if (engine?.async && jobs) {
       const r = await jobs.start(engine.id, script, cast);
-      if (r.jobId) { setJobId(r.jobId); setJobNonce((n) => n + 1); }
+      if (r.jobId) { setRecovered(undefined); setJobId(r.jobId); setJobNonce((n) => n + 1); }
       if (r.error) setError(t(r.error));
       return;
     }
@@ -126,10 +178,23 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
       {running && job && (
         <div className="space-y-1">
           <div className="h-1.5 overflow-hidden rounded-full bg-border/60"><div className="h-full bg-primary transition-all" style={{ width: `${Math.max(3, job.progress)}%` }} /></div>
-          <p className="text-[12px] text-muted-foreground">{t("Keep this page open until the recording finishes.")}</p>
+          <p className="text-[12px] text-muted-foreground">{t("You can close this page: the recording continues and is offered here when you come back.")}</p>
         </div>
       )}
       {url && <audio controls src={url} className="w-full" />}
+      {recovered && (
+        <p className="text-[12.5px] text-muted-foreground">
+          {t("Found a recording started earlier for this part.")}{" "}
+          {!recovered.sameScript && <span className="text-[#9A5B1E]">{t("It was made from an earlier version of the script.")}</span>}
+        </p>
+      )}
+      {offer && jobId && jobs && (
+        <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-border/70 bg-white/60 p-3 text-[12.5px]">
+          <span className="mr-auto">{t("This recording finished while the page was closed. Listen, then use it or dismiss it.")}</span>
+          <button type="button" className={buttonPrimary} disabled={pending} onClick={() => use(jobId, offer.path)}>{t("Use this recording")}</button>
+          <button type="button" className={buttonSecondary} disabled={pending} onClick={() => { forget(); setUrl(initialUrl); }}>{t("Dismiss")}</button>
+        </div>
+      )}
       {review && jobId && jobs && (
         <div className="space-y-2 rounded-[10px] border border-[#E8C9A0] bg-[#FFF6EA] p-3 text-[12.5px]">
           <p>{t("The automatic check flagged this recording. Listen to it, then approve or reject it.")}</p>
@@ -138,11 +203,14 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
             <button type="button" className={buttonPrimary} disabled={pending} onClick={() => start(async () => {
               const r = await jobs.review(jobId, true);
               if (r.error) { setError(t(r.error)); return; }
-              const path = review.path; setReview(undefined); setMadeFrom(script); onChange(path);
+              const a = await jobs.attach(jobId);
+              if (a.error) { setError(t(a.error)); return; }
+              const path = a.path ?? review.path; setReview(undefined); setRecovered(undefined);
+              setMadeFrom(recovered && !recovered.sameScript ? "" : script); onChange(path);
             })}>{t("Approve")}</button>
             <button type="button" className={buttonSecondary} disabled={pending} onClick={() => start(async () => {
               const r = await jobs.review(jobId, false);
-              if (r.error) setError(t(r.error)); else { setReview(undefined); setUrl(initialUrl); }
+              if (r.error) setError(t(r.error)); else { setReview(undefined); setRecovered(undefined); setUrl(initialUrl); }
             })}>{t("Reject")}</button>
           </div>
         </div>
@@ -154,9 +222,10 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
             <button type="button" className={buttonSecondary} disabled={pending} onClick={() => start(async () => {
               setError(undefined);
               const r = await jobs.retry(jobId, script, cast);
-              if (r.error) setError(t(r.error)); else setJobNonce((n) => n + 1);
+              if (r.error) setError(t(r.error)); else { setRecovered(undefined); setJobNonce((n) => n + 1); }
             })}>{t("Try again")}</button>
           )}
+          {recovered && <button type="button" className={buttonSecondary} disabled={pending} onClick={forget}>{t("Dismiss")}</button>}
         </div>
       )}
       {stale && <p className="text-[12.5px] text-[#9A5B1E]">{t("The script changed after recording. Record again so they match.")}</p>}

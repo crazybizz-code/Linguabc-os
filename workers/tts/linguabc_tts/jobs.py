@@ -104,13 +104,24 @@ class Http:
             return e.code
 
 
+_QUOTED = re.compile(r"'[^']*'")
+_EXC = re.compile(r"^([A-Za-z_]\w*(?:Error|Exception)):.*$", re.S)
+
+
+def _redact(reason: str) -> str:
+    """A segment reason without the words of the script (they can be answers)."""
+    return _EXC.sub(r"\1", _QUOTED.sub("'…'", str(reason)))[:200]
+
+
 def qa_summary(report: dict) -> dict:
-    """What the app keeps about a recording: no script text."""
-    keys = ("status", "wer", "answers_missing", "problems", "failed_segments", "unsupported_expressions",
+    """What the app keeps about a recording: no script text and no answers
+    (answers_missing holds question ids, answers_checked a count)."""
+    keys = ("status", "wer", "answers_missing", "answers_checked", "problems", "failed_segments", "unsupported_expressions",
             "experimental_expressions_used", "expressions_dropped_no_instruct", "duration_s", "loudness", "cache")
     out = {k: report[k] for k in keys if k in report}
     out["review_flags"] = sum(1 for s in report.get("segments", []) if s.get("review"))
-    out["failures"] = [{"n": i + 1, "reasons": s.get("reasons", [])[:3]} for i, s in enumerate(report.get("segments", [])) if s.get("status") != "pass"][:10]
+    out["problems"] = [_redact(p) for p in out.get("problems", [])]
+    out["failures"] = [{"n": i + 1, "reasons": [_redact(r) for r in s.get("reasons", [])[:3]]} for i, s in enumerate(report.get("segments", [])) if s.get("status") != "pass"][:10]
     out["manual_review_required"] = True
     return out
 

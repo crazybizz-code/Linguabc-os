@@ -94,6 +94,34 @@ export const callbackSchema = z.object({
 });
 export type Callback = z.infer<typeof callbackSchema>;
 
+/** One question's accepted answers (gap questions), checked against the recording. */
+export type AnswerCheck = { id: string; accepted: string[] };
+
+export const MAX_ANSWER_CHECKS = 60;
+const ANSWER_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Validates answers from the editor; null if anything is malformed. Empty answers are dropped. */
+export function cleanAnswers(raw: unknown): AnswerCheck[] | null {
+  if (raw == null) return [];
+  if (!Array.isArray(raw) || raw.length > MAX_ANSWER_CHECKS) return null;
+  const out: AnswerCheck[] = [];
+  const ids = new Set<string>();
+  for (const a of raw) {
+    if (!a || typeof a !== "object") return null;
+    const { id, accepted } = a as { id?: unknown; accepted?: unknown };
+    if (typeof id !== "string" || !ANSWER_ID.test(id) || ids.has(id) || !Array.isArray(accepted)) return null;
+    if (accepted.length > 10 || accepted.some((v) => typeof v !== "string" || v.length > 100)) return null;
+    const forms = [...new Set((accepted as string[]).map((v) => v.trim()).filter(Boolean))];
+    if (!forms.length) continue;
+    ids.add(id);
+    out.push({ id, accepted: forms.slice(0, 5) });
+  }
+  return out;
+}
+
+/** A fingerprint of the answers for the idempotency key (the answers themselves are not stored). */
+export const answersHash = (answers: AnswerCheck[]) => sha256(JSON.stringify(answers.map((a) => [a.id, a.accepted])));
+
 export type JobRequest = {
   version: 1;
   job_id: string;
@@ -102,7 +130,8 @@ export type JobRequest = {
   scope: string;
   language: "English";
   plan: unknown[];
-  checks: { answers: string[][] };
+  /** The answer key, for the worker's ASR check only: it reports ids it did not hear, never the answers. */
+  checks: { answers: AnswerCheck[] };
   upload: { url: string; content_type: "audio/mpeg" };
   callback: { url: string; token: string };
 };

@@ -25,7 +25,7 @@ const token = newToken();
 const job = { version: 1, job_id: crypto.randomUUID(), attempt: 1, engine: "chatterbox-turbo", scope: "platform", language: "English",
   plan: [{ kind: "speech", speaker: "A", voice: "Ryan", text: "The coach leaves at 7:45 from platform 9." }, { kind: "pause", seconds: 0.4 },
          { kind: "speech", speaker: "B", voice: "Aiden", text: "Thank you, that is very helpful." }],
-  checks: { answers: [] }, upload: { url: "http://127.0.0.1:8766/upload/x.mp3", content_type: "audio/mpeg" },
+  checks: { answers: [{ id: "3", accepted: ["7:45"] }, { id: "4", accepted: ["platform 9", "9"] }] }, upload: { url: "http://127.0.0.1:8766/upload/x.mp3", content_type: "audio/mpeg" },
   callback: { url: "http://127.0.0.1:8766/callback", token } };
 const body = JSON.stringify(job);
 const res = await fetch(`${WORKER}/jobs`, { method: "POST", headers: signedHeaders(body, SECRET), body });
@@ -38,5 +38,8 @@ const last = reports.at(-1);
 assert.ok(reports.length >= 2 && reports.every((r) => r.ok && r.valid && r.engine === "chatterbox-turbo"), "every report signed and well formed");
 assert.equal(last.data.status, "completed");
 assert.equal(last.data.token, token);
+assert.equal(last.data.qa.answers_checked, 2);
+assert.deepEqual(last.data.qa.answers_missing, []);
+assert.ok(!JSON.stringify(reports.map((r) => r.data)).includes("7:45"), "answers never come back");
 assert.ok(upload && upload.bytes > 1000 && upload.type === "audio/mpeg" && upload.first === 0xff, "MP3 uploaded before the result");
 console.log(JSON.stringify({ reports: reports.map((r) => [r.data.status, r.data.progress]), upload_bytes: upload.bytes, result_seconds: last.data.seconds }));

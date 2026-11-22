@@ -27,6 +27,16 @@
 --   * The same request twice (same user, same idempotency key) returns the
 --     same job, so a double click never pays or records twice.
 --   * Fish recordings do not use jobs: they keep the existing direct path.
+--   * Recovery: each job names the draft slot it was made for (draft_key,
+--     e.g. test:<id>:<section>) and a hash of its script, so an editor that
+--     was closed finds its running or finished job again. attach_audio_job
+--     marks a finished recording as put into the draft (idempotent);
+--     dismiss_audio_job hides one the editor does not want.
+--   * Answer-bearing QA: the app sends the answer key to the worker with the
+--     job (never stored here); the worker reports only question ids that it
+--     could not hear. If answers were expected and not all were checked and
+--     heard, a "completed" report is stored as needs_review: a person must
+--     listen before the recording is used.
 -- =====================================================================
 
 create table public.audio_jobs (
@@ -38,6 +48,11 @@ create table public.audio_jobs (
   target_bucket   text not null check (target_bucket in ('listening-audio', 'library-audio', 'library-podcasts')),
   target_path     text not null,
   idempotency_key text not null check (idempotency_key ~ '^[0-9a-f]{64}$'),
+  draft_key       text not null check (draft_key ~ '^(test:[0-9a-f-]{36}:[0-9]{1,2}|podcast:[A-Za-z0-9_-]{1,64}|homework:[A-Za-z0-9_-]{1,64})$'),
+  script_hash     text not null check (script_hash ~ '^[0-9a-f]{64}$'),
+  answers_expected int not null default 0 check (answers_expected between 0 and 200),
+  attached_at     timestamptz,
+  dismissed_at    timestamptz,
   status          text not null default 'queued' check (status in ('queued', 'processing', 'completed', 'failed', 'needs_review')),
   progress        int  not null default 0 check (progress between 0 and 100),
   segments_done   int  not null default 0 check (segments_done >= 0),
@@ -60,6 +75,7 @@ create table public.audio_jobs (
 create index audio_jobs_center_idx on public.audio_jobs (center_id, created_at desc);
 create index audio_jobs_active_idx on public.audio_jobs (status, lease_until) where status in ('queued', 'processing');
 create index audio_jobs_reviewed_by_idx on public.audio_jobs (reviewed_by);
+create index audio_jobs_draft_idx on public.audio_jobs (draft_key, created_at desc);
 
 -- The callback token's hash, out of reach of every API role.
 create table public.audio_job_tokens (
@@ -89,8 +105,18 @@ returns boolean language sql stable security definer set search_path = '' as $$
     else false end;
 $$;
 
-revoke execute on function app.can_make_audio_job(uuid, text), app.audio_job_target_ok(uuid, text, text, text) from public, anon;
-grant execute on function app.can_make_audio_job(uuid, text), app.audio_job_target_ok(uuid, text, text, text) to authenticated, service_role;
+-- The draft slot must belong to the same recording as the target file.
+create function app.audio_job_draft_ok(p_purpose text, p_draft_key text, p_path text)
+returns boolean language sql immutable set search_path = '' as $$
+  select case p_purpose
+    when 'test' then split_part(p_draft_key, ':', 2) = split_part(p_path, '/', 2)
+    when 'podcast' then p_draft_key like 'podcast:%'
+    when 'homework' then p_draft_key like 'homework:%'
+    else false end;
+$$;
+
+revoke execute on function app.can_make_audio_job(uuid, text), app.audio_job_target_ok(uuid, text, text, text), app.audio_job_draft_ok(text, text, text) from public, anon;
+grant execute on function app.can_make_audio_job(uuid, text), app.audio_job_target_ok(uuid, text, text, text), app.audio_job_draft_ok(text, text, text) to authenticated, service_role;
 
 alter table public.audio_jobs enable row level security;
 create policy audio_jobs_select on public.audio_jobs for select to authenticated
@@ -105,7 +131,8 @@ create trigger audio_jobs_touch before update on public.audio_jobs for each row 
 
 -- Start (or find) a job. p_token_hash: SHA-256 (hex) of the random callback token the app gives the worker.
 create function public.enqueue_audio_job(
-  p_center uuid, p_purpose text, p_provider text, p_bucket text, p_path text, p_idempotency_key text, p_token_hash text)
+  p_center uuid, p_purpose text, p_provider text, p_bucket text, p_path text, p_idempotency_key text, p_token_hash text,
+  p_draft_key text, p_script_hash text, p_answers_expected int default 0)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v public.audio_jobs;
@@ -114,6 +141,7 @@ begin
   if p_provider not in ('chatterbox-turbo', 'chatterbox', 'qwen') then raise exception 'unknown voice engine'; end if;
   if not app.audio_job_target_ok(p_center, p_purpose, p_bucket, p_path) then raise exception 'bad target for this recording'; end if;
   if p_token_hash !~ '^[0-9a-f]{64}$' then raise exception 'bad token'; end if;
+  if not app.audio_job_draft_ok(p_purpose, p_draft_key, p_path) then raise exception 'bad draft for this recording'; end if;
 
   select * into v from public.audio_jobs where created_by = auth.uid() and idempotency_key = p_idempotency_key;
   if found then
@@ -123,8 +151,10 @@ begin
     raise exception 'Three recordings are already running. Wait for one to finish.';
   end if;
 
-  insert into public.audio_jobs (center_id, created_by, purpose, provider, target_bucket, target_path, idempotency_key)
-  values (p_center, auth.uid(), p_purpose, p_provider, p_bucket, p_path, p_idempotency_key)
+  insert into public.audio_jobs (center_id, created_by, purpose, provider, target_bucket, target_path, idempotency_key,
+                                 draft_key, script_hash, answers_expected)
+  values (p_center, auth.uid(), p_purpose, p_provider, p_bucket, p_path, p_idempotency_key,
+          p_draft_key, p_script_hash, coalesce(p_answers_expected, 0))
   returning * into v;
   insert into public.audio_job_tokens (job_id, token_hash) values (v.id, p_token_hash);
   return jsonb_build_object('id', v.id, 'status', v.status, 'created', true, 'target_path', v.target_path);
@@ -165,6 +195,14 @@ begin
   if p_status in ('completed', 'needs_review') then
     if not exists (select 1 from storage.objects where bucket_id = v.target_bucket and name = v.target_path) then
       raise exception 'the recording is not in storage';
+    end if;
+    -- Answer-bearing QA: expected answers must all have been checked and heard,
+    -- otherwise a person reviews it (never completed automatically).
+    if p_status = 'completed' and v.answers_expected > 0 and (
+         coalesce((p_qa->>'answers_checked')::int, 0) < v.answers_expected
+         or jsonb_typeof(p_qa->'answers_missing') is distinct from 'array'
+         or jsonb_array_length(p_qa->'answers_missing') > 0) then
+      p_status := 'needs_review';
     end if;
     update public.audio_jobs set status = p_status, progress = 100,
       segments_done = coalesce(p_segments_done, segments_total, segments_done),
@@ -208,12 +246,39 @@ begin
   end if;
   if v.attempts >= v.max_attempts then raise exception 'no attempts left for this recording'; end if;
   if p_token_hash !~ '^[0-9a-f]{64}$' then raise exception 'bad token'; end if;
-  if not app.audio_job_target_ok(v.center_id, v.purpose, v.target_bucket, p_path) then raise exception 'bad target for this recording'; end if;
+  if not app.audio_job_target_ok(v.center_id, v.purpose, v.target_bucket, p_path)
+     or not app.audio_job_draft_ok(v.purpose, v.draft_key, p_path) then raise exception 'bad target for this recording'; end if;
   update public.audio_jobs set status = 'queued', attempts = attempts + 1, progress = 0, segments_done = 0,
-    target_path = p_path, error = null, qa = null, seconds = null, lease_until = null, started_at = null, finished_at = null
+    target_path = p_path, error = null, qa = null, seconds = null, lease_until = null, started_at = null, finished_at = null,
+    attached_at = null, dismissed_at = null
   where id = v.id;
   update public.audio_job_tokens set token_hash = p_token_hash where job_id = v.id;
   return v.attempts + 1;
+end $$;
+
+-- A finished recording was put into its draft (repeat calls change nothing).
+create function public.attach_audio_job(p_job uuid)
+returns text language plpgsql security definer set search_path = '' as $$
+declare
+  v public.audio_jobs;
+begin
+  select * into v from public.audio_jobs where id = p_job for update;
+  if not found or auth.uid() is null or not app.can_make_audio_job(v.center_id, v.purpose) then raise exception 'forbidden'; end if;
+  if v.status <> 'completed' then raise exception 'only a completed recording can be used'; end if;
+  update public.audio_jobs set attached_at = coalesce(attached_at, now()), dismissed_at = null where id = v.id;
+  return v.target_path;
+end $$;
+
+-- The editor does not want this finished (or failed) recording offered again.
+create function public.dismiss_audio_job(p_job uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v public.audio_jobs;
+begin
+  select * into v from public.audio_jobs where id = p_job for update;
+  if not found or auth.uid() is null or not app.can_make_audio_job(v.center_id, v.purpose) then raise exception 'forbidden'; end if;
+  if v.status in ('queued', 'processing') then raise exception 'this recording is still running'; end if;
+  update public.audio_jobs set dismissed_at = coalesce(dismissed_at, now()) where id = v.id;
 end $$;
 
 -- Jobs whose worker went quiet are failed, so they can be retried.
@@ -226,10 +291,12 @@ begin
   return n;
 end $$;
 
-revoke execute on function public.enqueue_audio_job(uuid, text, text, text, text, text, text),
-  public.review_audio_job(uuid, boolean), public.retry_audio_job(uuid, text, text) from public, anon;
-grant execute on function public.enqueue_audio_job(uuid, text, text, text, text, text, text),
-  public.review_audio_job(uuid, boolean), public.retry_audio_job(uuid, text, text) to authenticated;
+revoke execute on function public.enqueue_audio_job(uuid, text, text, text, text, text, text, text, text, int),
+  public.review_audio_job(uuid, boolean), public.retry_audio_job(uuid, text, text),
+  public.attach_audio_job(uuid), public.dismiss_audio_job(uuid) from public, anon;
+grant execute on function public.enqueue_audio_job(uuid, text, text, text, text, text, text, text, text, int),
+  public.review_audio_job(uuid, boolean), public.retry_audio_job(uuid, text, text),
+  public.attach_audio_job(uuid), public.dismiss_audio_job(uuid) to authenticated;
 revoke execute on function public.audio_job_update(uuid, text, int, text, int, int, int, numeric, jsonb, text) from public, anon, authenticated;
 grant execute on function public.audio_job_update(uuid, text, int, text, int, int, int, numeric, jsonb, text) to service_role;
 revoke execute on function app.expire_audio_jobs() from public, anon, authenticated;

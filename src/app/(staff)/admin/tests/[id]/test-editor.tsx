@@ -13,7 +13,9 @@ import { frameListening, hasFrame } from "@/lib/ai/listening-frame";
 import type { QuestionType } from "@/lib/questions";
 import { QuestionEditor, questionProblem, TYPE_ORDER, typeLabel } from "../../../homework/new/question-editor";
 import { deleteTest, draftSection, recordSection, saveTest, setTestStatus, type TestDraft } from "../actions";
-import { retryStudioJob, reviewStudioJob, startStudioJob, studioJobResult } from "../../audio-jobs/actions";
+import {
+  attachStudioJob, dismissStudioJob, recoverStudioJob, retryStudioJob, reviewStudioJob, startStudioJob, studioJobResult,
+} from "../../audio-jobs/actions";
 import type { StudioEngineOption, StudioJobs } from "@/components/questions/audio-panel";
 
 const area = `${inputClass} h-auto py-2 leading-relaxed`;
@@ -111,9 +113,15 @@ function SectionCard({ index, section: s, first, testId, skill, level, voices, e
   index: number; section: Section; first: number; testId: string; skill: TestDraft["skill"]; level: Level;
   voices: Voice[]; engines?: StudioEngineOption[]; audioUrl?: string; locked: boolean; busy: boolean; onChange: (patch: Partial<Section>) => void;
 }) {
+  // The section's answer key goes with its recording job, for the worker's check only
+  // (gap questions' accepted answers, numbered as students see them; nothing comes back but numbers).
+  const answers = s.questions.flatMap((q, k) => (q.type === "gap" && q.accepted?.some((v) => v.trim()) ? [{ id: String(first + k), accepted: q.accepted }] : []));
+  const target = { kind: "test" as const, testId, section: index };
   const jobs: StudioJobs = {
-    start: (engine, script, cast) => startStudioJob(engine, script, cast, { kind: "test", testId }),
-    result: studioJobResult, review: reviewStudioJob, retry: retryStudioJob,
+    start: (engine, script, cast) => startStudioJob(engine, script, cast, target, answers),
+    retry: (jobId, script, cast) => retryStudioJob(jobId, script, cast, answers),
+    recover: (script, audioPath) => recoverStudioJob(target, script, audioPath),
+    result: studioJobResult, review: reviewStudioJob, attach: attachStudioJob, dismiss: dismissStudioJob,
   };
   const t = useT();
   const [topic, setTopic] = useState("");

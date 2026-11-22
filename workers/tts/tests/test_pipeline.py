@@ -127,7 +127,8 @@ def test_missing_answer_needs_review(tmp_path):
     engine, asr, cache = setup(tmp_path)
     res = render(request(LINES, answers=[["platform four"]]), engine, asr, cache)
     assert res.ok and res.report["status"] == "needs_review"
-    assert res.report["answers_missing"] == [["platform four"]]
+    assert res.report["answers_missing"] == ["1"] and res.report["answers_checked"] == 1
+    assert "platform four" not in json.dumps(res.report["problems"])  # ids only, never the answer
 
 
 def test_unknown_voice_fails(tmp_path):

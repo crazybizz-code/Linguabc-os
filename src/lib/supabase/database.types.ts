@@ -164,6 +164,11 @@ export type Database = {
           target_bucket: string
           target_path: string
           idempotency_key: string
+          draft_key: string
+          script_hash: string
+          answers_expected: number
+          attached_at: string | null
+          dismissed_at: string | null
           status: string
           progress: number
           segments_done: number
@@ -2174,7 +2179,10 @@ export type Database = {
       center_report: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       remind_payment: { Args: { p_invoice: string }; Returns: number }
       enqueue_audio_job: {
-        Args: { p_center: string | null; p_purpose: string; p_provider: string; p_bucket: string; p_path: string; p_idempotency_key: string; p_token_hash: string }
+        Args: {
+          p_center: string | null; p_purpose: string; p_provider: string; p_bucket: string; p_path: string; p_idempotency_key: string; p_token_hash: string
+          p_draft_key: string; p_script_hash: string; p_answers_expected?: number
+        }
         Returns: Json
       }
       audio_job_update: {
@@ -2186,6 +2194,8 @@ export type Database = {
       }
       review_audio_job: { Args: { p_job: string; p_approve: boolean }; Returns: string }
       retry_audio_job: { Args: { p_job: string; p_token_hash: string; p_path: string }; Returns: number }
+      attach_audio_job: { Args: { p_job: string }; Returns: string }
+      dismiss_audio_job: { Args: { p_job: string }; Returns: undefined }
       claim_audio_segment: {
         Args: { p_center: string | null; p_hash: string; p_provider: string; p_model: string; p_voice: string; p_text_bytes: number }
         Returns: Json

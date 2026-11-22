@@ -13,13 +13,18 @@ import { MAX_SCRIPT_CHARS, type Voice } from "@/lib/ai/script";
 import type { QuestionType } from "@/lib/questions";
 import { QuestionEditor, questionProblem, typeLabel } from "../../homework/new/question-editor";
 import { deletePodcast, draftPodcast, recordPodcast, savePodcast, setPodcastStatus, type PodcastSave } from "./actions";
-import { retryStudioJob, reviewStudioJob, startStudioJob, studioJobResult } from "../audio-jobs/actions";
+import {
+  attachStudioJob, dismissStudioJob, recoverStudioJob, retryStudioJob, reviewStudioJob, startStudioJob, studioJobResult,
+} from "../audio-jobs/actions";
 import type { StudioEngineOption, StudioJobs } from "@/components/questions/audio-panel";
 
-const PODCAST_JOBS: StudioJobs = {
-  start: (engine, script, cast) => startStudioJob(engine, script, cast, { kind: "podcast" }),
-  result: studioJobResult, review: reviewStudioJob, retry: retryStudioJob,
-};
+/** Job actions for one podcast's recording (a new podcast's slot is "new" until it is saved). */
+const podcastJobs = (podcastId: string | null): StudioJobs => ({
+  start: (engine, script, cast) => startStudioJob(engine, script, cast, { kind: "podcast", podcastId }),
+  retry: (jobId, script, cast) => retryStudioJob(jobId, script, cast),
+  recover: (script, audioPath) => recoverStudioJob({ kind: "podcast", podcastId }, script, audioPath),
+  result: studioJobResult, review: reviewStudioJob, attach: attachStudioJob, dismiss: dismissStudioJob,
+});
 
 const area = `${inputClass} h-auto py-2 leading-relaxed`;
 const TONE: Record<string, Tone> = { draft: "amber", published: "green", hidden: "neutral" };
@@ -148,7 +153,7 @@ export function PodcastEditor({ id, status, initial, voices, audioUrl, engines }
               return r;
             }}
             onChange={(audioPath) => update({ audioPath })}
-            engines={engines} jobs={PODCAST_JOBS} onSeconds={(seconds) => update({ seconds: Math.round(seconds) })} />
+            engines={engines} jobs={podcastJobs(id)} onSeconds={(seconds) => update({ seconds: Math.round(seconds) })} />
         )}
       </Card>
 

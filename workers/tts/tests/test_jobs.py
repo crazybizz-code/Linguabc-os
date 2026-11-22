@@ -35,7 +35,7 @@ def job_body(**over):
         "plan": [{"kind": "speech", "speaker": "A", "voice": "Ryan", "text": "The course costs £185 in total."},
                  {"kind": "pause", "seconds": 0.4},
                  {"kind": "speech", "speaker": "B", "voice": "Aiden", "text": "Good, I will book it today."}],
-        "checks": {"answers": [["185 pounds"]]},
+        "checks": {"answers": [{"id": "q7", "accepted": ["185 pounds", "£185"]}]},
         "upload": {"url": "https://project.supabase.co/storage/v1/object/upload/sign/library-podcasts/podcasts/x.mp3?token=t", "content_type": "audio/mpeg"},
         "callback": {"url": "https://app.linguabc.xyz/api/audio-jobs/callback", "token": TOKEN},
     }
@@ -145,3 +145,37 @@ def test_http_jobs_endpoint(tmp_path, monkeypatch):
     bad = json.dumps(job_body(engine="qwen")).encode()
     assert c.post("/jobs", content=bad, headers={"X-LinguABC-Timestamp": str(ts), "X-LinguABC-Signature": sign(bad, SECRET, ts)}).status_code == 400
     assert c.get("/health").json()["voices"] == engine.voices()
+
+
+def test_answers_are_checked_but_never_reported(tmp_path):
+    # the answer is said: completed, one answer checked, nothing missing
+    r, _ = runner(tmp_path)
+    r.submit(parse_job(job_body(), "chatterbox-turbo"))
+    r.run_pending()
+    final = r.http.posts[-1][1]
+    assert final["status"] == "completed" and final["qa"]["answers_checked"] == 1 and final["qa"]["answers_missing"] == []
+    # an answer that is not in the recording: needs review, reported by id only
+    r2, _ = runner(tmp_path / "b")
+    r2.submit(parse_job(job_body(checks={"answers": [{"id": "q7", "accepted": ["185 pounds"]},
+                                                        {"id": "q8", "accepted": ["Thursday the 14th", "14 Thursday"]}]}), "chatterbox-turbo"))
+    r2.run_pending()
+    final = r2.http.posts[-1][1]
+    assert final["status"] == "needs_review" and final["qa"]["answers_missing"] == ["q8"] and final["qa"]["answers_checked"] == 2
+    every_report = json.dumps([p[1] for p in r2.http.posts])
+    assert "Thursday" not in every_report and "14th" not in every_report and "185 pounds" not in every_report
+
+
+def test_bad_answer_checks_are_refused():
+    for bad in ([{"id": "q 1", "accepted": ["x"]}], [{"id": "q1", "accepted": []}], [{"id": "q1", "accepted": ["x" * 101]}],
+                [{"id": "q1", "accepted": ["a"]}, {"id": "q1", "accepted": ["b"]}], [{"id": "q1", "accepted": ["a"] * 6}],
+                [{"id": f"q{i}", "accepted": ["a"]} for i in range(61)], "185"):
+        with pytest.raises(BadRequest):
+            parse_job(job_body(checks={"answers": bad}), "chatterbox-turbo")
+
+
+def test_failure_reasons_do_not_carry_script_words():
+    from linguabc_tts.jobs import qa_summary
+    out = qa_summary({"status": "failed", "problems": ["1 answer(s) not heard: questions q3"],
+                      "segments": [{"status": "failed", "reasons": ["not heard: number '23rd of March', name 'Smythe'", "RuntimeError: said Smythe badly"]}]})
+    text = json.dumps(out)
+    assert "Smythe" not in text and "March" not in text and "RuntimeError" in text and "q3" in text

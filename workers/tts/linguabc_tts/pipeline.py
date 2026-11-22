@@ -287,7 +287,10 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
     heard_all = " ".join(p.heard for p in pieces)
     said_all = " ".join(p.text for p in pieces)
     job_wer = round(wer(said_all, heard_all), 4)
-    answers_missing = missing_answers(req.answers, heard_all)
+    # ids only: the report goes back to the app, and answers must not leave the key
+    missing = {id(v) for v in missing_answers(req.answers, heard_all)}
+    ids = req.answer_ids or [str(i + 1) for i in range(len(req.answers))]
+    answers_missing = [ids[i] for i, v in enumerate(req.answers) if id(v) in missing]
     consistency: dict = {}
     if embedder is not None:
         vecs: dict[str, list[np.ndarray]] = {}
@@ -299,7 +302,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
     if job_wer > qa.job_wer_max:
         problems.append(f"recording WER {job_wer:.1%} > {qa.job_wer_max:.0%}")
     if answers_missing:
-        problems.append("answers not heard: " + "; ".join("/".join(a) for a in answers_missing))
+        problems.append(f"{len(answers_missing)} answer(s) not heard: questions " + ", ".join(answers_missing))
     low = {v: s for v, s in consistency.items() if s is not None and s < qa.speaker_similarity_min}
     if low:
         problems.append("voice drifts: " + ", ".join(f"{v} {s:.2f}" for v, s in low.items()))
@@ -314,6 +317,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         problems=problems,
         wer=job_wer,
         answers_missing=answers_missing,
+        answers_checked=len(req.answers),
         speaker_consistency=consistency or "not measured",
         loudness={"before_lufs": before["input_i"], "after_lufs": after["input_i"], "true_peak_db": after["input_tp"]},
         clipping=round(clip_all, 6),

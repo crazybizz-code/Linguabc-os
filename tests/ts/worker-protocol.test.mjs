@@ -55,3 +55,18 @@ test("callback reports are validated strictly", () => {
 });
 
 const PY_VECTOR = "76e14faa96c9a3d6c3cc067b1ee5e29e6af989fd18976836debc0d5c24777542";
+
+test("answer key for the worker's check: validated, empty answers dropped, fingerprint only for the key", async () => {
+  const { cleanAnswers, answersHash, MAX_ANSWER_CHECKS } = await import("../../src/lib/ai/worker-protocol.ts");
+  assert.deepEqual(cleanAnswers(undefined), []);
+  assert.deepEqual(cleanAnswers([{ id: "12", accepted: [" 185 ", "£185", "185"] }, { id: "13", accepted: ["", " "] }]),
+    [{ id: "12", accepted: ["185", "£185"] }]);
+  for (const bad of [
+    "185", [{ id: "1 2", accepted: ["x"] }], [{ id: "1", accepted: "x" }], [{ id: "1", accepted: [5] }], [{ id: "1", accepted: ["x".repeat(101)] }],
+    [{ id: "1", accepted: ["a"] }, { id: "1", accepted: ["b"] }], Array.from({ length: MAX_ANSWER_CHECKS + 1 }, (_, i) => ({ id: `q${i}`, accepted: ["a"] })),
+  ]) assert.equal(cleanAnswers(bad), null, JSON.stringify(bad).slice(0, 60));
+  const h = answersHash([{ id: "12", accepted: ["Thursday"] }]);
+  assert.match(h, /^[0-9a-f]{64}$/);
+  assert.ok(!h.includes("Thursday"));
+  assert.notEqual(h, answersHash([{ id: "12", accepted: ["Tuesday"] }]), "a changed key is a new recording");
+});

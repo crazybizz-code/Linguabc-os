@@ -9,8 +9,13 @@
     {"kind": "pause", "seconds": 0.35},
     ...
   ],
-  "checks": {"answers": [["four", "4"], ["Smythe"]]}   # optional
+  "checks": {"answers": [{"id": "q1", "accepted": ["four", "4"]}, {"id": "q2", "accepted": ["Smythe"]}]}   # optional
 }
+
+Answers (from the test editor's key) are used only to check the recording:
+reports name the question ids that were not heard, never the answers, and
+nothing here logs them. Plain strings or lists of strings are still accepted
+(ids are then "1", "2", ...).
 """
 
 from __future__ import annotations
@@ -44,12 +49,17 @@ class Pause:
     seconds: float
 
 
+MAX_ANSWERS = 60
+_ANSWER_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
 @dataclass
 class RenderRequest:
     scope: str
     language: str
     plan: list[Speech | Pause]
     answers: list[list[str]] = field(default_factory=list)
+    answer_ids: list[str] = field(default_factory=list)
 
     @property
     def speech(self) -> list[Speech]:
@@ -98,12 +108,25 @@ def parse_request(data: Any) -> RenderRequest:
         raise BadRequest("nothing to say")
 
     answers: list[list[str]] = []
+    ids: list[str] = []
     checks = data.get("checks") or {}
     if not isinstance(checks, dict):
         raise BadRequest("checks must be an object")
-    for a in checks.get("answers") or []:
+    raw = checks.get("answers") or []
+    if not isinstance(raw, list) or len(raw) > MAX_ANSWERS:
+        raise BadRequest(f"checks.answers must be a list of at most {MAX_ANSWERS}")
+    for n, a in enumerate(raw, 1):
+        aid = str(n)
+        if isinstance(a, dict):
+            aid, a = a.get("id"), a.get("accepted")
+            if not isinstance(aid, str) or not _ANSWER_ID.match(aid):
+                raise BadRequest("checks.answers[].id must be a short id")
         variants = [a] if isinstance(a, str) else a
-        if not isinstance(variants, list) or not variants or not all(isinstance(v, str) and 0 < len(v) <= 100 for v in variants):
-            raise BadRequest("checks.answers must be strings or lists of strings")
+        if (not isinstance(variants, list) or not 0 < len(variants) <= 5
+                or not all(isinstance(v, str) and 0 < len(v.strip()) and len(v) <= 100 for v in variants)):
+            raise BadRequest("each answer needs 1-5 accepted forms of at most 100 characters")
+        if aid in ids:
+            raise BadRequest("answer ids must be unique")
         answers.append(variants)
-    return RenderRequest(scope, language, plan, answers)
+        ids.append(aid)
+    return RenderRequest(scope, language, plan, answers, ids)
