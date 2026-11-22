@@ -49,6 +49,7 @@ class QaConfig:
     # long piece is spoken sentence by sentence, up to this many words per call.
     max_words_per_call: int = 30
     sentence_gap_s: float = 0.28
+    unclear_word_p: float = 0.5      # ASR word probability below this is flagged (not failed)
 
 
 @dataclass
@@ -72,6 +73,7 @@ class PieceReport:
     status: str = "pending"
     reasons: list[str] = field(default_factory=list)
     continues: bool = False  # a later sentence of the same piece
+    unclear: list[str] = field(default_factory=list)  # words ASR was unsure of: listen for mispronunciation
 
 
 @dataclass
@@ -163,6 +165,10 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         no_instruct += notes.dropped_no_instruct
         for part in parts:
             settings = {**params, "language": req.language, "instruct": part.instruct or ""}
+            # A designed or cloned voice is its description or reference clip, not just its name.
+            sig = getattr(engine, "voice_signature", None)
+            if sig is not None:
+                settings["voice_sig"] = sig(item.voice)
             for k, chunk in enumerate(sentence_chunks(part.text, qa.max_words_per_call)):
                 h = segment_hash(provider=engine.provider, model=engine.model_id, voice=item.voice,
                                  expression=[part.tag] if part.tag else [], text=chunk, params=settings, scope=req.scope)
@@ -199,6 +205,8 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
                     piece.reasons = [f"{type(e).__name__}: {str(e)[:200]}"]
                     continue
                 piece.reasons = _check(piece, raw, sr, heard, qa)
+                words = getattr(transcriber, "last_words", None) or []
+                piece.unclear = [w for w, p in words if p < qa.unclear_word_p]
                 if not piece.reasons:
                     clip = A.trim(raw, sr)
                     cache.put(req.scope, piece.hash, clip, sr, {"wer": piece.wer, "heard": heard, "text": piece.text,

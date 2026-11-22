@@ -93,6 +93,8 @@ def measure_loudness(audio: np.ndarray, sr: int) -> dict:
 def normalize_loudness(audio: np.ndarray, sr: int) -> tuple[np.ndarray, dict]:
     """Two-pass linear loudnorm: one gain for the whole recording, pauses stay silent."""
     m = measure_loudness(audio, sr)
+    if not np.isfinite(m["input_i"]) or not np.isfinite(m["target_offset"]):
+        return audio.astype(np.float32, copy=True), m  # silence: nothing to normalise
     proc = _run(["-f", "f32le", "-ar", str(sr), "-ac", "1", "-i", "pipe:0",
                  "-af", (f"loudnorm=I={TARGET_LUFS}:TP={TRUE_PEAK}:LRA=11:linear=true:"
                          f"measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}:"

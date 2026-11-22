@@ -86,3 +86,9 @@ def test_looped_ending_is_caught():
     assert repeated_phrases(said, said + " of smoke.") == ["of smoke"]
     assert repeated_phrases(said, said) == []
     assert repeated_phrases("It was very, very cold.", "It was very very cold.") == []
+
+
+def test_phone_numbers_and_spoken_hundreds():
+    assert wer("It's oh-seven-seven-nine-three, four-six-one, two-five-eight.", "It's 07793 461 258.") == 0
+    assert wer("or a hundred and ninety pounds for the year", "or £190 for the year") == 0
+    assert wer("It's flat four, twenty-seven Mill Street.", "It's flat 4, 27 Mill Street.") == 0

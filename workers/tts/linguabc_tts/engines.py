@@ -94,11 +94,125 @@ class QwenEngine:
         c = self.config
         with torch.inference_mode():
             wavs, sr = self.model.generate_custom_voice(
-                text=text, speaker=voice, language=language, instruct=instruct or "",
-                do_sample=True, temperature=c.temperature, top_p=c.top_p, top_k=c.top_k,
-                repetition_penalty=c.repetition_penalty, max_new_tokens=c.max_new_tokens,
-                subtalker_dosample=True, subtalker_temperature=c.temperature, subtalker_top_p=c.top_p,
-            )
+                text=text, speaker=voice, language=language, instruct=instruct or "", **_sampling(c, text))
+        return np.asarray(wavs[0], dtype=np.float32).reshape(-1), int(sr)
+
+
+def _load_qwen(model_path: str, device: str | None):
+    """Loads any Qwen3-TTS checkpoint the same way (GPU bf16; CPU fp32 or QWEN_CPU_DTYPE=bfloat16)."""
+    import torch
+    from qwen_tts import Qwen3TTSModel
+
+    cuda = torch.cuda.is_available() if device is None else device.startswith("cuda")
+    dev = device or ("cuda:0" if cuda else "cpu")
+    cpu_dtype = torch.bfloat16 if os.environ.get("QWEN_CPU_DTYPE", "").lower() in ("bf16", "bfloat16") else torch.float32
+    kwargs: dict = {"device_map": dev, "dtype": torch.bfloat16 if cuda else cpu_dtype}
+    if cuda:
+        try:
+            import flash_attn  # noqa: F401
+            kwargs["attn_implementation"] = "flash_attention_2"
+        except ImportError:
+            kwargs["attn_implementation"] = "sdpa"
+    else:
+        torch.set_num_threads(max(1, os.cpu_count() or 1))
+    return torch, Qwen3TTSModel.from_pretrained(model_path, **kwargs)
+
+
+def token_budget(text: str, cap: int) -> int:
+    """Codec frames (12.5 per second) a text can need: ~0.8 s per word, letter
+    or digit plus 3 s, at most `cap`. Stops a runaway generation (seen with
+    Base cloning on CPU: 2048 frames, ~160 s of audio, for one short line)."""
+    import re as _re
+
+    units = len(_re.findall(r"[A-Za-z]+(?:'[a-z]+)?|\d", text))
+    spelled = sum(len(m) // 2 for m in _re.findall(r"\b(?:[A-Za-z]-){2,}[A-Za-z]\b", text))
+    return int(min(cap, 12.5 * (0.8 * (units + spelled) + 3)))
+
+
+def _sampling(c: GenerationConfig, text: str) -> dict:
+    return dict(do_sample=True, temperature=c.temperature, top_p=c.top_p, top_k=c.top_k,
+                repetition_penalty=c.repetition_penalty, max_new_tokens=token_budget(text, c.max_new_tokens),
+                subtalker_dosample=True, subtalker_temperature=c.temperature, subtalker_top_p=c.top_p)
+
+
+def _fingerprint(*parts) -> str:
+    h = hashlib.sha256()
+    for p in parts:
+        h.update(p if isinstance(p, bytes) else str(p).encode("utf-8"))
+        h.update(b"\0")
+    return h.hexdigest()[:16]
+
+
+class QwenDesignEngine:
+    """Qwen3-TTS VoiceDesign: each voice is a natural-language description
+    ("A woman in her 30s with a Southern British accent ..."). An expression
+    instruction is appended to the description for that call. The timbre is
+    re-imagined on every call, so the same description can drift between
+    lines; use it to design a voice, then clone it (QwenCloneEngine)."""
+
+    provider = "qwen"
+
+    def __init__(self, model_path: str, voices: dict[str, str], model_id: str = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+                 device: str | None = None, config: GenerationConfig = GenerationConfig()):
+        self._torch, self.model = _load_qwen(model_path, device)
+        if self.model.model.tts_model_type != "voice_design":
+            raise RuntimeError(f"{model_id} is not a VoiceDesign model")
+        self.model_id, self.config, self.descriptions = model_id, config, dict(voices)
+
+    def voices(self) -> list[str]:
+        return list(self.descriptions)
+
+    def takes_instruct(self, voice: str) -> bool:
+        return True
+
+    def voice_signature(self, voice: str) -> str:
+        return _fingerprint(self.descriptions[voice])
+
+    def synthesize(self, text, voice, instruct, language, seed):
+        torch = self._torch
+        torch.manual_seed(seed)
+        desc = self.descriptions[voice] + (f" {instruct}" if instruct else "")
+        with torch.inference_mode():
+            wavs, sr = self.model.generate_voice_design(text=text, instruct=desc, language=language, **_sampling(self.config, text))
+        return np.asarray(wavs[0], dtype=np.float32).reshape(-1), int(sr)
+
+
+class QwenCloneEngine:
+    """Qwen3-TTS Base: every voice is cloned from a reference clip and its
+    transcript (ICL mode). Same timbre on every line; no `instruct`, so
+    expression tags are dropped (reported as expressions_dropped_no_instruct)."""
+
+    provider = "qwen"
+
+    def __init__(self, model_path: str, voices: dict[str, tuple[np.ndarray, int, str]],
+                 model_id: str = "Qwen/Qwen3-TTS-12Hz-1.7B-Base", device: str | None = None,
+                 config: GenerationConfig = GenerationConfig()):
+        self._torch, self.model = _load_qwen(model_path, device)
+        if self.model.model.tts_model_type != "base":
+            raise RuntimeError(f"{model_id} is not a Base model")
+        self.model_id, self.config = model_id, config
+        self._prompts, self._sigs = {}, {}
+        for name, (audio, sr, ref_text) in voices.items():
+            self._prompts[name] = self.model.create_voice_clone_prompt(ref_audio=(audio, sr), ref_text=ref_text)
+            self._sigs[name] = _fingerprint(np.ascontiguousarray(audio, dtype=np.float32).tobytes(), sr, ref_text)
+
+    def voices(self) -> list[str]:
+        return list(self._prompts)
+
+    def takes_instruct(self, voice: str) -> bool:
+        return False
+
+    def voice_signature(self, voice: str) -> str:
+        return self._sigs[voice]
+
+    def synthesize(self, text, voice, instruct, language, seed):
+        torch = self._torch
+        torch.manual_seed(seed)
+        with torch.inference_mode():
+            # non_streaming_mode=True: qwen_tts defaults to simulated streaming text input for
+            # cloning, which (on real runs) produced silence and never stopped until the token cap.
+            wavs, sr = self.model.generate_voice_clone(text=text, language=language, voice_clone_prompt=self._prompts[voice],
+                                                       non_streaming_mode=True, **_sampling(self.config, text))
         return np.asarray(wavs[0], dtype=np.float32).reshape(-1), int(sr)
 
 

@@ -77,6 +77,8 @@ def _expand_numbers(t: str) -> str:
             out += f" {number_words(int(m.group(3)))}"
         return f" {out} "
 
+    # Phone-like sequences ("07793 461 258") are read digit by digit, every group.
+    t = re.sub(r"\b0\d+(?:[\s,-]+\d+)+\b", lambda m: " " + " ".join(_digits(g) for g in re.findall(r"\d+", m.group(0))) + " ", t)
     t = re.sub(r"([£$€])\s?(\d[\d,]*)(?:\.(\d{2}))?", money, t)
     t = re.sub(r"\b(\d{1,2}):(\d{2})\b", lambda m: f" {number_words(int(m.group(1)))} " + (
         "o'clock" if m.group(2) == "00" else ("oh " + number_words(int(m.group(2))) if m.group(2)[0] == "0" else number_words(int(m.group(2))))) + " ", t)
@@ -110,6 +112,14 @@ def normalize(text: str) -> list[str]:
     i = 0
     while i < len(words):
         w = words[i]
+        # "a hundred and ninety" = "one hundred ninety"
+        if w == "a" and i + 1 < len(words) and words[i + 1] in ("hundred", "thousand", "million"):
+            out.append("one")
+            i += 1
+            continue
+        if w == "and" and out and out[-1] in _NUMBER_WORDS and i + 1 < len(words) and words[i + 1] in _NUMBER_WORDS:
+            i += 1
+            continue
         if w in ("double", "triple") and i + 1 < len(words) and words[i + 1] in _ONES[:10]:
             out += [words[i + 1]] * (2 if w == "double" else 3)
             i += 2
@@ -252,7 +262,11 @@ class FasterWhisperTranscriber:
         from .audio import resample
 
         segments, _ = self.model.transcribe(resample(audio, sr, 16000), language="en" if language in ("English", "Auto") else None,
-                                            beam_size=5, temperature=0.0, condition_on_previous_text=False, vad_filter=False)
+                                            beam_size=5, temperature=0.0, condition_on_previous_text=False, vad_filter=False,
+                                            word_timestamps=True)
+        segments = list(segments)
+        # Word confidence: a low one often marks a mispronounced or slurred word.
+        self.last_words = [(w.word.strip(), round(float(w.probability), 3)) for s in segments for w in (s.words or [])]
         return " ".join(s.text.strip() for s in segments).strip()
 
 

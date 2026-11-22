@@ -23,6 +23,25 @@ What real audio taught us (and the code now handles):
 - ASR writes "p.m.", "checkout", "Miss", "IELTS" for the script's "pm",
   "check-out", "Ms", "eye-elts": normalised before comparing.
 
+## Designed and cloned voices (2026-11-22)
+
+`QwenDesignEngine` (VoiceDesign 1.7B: a voice is a text description, an
+expression is appended to it) and `QwenCloneEngine` (Base 1.7B: a voice is
+a reference clip plus its transcript). `pilot/voice_lab.py` compares them;
+`pilot/section.py` renders a full 7-8 minute Part 1 with cloned voices.
+
+Found on real runs, and handled in code:
+- Without a token budget, generation can run to 2048 frames (~160 s):
+  `token_budget()` caps each call at ~0.8 s per word, letter or digit + 3 s.
+- `generate_voice_clone` defaults to simulated streaming text input; on CPU
+  that gave silence and never stopped. The clone engine passes
+  `non_streaming_mode=True`.
+- Clones still occasionally return silence or a hallucinated line; the
+  pipeline's ASR check catches both and retries with a new seed.
+- Accent check: `linguabc_tts/accent.py` (CommonAccent ECAPA, MIT) scores
+  british / american / australian. It identified its own England, US,
+  Australia, Canada, Scotland and New Zealand samples correctly.
+
 ## How a request flows
 
 1. The app plans the script (`src/lib/ai/script.ts` → `planScript`): turns,

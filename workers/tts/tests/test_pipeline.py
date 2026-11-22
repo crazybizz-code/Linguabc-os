@@ -192,3 +192,12 @@ def test_recheck_failure_tries_new_seeds(tmp_path):
     engine.calls.clear()
     render(request(LINES[:1]), engine, asr, cache)
     assert engine.calls and engine.calls[0][3] != old_seed
+
+
+def test_token_budget_bounds_runaway_generation():
+    from linguabc_tts.engines import token_budget
+    short = token_budget("Could you tell me how much the tickets cost for the guided tour?", 2048)
+    assert 120 <= short <= 200  # ~10-16 s, not 164 s
+    spelled = token_budget("My surname is Harrison, that's H-A-R-R-I-S-O-N.", 2048)
+    assert spelled > token_budget("My surname is Harrison, that's it.", 2048)
+    assert token_budget("word " * 5000, 2048) == 2048
