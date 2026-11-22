@@ -73,3 +73,16 @@ class SegmentCache:
             except BaseException:
                 Path(tmp).unlink(missing_ok=True)
                 raise
+
+    def failed_attempts(self, scope: str, h: str) -> int:
+        """How many seeds an earlier run tried for a segment that never passed."""
+        audio_p, _ = self._paths(scope, h)
+        try:
+            return int(json.loads(audio_p.with_suffix(".fail.json").read_text("utf-8"))["tried"])
+        except (OSError, ValueError, KeyError):
+            return 0
+
+    def put_failure(self, scope: str, h: str, tried: int) -> None:
+        audio_p, _ = self._paths(scope, h)
+        audio_p.parent.mkdir(parents=True, exist_ok=True)
+        audio_p.with_suffix(".fail.json").write_text(json.dumps({"tried": tried}), "utf-8")

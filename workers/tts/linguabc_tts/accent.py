@@ -39,6 +39,8 @@ class AccentClassifier:
 
         from .audio import resample
 
+        if audio.size < sr * 0.5:
+            return {"top": None, "top_p": 0.0, "groups": {g: 0.0 for g in GROUPS}, "group": None}
         wav = torch.from_numpy(resample(audio, sr, 16000)).unsqueeze(0)
         scores, _, _, _ = self.model.classify_batch(wav)
         # The ECAPA classifier returns cosine scores (AM-softmax head, scale 30).

@@ -41,6 +41,8 @@ class QaConfig:
     silence_max_s: float = 1.2       # inside one spoken piece
     wpm_min: float = 90
     wpm_max: float = 220
+    wpm_hard_min: float = 60
+    wpm_hard_max: float = 330
     min_words_for_rate: int = 5
     speaker_similarity_min: float = 0.80
     max_attempts: int = 3
@@ -74,6 +76,7 @@ class PieceReport:
     reasons: list[str] = field(default_factory=list)
     continues: bool = False  # a later sentence of the same piece
     unclear: list[str] = field(default_factory=list)  # words ASR was unsure of: listen for mispronunciation
+    review: list[str] = field(default_factory=list)   # passed, but a listener should check this
 
 
 @dataclass
@@ -86,7 +89,7 @@ class RenderResult:
 
 #: Bump when the acceptance rules change: cached clips are re-checked (with their
 #: stored transcript, so no new speech or ASR) and dropped if they now fail.
-QA_VERSION = 3
+QA_VERSION = 4
 
 
 def sentence_chunks(text: str, max_words: int) -> list[str]:
@@ -110,6 +113,7 @@ def _seed(h: str, attempt: int) -> int:
 
 def _check(piece: PieceReport, clip: np.ndarray, sr: int, heard: str, qa: QaConfig) -> list[str]:
     reasons: list[str] = []
+    piece.review = []
     piece.heard = heard
     piece.wer = round(wer(piece.text, heard), 4)
     piece.missing = [{"kind": s.kind, "text": s.text} for s in missing_spans(piece.text, heard)]
@@ -133,8 +137,13 @@ def _check(piece: PieceReport, clip: np.ndarray, sr: int, heard: str, qa: QaConf
         reasons.append(f"silence of {piece.silence_s}s inside speech")
     spelled = any(s.kind == "spelling" for s in critical_spans(piece.text))
     # Spelling letter by letter is slow on purpose: no rate check there.
-    if not spelled and len(piece.text.split()) >= qa.min_words_for_rate and not qa.wpm_min <= piece.wpm <= qa.wpm_max:
-        reasons.append(f"speaking rate {piece.wpm:.0f} wpm")
+    if not spelled and len(piece.text.split()) >= qa.min_words_for_rate:
+        # Far outside speech rates means skipped or stretched words: retry. Merely fast or
+        # slow speech (short questions are quick) is flagged for the listener, not failed.
+        if not qa.wpm_hard_min <= piece.wpm <= qa.wpm_hard_max:
+            reasons.append(f"speaking rate {piece.wpm:.0f} wpm")
+        elif not qa.wpm_min <= piece.wpm <= qa.wpm_max:
+            piece.review.append(f"speaking rate {piece.wpm:.0f} wpm")
     return reasons
 
 
@@ -181,12 +190,13 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
             continue
         with cache.lock(piece.hash):
             hit = cache.get(req.scope, piece.hash)
-            tried = 0
+            # Seeds already tried on an earlier failed run give the same audio: skip them.
+            tried = cache.failed_attempts(req.scope, piece.hash)
             if hit is not None and hit.meta.get("qa_version") != QA_VERSION:
                 if _check(piece, hit.audio, hit.sr, hit.meta.get("heard", ""), qa):
                     # Fails today's rules: speak it again, with seeds not tried before
                     # (generation is deterministic, the old seeds give the same audio).
-                    tried = int(hit.meta.get("attempts") or qa.max_attempts)
+                    tried = max(tried, int(hit.meta.get("attempts") or qa.max_attempts))
                     hit = None
                 else:
                     cache.put(req.scope, piece.hash, hit.audio, hit.sr, {**hit.meta, "qa_version": QA_VERSION})
@@ -218,6 +228,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
                     break
             else:
                 piece.status = "failed"
+                cache.put_failure(req.scope, piece.hash, tried + qa.max_attempts)
 
     failed = [p for p in pieces if p.status != "pass"]
     report: dict = {

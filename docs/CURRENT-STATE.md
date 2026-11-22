@@ -104,6 +104,8 @@ Both are drafts waiting for the owner's review before publishing.
 - Production usage before the change (read-only, 2026-11-21): 9 Fish recordings, 26,870 bytes (~$0.40), 7 files kept (2 were re-takes). Fish dashboard said $0.57.
 - Tests: SQL suite 29 sections pass (new: 29. audio segment cache); `npm run test:ts` 17 pass; `workers/tts` pytest 40 pass; tsc, eslint, build clean.
 - **Before production:** owner approves applying 0029; the cache works without it (speaks as before) but saves nothing.
+- **Real Qwen runs (2026-11-22, free 4-vCPU container, no GPU):** CustomVoice pilot (3 recordings), VoiceDesign vs Base-clone lab (4 designed voices), and a full Part 1 section with cloned voices (400 s, 62 segments, WER 0.67%, all 10 answers heard, ~87 min of compute). Every Qwen voice, designed as British or Australian or not, was scored American by the CommonAccent check; the owner's blind listening decides. Audio is in `workers/tts/pilot/out/` (not committed); blind review kit in `workers/tts/pilot/out/blind-review/` (Fish samples to be added by the owner).
+- The environment's network allowlist now includes Hugging Face hosts and `download.pytorch.org` (added with the owner's approval, 2026-11-22).
 
 ## Exact next task
 1. **V1 step 4, in-app notifications:** built on the branch (0022 triggers; a bell in the student and parent portals; translated text). With the owner's go-ahead: apply 0022, then merge.

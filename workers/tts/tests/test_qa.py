@@ -92,3 +92,10 @@ def test_phone_numbers_and_spoken_hundreds():
     assert wer("It's oh-seven-seven-nine-three, four-six-one, two-five-eight.", "It's 07793 461 258.") == 0
     assert wer("or a hundred and ninety pounds for the year", "or £190 for the year") == 0
     assert wer("It's flat four, twenty-seven Mill Street.", "It's flat 4, 27 Mill Street.") == 0
+
+
+def test_postcodes_and_codes():
+    # Seen on the real section run: script "B-S-three, two-L-R", ASR "BS3-2LR".
+    assert wer("It's B-S-three, two-L-R.", "It's BS3-2LR.") == 0
+    assert wer("It's B-S-three, two-L-R.", "It's BS3 2LR.") == 0
+    assert normalize("the 23rd of March") == normalize("the twenty-third of March")

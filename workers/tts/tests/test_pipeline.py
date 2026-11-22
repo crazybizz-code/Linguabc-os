@@ -201,3 +201,22 @@ def test_token_budget_bounds_runaway_generation():
     spelled = token_budget("My surname is Harrison, that's H-A-R-R-I-S-O-N.", 2048)
     assert spelled > token_budget("My surname is Harrison, that's it.", 2048)
     assert token_budget("word " * 5000, 2048) == 2048
+
+
+def test_failed_segment_seeds_are_not_tried_again(tmp_path):
+    engine, asr, cache = setup(tmp_path, garble={"Of course. Can I have your surname?": 3})
+    first = render(request(LINES), engine, asr, cache)
+    assert not first.ok
+    seeds_first = {c[3] for c in engine.calls if c[0] == "Of course. Can I have your surname?"}
+    engine.calls.clear()
+    second = render(request(LINES), engine, asr, cache)
+    seeds_second = {c[3] for c in engine.calls if c[0] == "Of course. Can I have your surname?"}
+    assert second.ok and not (seeds_first & seeds_second)
+
+
+def test_fast_short_lines_are_flagged_not_failed(tmp_path):
+    from linguabc_tts.pipeline import QaConfig
+    engine, asr, cache = setup(tmp_path)
+    res = render(request(LINES), engine, asr, cache, qa=QaConfig(wpm_max=100))
+    assert res.ok
+    assert any(s["review"] for s in res.report["segments"])
