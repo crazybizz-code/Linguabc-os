@@ -1,0 +1,7 @@
+**/__pycache__
+.pytest_cache
+.segment-cache
+pilot
+tests
+*.mp3
+*.wav

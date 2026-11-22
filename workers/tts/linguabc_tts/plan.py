@@ -24,7 +24,7 @@ MAX_TEXT = 2000
 MAX_TOTAL_TEXT = 15000
 MAX_PAUSE = 120.0
 _SCOPE = re.compile(r"^(platform|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
-_VOICE = re.compile(r"^[A-Za-z_]{2,30}$")
+_VOICE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{1,40}$")
 LANGUAGES = {"English", "Auto"}
 
 

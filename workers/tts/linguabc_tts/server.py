@@ -39,7 +39,7 @@ def verify(body: bytes, timestamp: str | None, signature: str | None, secret: st
 
 def handle(body: bytes, headers: dict[str, str], secret: str, engine: Engine, transcriber: Transcriber,
            cache: SegmentCache, qa: QaConfig = QaConfig(), embedder: SpeakerEmbedder | None = None,
-           params: dict | None = None) -> tuple[int, dict]:
+           params: dict | None = None, spoken: bool = False) -> tuple[int, dict]:
     h = {k.lower(): v for k, v in headers.items()}
     if len(body) > MAX_BODY:
         return 413, {"error": "request too large"}
@@ -49,7 +49,7 @@ def handle(body: bytes, headers: dict[str, str], secret: str, engine: Engine, tr
         req = parse_request(json.loads(body))
     except (BadRequest, json.JSONDecodeError, UnicodeDecodeError) as e:
         return 400, {"error": str(e)[:200]}
-    result = render(req, engine, transcriber, cache, qa=qa, embedder=embedder, params=params)
+    result = render(req, engine, transcriber, cache, qa=qa, embedder=embedder, params=params, spoken=spoken)
     reply = {"model": engine.model_id, "seconds": result.seconds, "billed_text_bytes": 0, "report": result.report}
     if not result.ok:
         return 422, {**reply, "error": f"{result.report['failed_segments']} segment(s) failed QA"}

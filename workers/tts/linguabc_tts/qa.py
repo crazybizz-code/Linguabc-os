@@ -139,6 +139,15 @@ def normalize(text: str) -> list[str]:
             if out[i] == a and out[i + 1] == b:
                 out[i:i + 2] = [word]
             i += 1
+    # Brand respellings ("Lingua A B C", "Lingua ABC", "Lingwa ABC") are the brand.
+    i = 0
+    while i < len(out) - 1:
+        if out[i] in ("lingua", "lingwa", "linguah") and out[i + 1] in ("abc", "a"):
+            if out[i + 1] == "abc":
+                out[i:i + 2] = ["linguabc"]
+            elif out[i + 1:i + 4] == ["a", "b", "c"]:
+                out[i:i + 4] = ["linguabc"]
+        i += 1
     # Join runs of single letters (spelling), keep "a" and "i" when alone.
     joined: list[str] = []
     run: list[str] = []

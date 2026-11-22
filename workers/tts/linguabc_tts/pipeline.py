@@ -30,6 +30,7 @@ from .expressions import split_expressions, strip_tags
 from .hashing import segment_hash
 from .plan import Pause, RenderRequest, Speech
 from .spoken import to_spoken
+from .lexicon import LEXICON_VERSION, respell
 from .qa import (Transcriber, SpeakerEmbedder, critical_spans, missing_answers, repeated_phrases, missing_spans, speaker_consistency, wer,
                  words_per_minute)
 
@@ -182,6 +183,9 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
             settings = {**params, "language": req.language, "instruct": part.instruct or ""}
             if spoken:
                 settings["spoken"] = 1
+            lex = respell(part.text, getattr(engine, "lexicon_key", engine.provider))
+            if lex != part.text:
+                settings["lexicon"] = LEXICON_VERSION  # a respelled word changes the audio
             # A designed or cloned voice is its description or reference clip, not just its name.
             sig = getattr(engine, "voice_signature", None)
             if sig is not None:
@@ -216,7 +220,8 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
             for attempt in range(qa.max_attempts):
                 piece.attempts = attempt + 1
                 try:
-                    said = to_spoken(piece.text) if spoken else piece.text
+                    said = respell(to_spoken(piece.text) if spoken else piece.text,
+                                   getattr(engine, "lexicon_key", engine.provider))
                     raw, sr = engine.synthesize(said, piece.voice, piece.instruct, req.language, _seed(piece.hash, tried + attempt))
                     spoken_calls += 1
                     heard = transcriber.transcribe(raw, sr, req.language)

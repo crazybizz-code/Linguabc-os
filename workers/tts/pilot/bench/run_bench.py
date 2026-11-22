@@ -67,7 +67,7 @@ def build(engine: str, args) -> Timed:
     refs = {n: p for n, (p, *_r) in REFERENCES.items()}
     cc0 = {n: Path(args.cc0_dir) / f for n, (f, *_r) in CC0_REFERENCES.items()}
     if engine.startswith("chatterbox"):
-        from engines_bench import ChatterboxEngine
+        from linguabc_tts.engines_chatterbox import ChatterboxEngine
         return Timed(ChatterboxEngine({**refs, **cc0}, "turbo" if engine.endswith("turbo") else "original"))
     if engine == "zonos":
         from engines_bench import ZonosEngine
@@ -106,6 +106,7 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--qwen-base-dir")
     ap.add_argument("--qwen-design-dir")
+    ap.add_argument("--qwen-cv-dir")
     ap.add_argument("--cases", default="ielts,podcast,ab,accent")
     ap.add_argument("--max-attempts", type=int, default=4)
     ap.add_argument("--spoken", action="store_true", help="say numbers, money and codes as words (spoken.to_spoken)")
