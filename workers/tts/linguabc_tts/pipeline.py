@@ -29,6 +29,7 @@ from .engines import Engine
 from .expressions import split_expressions, strip_tags
 from .hashing import segment_hash
 from .plan import Pause, RenderRequest, Speech
+from .spoken import to_spoken
 from .qa import (Transcriber, SpeakerEmbedder, critical_spans, missing_answers, repeated_phrases, missing_spans, speaker_consistency, wer,
                  words_per_minute)
 
@@ -52,6 +53,9 @@ class QaConfig:
     max_words_per_call: int = 30
     sentence_gap_s: float = 0.28
     unclear_word_p: float = 0.5      # ASR word probability below this is flagged (not failed)
+    # Benchmarks only: still join the recording when segments fail (using their last take),
+    # so people can listen to what went wrong. The status stays "failed".
+    assemble_failed: bool = False
 
 
 @dataclass
@@ -149,7 +153,9 @@ def _check(piece: PieceReport, clip: np.ndarray, sr: int, heard: str, qa: QaConf
 
 def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: SegmentCache,
            qa: QaConfig = QaConfig(), embedder: SpeakerEmbedder | None = None, params: dict | None = None,
-           sample_rate: int = 24000) -> RenderResult:
+           sample_rate: int = 24000, spoken: bool = False) -> RenderResult:
+    """spoken=True: numbers, money, codes and times are said as words (spoken.to_spoken)
+    before they reach the engine; QA still compares against the written script."""
     started = time.monotonic()
     params = dict(params or {})
     unsupported: list[str] = []
@@ -174,6 +180,8 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         no_instruct += notes.dropped_no_instruct
         for part in parts:
             settings = {**params, "language": req.language, "instruct": part.instruct or ""}
+            if spoken:
+                settings["spoken"] = 1
             # A designed or cloned voice is its description or reference clip, not just its name.
             sig = getattr(engine, "voice_signature", None)
             if sig is not None:
@@ -208,13 +216,16 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
             for attempt in range(qa.max_attempts):
                 piece.attempts = attempt + 1
                 try:
-                    raw, sr = engine.synthesize(piece.text, piece.voice, piece.instruct, req.language, _seed(piece.hash, tried + attempt))
+                    said = to_spoken(piece.text) if spoken else piece.text
+                    raw, sr = engine.synthesize(said, piece.voice, piece.instruct, req.language, _seed(piece.hash, tried + attempt))
                     spoken_calls += 1
                     heard = transcriber.transcribe(raw, sr, req.language)
                 except Exception as e:  # engine or ASR crash: try the next seed
                     piece.reasons = [f"{type(e).__name__}: {str(e)[:200]}"]
                     continue
                 piece.reasons = _check(piece, raw, sr, heard, qa)
+                if qa.assemble_failed:
+                    clips[idx] = A.resample(A.trim(raw, sr), sr, sample_rate)
                 words = getattr(transcriber, "last_words", None) or []
                 piece.unclear = [w for w, p in words if p < qa.unclear_word_p]
                 if not piece.reasons:
@@ -241,7 +252,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         "experimental_expressions_used": sorted(set(experimental)),
         "expressions_dropped_no_instruct": sorted(set(no_instruct)),
     }
-    if failed:
+    if failed and not (qa.assemble_failed and all(i in clips for i in range(len(pieces)))):
         report.update(status="failed", elapsed_s=round(time.monotonic() - started, 2))
         return RenderResult(False, None, 0.0, report)
 
@@ -290,7 +301,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         problems.append(f"loudness {after['input_i']} LUFS")
 
     report.update(
-        status="needs_review" if problems else "pass",
+        status="failed" if failed else ("needs_review" if problems else "pass"),
         problems=problems,
         wer=job_wer,
         answers_missing=answers_missing,
@@ -300,4 +311,4 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         duration_s=seconds,
         elapsed_s=round(time.monotonic() - started, 2),
     )
-    return RenderResult(True, mp3, seconds, report)
+    return RenderResult(not failed, mp3, seconds, report)

@@ -220,3 +220,11 @@ def test_fast_short_lines_are_flagged_not_failed(tmp_path):
     res = render(request(LINES), engine, asr, cache, qa=QaConfig(wpm_max=100))
     assert res.ok
     assert any(s["review"] for s in res.report["segments"])
+
+
+def test_benchmarks_can_assemble_failed_takes(tmp_path):
+    from linguabc_tts.pipeline import QaConfig
+    engine, asr, cache = setup(tmp_path, garble={"It's Smythe. That's S-M-Y-T-H-E.": 99})
+    res = render(request(LINES), engine, asr, cache, qa=QaConfig(assemble_failed=True))
+    assert not res.ok and res.mp3 and res.report["status"] == "failed"
+    assert render(request(LINES), engine, asr, cache).mp3 is None  # production default: nothing to listen to
