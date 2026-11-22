@@ -61,7 +61,9 @@ class QwenEngine:
         self.config = config
         cuda = torch.cuda.is_available() if device is None else device.startswith("cuda")
         self.device = device or ("cuda:0" if cuda else "cpu")
-        kwargs: dict = {"device_map": self.device, "dtype": torch.bfloat16 if cuda else torch.float32}
+        # CPU: float32 by default; QWEN_CPU_DTYPE=bfloat16 is much faster on CPUs with AMX/AVX-512 BF16.
+        cpu_dtype = torch.bfloat16 if os.environ.get("QWEN_CPU_DTYPE", "").lower() in ("bf16", "bfloat16") else torch.float32
+        kwargs: dict = {"device_map": self.device, "dtype": torch.bfloat16 if cuda else cpu_dtype}
         if cuda:
             try:
                 import flash_attn  # noqa: F401
@@ -69,7 +71,7 @@ class QwenEngine:
             except ImportError:
                 kwargs["attn_implementation"] = "sdpa"
         if not cuda:
-            torch.set_num_threads(max(1, (os.cpu_count() or 2) - 1))
+            torch.set_num_threads(max(1, os.cpu_count() or 1))
         self.model = Qwen3TTSModel.from_pretrained(model_path, **kwargs)
         inner = self.model.model
         if inner.tts_model_type != "custom_voice":

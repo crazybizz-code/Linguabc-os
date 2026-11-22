@@ -6,9 +6,22 @@ checks every segment with ASR, and returns one MP3 with a QA report. It runs
 on its own (Modal serverless GPU); the Next.js app only calls it when
 `AUDIO_PROVIDER=qwen`. Production stays on Fish Audio.
 
-**Status:** the pipeline is tested end to end with a fake engine and fake ASR.
-It has **not** run real Qwen inference yet: this build environment has no GPU
-and cannot reach huggingface.co for the weights. It is **not deployed**.
+**Status (2026-11-22):** real inference has run on a free 4-vCPU cloud
+container (no GPU), bfloat16: Qwen3-TTS 1.7B CustomVoice at RTF ≈ 3.4–3.9
+(1 s of audio takes ~3.5 s), checked with faster-distil-whisper-large-v3 on
+CPU and Resemblyzer for speaker consistency. Run it with
+`pilot/run_pilot.py` (three recordings plus an expression A/B). It is **not
+deployed**.
+
+What real audio taught us (and the code now handles):
+- Qwen sometimes loops the end of a long generation ("…full of smoke. of
+  smoke."): long pieces are spoken sentence by sentence (≤ 30 words per
+  call) and doubled phrases are rejected.
+- With an instruction it sometimes drops a sentence (a `[serious]` take lost
+  "This is extremely important."): caught by WER and retried.
+- Generation is deterministic: a retry must use a seed not tried before.
+- ASR writes "p.m.", "checkout", "Miss", "IELTS" for the script's "pm",
+  "check-out", "Ms", "eye-elts": normalised before comparing.
 
 ## How a request flows
 

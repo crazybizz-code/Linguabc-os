@@ -17,6 +17,7 @@ and a retry of the same request only speaks the failed pieces.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -28,7 +29,7 @@ from .engines import Engine
 from .expressions import split_expressions, strip_tags
 from .hashing import segment_hash
 from .plan import Pause, RenderRequest, Speech
-from .qa import (Transcriber, SpeakerEmbedder, missing_answers, missing_spans, speaker_consistency, wer,
+from .qa import (Transcriber, SpeakerEmbedder, critical_spans, missing_answers, repeated_phrases, missing_spans, speaker_consistency, wer,
                  words_per_minute)
 
 
@@ -44,6 +45,10 @@ class QaConfig:
     speaker_similarity_min: float = 0.80
     max_attempts: int = 3
     piece_gap_s: float = 0.12        # between expression pieces of one turn
+    # Long generations tend to loop at the end (seen on real Qwen audio), so a
+    # long piece is spoken sentence by sentence, up to this many words per call.
+    max_words_per_call: int = 30
+    sentence_gap_s: float = 0.28
 
 
 @dataclass
@@ -66,6 +71,7 @@ class PieceReport:
     seconds: float = 0.0
     status: str = "pending"
     reasons: list[str] = field(default_factory=list)
+    continues: bool = False  # a later sentence of the same piece
 
 
 @dataclass
@@ -74,6 +80,26 @@ class RenderResult:
     mp3: bytes | None
     seconds: float
     report: dict
+
+
+#: Bump when the acceptance rules change: cached clips are re-checked (with their
+#: stored transcript, so no new speech or ASR) and dropped if they now fail.
+QA_VERSION = 3
+
+
+def sentence_chunks(text: str, max_words: int) -> list[str]:
+    """Splits text at sentence ends so no call says more than max_words
+    (a single longer sentence stays whole)."""
+    if len(text.split()) <= max_words:
+        return [text]
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\"'£$€])", text) if s.strip()]
+    chunks: list[str] = []
+    for s in sentences:
+        if chunks and len(chunks[-1].split()) + len(s.split()) <= max_words:
+            chunks[-1] = f"{chunks[-1]} {s}"
+        else:
+            chunks.append(s)
+    return chunks
 
 
 def _seed(h: str, attempt: int) -> int:
@@ -92,6 +118,9 @@ def _check(piece: PieceReport, clip: np.ndarray, sr: int, heard: str, qa: QaConf
     piece.wpm = round(words_per_minute(piece.text, piece.seconds), 1)
     if piece.wer > qa.segment_wer_max:
         reasons.append(f"WER {piece.wer:.0%} > {qa.segment_wer_max:.0%}")
+    loops = repeated_phrases(piece.text, heard)
+    if loops:
+        reasons.append("repeated: " + "; ".join(f"'{l}'" for l in loops))
     if piece.missing:
         reasons.append("not heard: " + ", ".join(f"{m['kind']} '{m['text']}'" for m in piece.missing))
     if piece.clipping > qa.clipping_max:
@@ -100,7 +129,9 @@ def _check(piece: PieceReport, clip: np.ndarray, sr: int, heard: str, qa: QaConf
         reasons.append("silent")
     elif piece.silence_s > qa.silence_max_s:
         reasons.append(f"silence of {piece.silence_s}s inside speech")
-    if len(piece.text.split()) >= qa.min_words_for_rate and not qa.wpm_min <= piece.wpm <= qa.wpm_max:
+    spelled = any(s.kind == "spelling" for s in critical_spans(piece.text))
+    # Spelling letter by letter is slow on purpose: no rate check there.
+    if not spelled and len(piece.text.split()) >= qa.min_words_for_rate and not qa.wpm_min <= piece.wpm <= qa.wpm_max:
         reasons.append(f"speaking rate {piece.wpm:.0f} wpm")
     return reasons
 
@@ -117,11 +148,12 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
     clips: dict[int, np.ndarray] = {}
     spoken_calls = 0
 
-    known = set(engine.voices())
+    # qwen_tts lists speakers in lower case and matches them case-insensitively.
+    known = {v.lower() for v in engine.voices()}
     for item_no, item in enumerate(req.plan):
         if not isinstance(item, Speech):
             continue
-        if known and item.voice not in known:
+        if known and item.voice.lower() not in known:
             pieces.append(PieceReport(item_no, item.voice, strip_tags(item.text), None, None, None, "", False,
                                       status="failed", reasons=[f"unknown voice {item.voice}"]))
             continue
@@ -131,15 +163,27 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
         no_instruct += notes.dropped_no_instruct
         for part in parts:
             settings = {**params, "language": req.language, "instruct": part.instruct or ""}
-            h = segment_hash(provider=engine.provider, model=engine.model_id, voice=item.voice,
-                             expression=[part.tag] if part.tag else [], text=part.text, params=settings, scope=req.scope)
-            pieces.append(PieceReport(item_no, item.voice, part.text, part.tag, part.support, part.instruct, h, False))
+            for k, chunk in enumerate(sentence_chunks(part.text, qa.max_words_per_call)):
+                h = segment_hash(provider=engine.provider, model=engine.model_id, voice=item.voice,
+                                 expression=[part.tag] if part.tag else [], text=chunk, params=settings, scope=req.scope)
+                piece = PieceReport(item_no, item.voice, chunk, part.tag, part.support, part.instruct, h, False)
+                piece.continues = k > 0
+                pieces.append(piece)
 
     for idx, piece in enumerate(pieces):
         if piece.status == "failed":
             continue
         with cache.lock(piece.hash):
             hit = cache.get(req.scope, piece.hash)
+            tried = 0
+            if hit is not None and hit.meta.get("qa_version") != QA_VERSION:
+                if _check(piece, hit.audio, hit.sr, hit.meta.get("heard", ""), qa):
+                    # Fails today's rules: speak it again, with seeds not tried before
+                    # (generation is deterministic, the old seeds give the same audio).
+                    tried = int(hit.meta.get("attempts") or qa.max_attempts)
+                    hit = None
+                else:
+                    cache.put(req.scope, piece.hash, hit.audio, hit.sr, {**hit.meta, "qa_version": QA_VERSION})
             if hit is not None:
                 piece.cached, piece.status = True, "pass"
                 piece.wer, piece.heard, piece.seconds = hit.meta.get("wer"), hit.meta.get("heard", ""), round(hit.audio.size / hit.sr, 3)
@@ -148,7 +192,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
             for attempt in range(qa.max_attempts):
                 piece.attempts = attempt + 1
                 try:
-                    raw, sr = engine.synthesize(piece.text, piece.voice, piece.instruct, req.language, _seed(piece.hash, attempt))
+                    raw, sr = engine.synthesize(piece.text, piece.voice, piece.instruct, req.language, _seed(piece.hash, tried + attempt))
                     spoken_calls += 1
                     heard = transcriber.transcribe(raw, sr, req.language)
                 except Exception as e:  # engine or ASR crash: try the next seed
@@ -159,7 +203,8 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
                     clip = A.trim(raw, sr)
                     cache.put(req.scope, piece.hash, clip, sr, {"wer": piece.wer, "heard": heard, "text": piece.text,
                                                                 "voice": piece.voice, "expression": piece.expression,
-                                                                "attempts": piece.attempts, "model": engine.model_id})
+                                                                "attempts": piece.attempts, "model": engine.model_id,
+                                                                "qa_version": QA_VERSION})
                     piece.status = "pass"
                     clips[idx] = A.resample(clip, sr, sample_rate)
                     break
@@ -192,7 +237,7 @@ def render(req: RenderRequest, engine: Engine, transcriber: Transcriber, cache: 
             continue
         for k, idx in enumerate(by_item.get(item_no, [])):
             if k:
-                out.append(A.silence(qa.piece_gap_s, sample_rate))
+                out.append(A.silence(qa.sentence_gap_s if pieces[idx].continues else qa.piece_gap_s, sample_rate))
             out.append(clips[idx])
     joined = np.concatenate(out) if out else np.zeros(0, dtype=np.float32)
     normalized, before = A.normalize_loudness(joined, sample_rate)

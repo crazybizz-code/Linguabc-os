@@ -147,3 +147,48 @@ def test_unknown_voice_fails(tmp_path):
 def test_bad_requests_are_refused(bad):
     with pytest.raises(BadRequest):
         parse_request(bad)
+
+
+def test_cached_clips_are_rechecked_when_rules_change(tmp_path):
+    import json as _json
+    engine, asr, cache = setup(tmp_path)
+    render(request(LINES), engine, asr, cache)
+    # Pretend one clip was accepted by older, looser rules with a looped ending.
+    meta_files = sorted((tmp_path / "cache").rglob("*.json"))
+    target = next(m for m in meta_files if "surname?" in _json.loads(m.read_text())["text"])
+    meta = _json.loads(target.read_text())
+    meta.update(qa_version=1, heard=meta["heard"] + " your surname?")
+    target.write_text(_json.dumps(meta))
+    engine.calls.clear()
+    res = render(request(LINES), engine, asr, cache)
+    assert [c[0] for c in engine.calls] == ["Of course. Can I have your surname?"]
+    assert res.ok
+
+
+def test_long_turns_are_spoken_sentence_by_sentence(tmp_path):
+    from linguabc_tts.pipeline import sentence_chunks
+    long = ("Good afternoon. Today I'm going to talk about the world's first underground railway. "
+            "It opened in London on the 10th of January 1863, and on its first day it carried around 38,000 passengers. "
+            "The trains were pulled by steam engines, so the tunnels were often full of smoke.")
+    chunks = sentence_chunks(long, 30)
+    assert len(chunks) == 3 and " ".join(chunks) == long
+    assert all(len(c.split()) <= 30 for c in chunks)
+    assert sentence_chunks("Short line.", 30) == ["Short line."]
+    engine, asr, cache = setup(tmp_path)
+    res = render(request([("Ryan", long)]), engine, asr, cache)
+    assert res.ok and len(res.report["segments"]) == 3
+    assert [s["continues"] for s in res.report["segments"]] == [False, True, True]
+
+
+def test_recheck_failure_tries_new_seeds(tmp_path):
+    import json as _json
+    engine, asr, cache = setup(tmp_path)
+    render(request(LINES[:1]), engine, asr, cache)
+    meta_file = next((tmp_path / "cache").rglob("*.json"))
+    meta = _json.loads(meta_file.read_text())
+    old_seed = [c[3] for c in engine.calls][0]
+    meta.update(qa_version=1, heard=meta["heard"] + " help you today?", attempts=3)
+    meta_file.write_text(_json.dumps(meta))
+    engine.calls.clear()
+    render(request(LINES[:1]), engine, asr, cache)
+    assert engine.calls and engine.calls[0][3] != old_seed

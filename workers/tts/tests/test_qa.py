@@ -1,7 +1,7 @@
 import numpy as np
 
 from linguabc_tts import audio as A
-from linguabc_tts.qa import (critical_spans, missing_answers, missing_spans, normalize, ordinal_words,
+from linguabc_tts.qa import (critical_spans, repeated_phrases, missing_answers, missing_spans, normalize, ordinal_words,
                              speaker_consistency, wer)
 
 
@@ -67,3 +67,22 @@ def test_loudness_normalisation_and_mp3():
     mp3 = A.encode_mp3(out, sr)
     assert mp3[:3] != b"ID3" and (mp3[0] == 0xFF)
     assert abs(A.decode_mp3(mp3, sr).size / sr - 3.0) < 0.15
+
+
+def test_respelled_words_match_what_asr_hears():
+    assert wer("This is an eye-elts Listening test.", "This is an IELTS listening test.") == 0
+
+
+def test_real_asr_spellings_from_the_pilot():
+    # Seen with faster-whisper on real Qwen audio (2026-11-22).
+    assert wer("Check-in is from 2 pm, and check-out is at 11 am.", "Check-in is from 2 p.m. and checkout is at 11 a.m.") == 0
+    assert wer("Thank you, Ms Thompson. The room is £95 a night.", "Thank you, Miss Thompson. The room is 95 pounds a night.") == 0
+    assert normalize("the twenty-third of March") == normalize("the 23rd of March")
+    assert wer("what time is check-in?", "what time is checking?") > 0  # a real difference: listen
+
+
+def test_looped_ending_is_caught():
+    said = "The trains were pulled by steam engines, so the tunnels were often full of smoke."
+    assert repeated_phrases(said, said + " of smoke.") == ["of smoke"]
+    assert repeated_phrases(said, said) == []
+    assert repeated_phrases("It was very, very cold.", "It was very very cold.") == []

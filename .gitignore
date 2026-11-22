@@ -47,3 +47,4 @@ __pycache__/
 .pytest_cache/
 .segment-cache/
 .venv/
+workers/tts/pilot/out/

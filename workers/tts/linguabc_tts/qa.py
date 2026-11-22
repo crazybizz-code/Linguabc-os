@@ -88,14 +88,24 @@ def _expand_numbers(t: str) -> str:
     return t
 
 
+#: Words the app respells for the voice (src/lib/ai/script.ts, SAY): ASR hears the real word.
+RESPELLED = {("eye", "elts"): "ielts"}
+#: Same word, different spelling: what the script writes vs what ASR tends to write.
+ALIASES = {"eyeelts": "ielts", "ms": "miss", "okay": "ok", "mr": "mister", "dr": "doctor", "colour": "color", "centre": "center",
+           "theatre": "theater", "metre": "meter", "programme": "program", "travelling": "traveling"}
+_NUMBER_WORDS = set(_ONES) | set(_TENS[2:]) | {"hundred", "thousand", "million", "billion"} | set(_ORD.values())
+
+
 def normalize(text: str) -> list[str]:
     t = strip_tags(text)
     t = re.sub(r"\b([A-Za-z])(?:-(?=[A-Za-z]\b)|\.(?=\s*[A-Za-z]\b))", r"\1 ", t)  # S-M-I-T-H, S.M.I.T.H.
     t = _expand_numbers(t)
     t = t.lower().replace("’", "'")
+    # Compounds are one word ("check-out" = "checkout"); number words stay apart ("twenty-third").
+    t = re.sub(r"\b([a-z]{2,})-(?=([a-z]{2,})\b)", lambda m: m.group(1) + (" " if m.group(1) in _NUMBER_WORDS or m.group(2) in _NUMBER_WORDS else ""), t)
     t = re.sub(r"[^a-z0-9' ]+", " ", t.replace("-", " "))
     words = [w.strip("'") for w in t.split()]
-    words = [w for w in words if w]
+    words = [ALIASES.get(w, w) for w in words if w]
     out: list[str] = []
     i = 0
     while i < len(words):
@@ -110,6 +120,12 @@ def normalize(text: str) -> list[str]:
             continue
         out.append(w)
         i += 1
+    for (a, b), word in RESPELLED.items():
+        i = 0
+        while i < len(out) - 1:
+            if out[i] == a and out[i + 1] == b:
+                out[i:i + 2] = [word]
+            i += 1
     # Join runs of single letters (spelling), keep "a" and "i" when alone.
     joined: list[str] = []
     run: list[str] = []
@@ -191,6 +207,22 @@ def missing_answers(answers: list[list[str]], transcript: str) -> list[list[str]
     return [variants for variants in answers if not any(contains(heard, normalize(v)) for v in variants)]
 
 
+def _doubled(words: list[str], n: int) -> set[tuple[str, ...]]:
+    return {tuple(words[i:i + n]) for i in range(len(words) - 2 * n + 1) if words[i:i + n] == words[i + n:i + 2 * n]}
+
+
+def repeated_phrases(reference: str, hypothesis: str) -> list[str]:
+    """Phrases said twice in a row that the script says once: the voice looped
+    (seen on real Qwen audio: "full of smoke. of smoke.")."""
+    ref, hyp = normalize(reference), normalize(hypothesis)
+    found = []
+    for n in (4, 3, 2):
+        for gram in sorted(_doubled(hyp, n) - _doubled(ref, n)):
+            if not any(" ".join(gram) in f for f in found):
+                found.append(" ".join(gram))
+    return found
+
+
 def words_per_minute(text: str, seconds: float) -> float:
     return len(normalize(text)) / (seconds / 60) if seconds > 0 else 0.0
 
@@ -211,7 +243,10 @@ class FasterWhisperTranscriber:
                 device = "cuda" if torch.cuda.is_available() else "cpu"
             except ImportError:
                 device = "cpu"
-        self.model = WhisperModel(model, device=device, compute_type="float16" if device == "cuda" else "int8")
+        import os
+
+        self.model = WhisperModel(model, device=device, compute_type="float16" if device == "cuda" else "int8",
+                                  cpu_threads=os.cpu_count() or 1)
 
     def transcribe(self, audio, sr, language):
         from .audio import resample
@@ -235,6 +270,30 @@ class FakeTranscriber:
 
 class SpeakerEmbedder(Protocol):
     def embed(self, audio: np.ndarray, sr: int) -> np.ndarray: ...
+
+
+class ResemblyzerEmbedder:
+    """Speaker embeddings from Resemblyzer (MIT, weights ship with the package, CPU is fine)."""
+
+    def __init__(self):
+        from resemblyzer import VoiceEncoder
+
+        self.encoder = VoiceEncoder("cpu", verbose=False)
+
+    def embed(self, audio, sr):
+        from resemblyzer import preprocess_wav
+
+        from .audio import resample
+
+        return self.encoder.embed_utterance(preprocess_wav(resample(audio, sr, 16000), source_sr=16000))
+
+
+def cross_similarity(a: list[np.ndarray], b: list[np.ndarray]) -> float | None:
+    """Cosine similarity between two voices' average embeddings (lower = easier to tell apart)."""
+    if not a or not b:
+        return None
+    ca, cb = (np.mean([v / (np.linalg.norm(v) + 1e-9) for v in vs], axis=0) for vs in (a, b))
+    return float(ca @ cb / ((np.linalg.norm(ca) * np.linalg.norm(cb)) + 1e-9))
 
 
 def speaker_consistency(embeddings: dict[str, list[np.ndarray]]) -> dict[str, float | None]:
