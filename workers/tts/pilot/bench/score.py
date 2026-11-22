@@ -22,11 +22,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent))
 sys.path.insert(0, str(HERE))
 
-from cases import AB_TAGS, CC0_REFERENCES, REFERENCES  # noqa: E402
+from cases import AB_TAGS, CC0_REFERENCES, IELTS_ANSWERS, REFERENCES  # noqa: E402
 from linguabc_tts import audio as A  # noqa: E402
 from linguabc_tts.accent import AccentClassifier  # noqa: E402
 from linguabc_tts.prosody import compare, measure  # noqa: E402
-from linguabc_tts.qa import ResemblyzerEmbedder, speaker_consistency  # noqa: E402
+from linguabc_tts.qa import ResemblyzerEmbedder, missing_answers, missing_spans, repeated_phrases, speaker_consistency, wer  # noqa: E402
 
 SR = 24000
 
@@ -39,6 +39,33 @@ def windows(audio, sr, seconds=8):
     n = sr * seconds
     out = [audio[i:i + n] for i in range(0, max(1, audio.size - n // 2), n)]
     return [w for w in out if A.trim(w, sr).size > sr * 3]
+
+
+AUDIO_REASONS = ("silent", "clipping", "silence of", "speaking rate")
+
+
+def requalify(report_path: Path, answers):
+    """Re-check every segment's ASR text with today's QA rules (same for all engines);
+    audio-based reasons (silence, clipping, extreme rate) from the run are kept."""
+    rep = json.loads(report_path.read_text())
+    fails, said, heard = [], [], []
+    for p in rep["segments"]:
+        reasons = [r for r in p.get("reasons", []) if r.startswith(AUDIO_REASONS)] if p["status"] != "pass" else []
+        w = wer(p["text"], p["heard"])
+        if w > 0.10:
+            reasons.append(f"WER {w:.0%}")
+        miss = missing_spans(p["text"], p["heard"])
+        if miss:
+            reasons.append("not heard: " + ", ".join(f"{m.kind} '{m.text}'" for m in miss))
+        loops = repeated_phrases(p["text"], p["heard"])
+        if loops:
+            reasons.append("repeated: " + "; ".join(loops))
+        if reasons:
+            fails.append({"text": p["text"][:70], "heard": p["heard"][:90], "reasons": reasons, "attempts": p["attempts"]})
+        said.append(p["text"])
+        heard.append(p["heard"])
+    return {"failed": len(fails), "segments": len(rep["segments"]), "wer": round(wer(" ".join(said), " ".join(heard)), 4),
+            "answers_missing": missing_answers(answers, " ".join(heard)) if answers else [], "failures": fails}
 
 
 def main() -> int:
@@ -66,9 +93,11 @@ def main() -> int:
         run = json.loads((d / "run.json").read_text())
         e = summary[d.name] = {"model": run["model"], "load_s": run["load_s"], "totals": run.get("totals"), "cases": {}, "ab": {}}
         for case, m in run["cases"].items():
-            row = {k: m[k] for k in ("status", "wer", "answers_missing", "failed", "segments", "attempts", "rtf", "seconds", "failures", "review")}
+            row = {k: m[k] for k in ("status", "attempts", "rtf", "seconds", "review")}
+            rq = requalify(d / f"{case}.report.json", IELTS_ANSWERS if case.startswith("ielts") else None)
+            row.update(rq, status="pass" if rq["failed"] == 0 else "failed", run_status=m["status"])
             mp3 = d / f"{case}.mp3"
-            voice = case.split("-", 1)[1] if "-" in case else None
+            voice = case.rsplit("-", 1)[1] if "-" in case else None
             if mp3.exists():
                 audio = A.decode_mp3(mp3.read_bytes(), SR)
                 ws = windows(audio, SR)
@@ -90,7 +119,7 @@ def main() -> int:
                 if A.trim(a1, SR).size > SR and A.trim(a2, SR).size > SR:
                     c = compare(tag, measure(a1, SR), measure(a2, SR))
                     e["ab"][tag] = {"measurable_effect": c["measurable_effect"],
-                                    "changes": {k: c[k] for k in ("f0_median_change_st", "f0_range_change_st", "end_rise_change_st", "loudness_change_db", "duration_change_pct")},
+                                    "changes": {k: (None if c[k] is None else round(float(c[k]), 2)) for k in ("f0_median_change_st", "f0_range_change_st", "end_rise_change_st", "loudness_change_db", "duration_change_pct")},
                                     "timbre_kept": round(cos(emb.embed(A.trim(a1, SR), SR), emb.embed(A.trim(a2, SR), SR)), 3)}
                 else:
                     e["ab"][tag] = {"measurable_effect": None, "note": "silent clip"}
@@ -108,8 +137,18 @@ def main() -> int:
             lines.append(f"| {eng} | {tag} | {r.get('measurable_effect')} | {r.get('changes', r.get('note'))} | {r.get('timbre_kept', '-')} |")
     lines += ["", "| Engine | Load s | Engine calls | Generated audio s | Engine wall s | RTF | Peak RAM GB |", "|---|---|---|---|---|---|---|"]
     for eng, e in summary.items():
-        t = e.get("totals") or {}
-        lines.append(f"| {eng} | {e['load_s']} | {t.get('engine_calls')} | {t.get('generated_audio_s')} | {t.get('engine_wall_s')} | {t.get('rtf')} | {t.get('peak_rss_gb')} |")
+        run = json.loads((bench / eng / "run.json").read_text())
+        cs = run["cases"].values()
+        calls = sum(c["engine_calls"] for c in cs)
+        gen = round(sum(c["generated_audio_s"] for c in cs), 1)
+        wall = round(sum(c["engine_wall_s"] for c in cs), 1)
+        final = round(sum(c["seconds"] for c in cs), 1)
+        e["speed"] = {"engine_calls": calls, "segments": sum(c["segments"] for c in cs), "generated_audio_s": gen,
+                      "final_audio_s": final, "engine_wall_s": wall, "rtf": round(wall / max(gen, 0.01), 2),
+                      "wall_per_final_audio_s": round(wall / max(final, 0.01), 2), "peak_rss_gb": (e.get("totals") or {}).get("peak_rss_gb")}
+        sp = e["speed"]
+        lines.append(f"| {eng} | {e['load_s']} | {calls} (segments {sp['segments']}) | {gen} | {wall} | {sp['rtf']} (per final audio s: {sp['wall_per_final_audio_s']}) | {sp['peak_rss_gb']} |")
+    (bench / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False, default=str), "utf-8")
     (bench / "summary.md").write_text("\n".join(lines) + "\n", "utf-8")
     print("\n".join(lines))
     return 0

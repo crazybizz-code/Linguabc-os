@@ -180,6 +180,7 @@ class Span:
 
 
 _SPANS = [
+    ("phone", re.compile(r"\b0\d+(?:[\s,-]+\d+)+\b")),
     ("money", re.compile(r"[£$€]\s?\d[\d,]*(?:\.\d{2})?")),
     ("date", re.compile(r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:" + "|".join(MONTHS) + r")\b|\b(?:" + "|".join(MONTHS) + r")\s+\d{1,2}(?:st|nd|rd|th)?\b", re.I)),
     ("time", re.compile(r"\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm|a\.m\.|p\.m\.)", re.I)),

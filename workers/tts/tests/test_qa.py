@@ -99,3 +99,9 @@ def test_postcodes_and_codes():
     assert wer("It's B-S-three, two-L-R.", "It's BS3-2LR.") == 0
     assert wer("It's B-S-three, two-L-R.", "It's BS3 2LR.") == 0
     assert normalize("the 23rd of March") == normalize("the twenty-third of March")
+
+
+def test_phone_number_is_one_span():
+    # Real ASR output on Qwen audio (2026-11-22).
+    assert missing_spans("You can reach me on 07946 328 150, any time after 4 pm.",
+                         "You can reach me on 07-946-328-150 anytime after 4 p.m.") == []
