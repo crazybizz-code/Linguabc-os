@@ -140,8 +140,12 @@ export async function audioJobResult(supabase: Client, jobId: string): Promise<J
 }
 
 export async function reviewAudioJob(supabase: Client, jobId: string, approve: boolean): Promise<{ status?: string; error?: string }> {
+  const { data: job } = await supabase.from("audio_jobs").select("target_bucket, target_path").eq("id", jobId).maybeSingle();
   const { data, error } = await supabase.rpc("review_audio_job", { p_job: jobId, p_approve: approve });
-  return error ? { error: friendly(error.message) } : { status: String(data) };
+  if (error) return { error: friendly(error.message) };
+  // A rejected recording was never put into a draft (only completed ones can be attached): remove its file.
+  if (!approve && job) await supabase.storage.from(job.target_bucket).remove([job.target_path]);
+  return { status: String(data) };
 }
 
 export type RecoveredJob = {
@@ -155,10 +159,18 @@ export type RecoveredJob = {
  */
 export async function recoverAudioJob(supabase: Client, userId: string, draftKey: string, script: string, audioPath?: string): Promise<RecoveredJob | null> {
   const { data: job } = await supabase.from("audio_jobs")
-    .select("id, provider, status, target_path, script_hash, attached_at, created_at")
+    .select("id, provider, status, target_bucket, target_path, script_hash, attached_at, created_at")
     .eq("draft_key", draftKey).eq("created_by", userId).is("dismissed_at", null)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!job || (audioPath && job.target_path === audioPath)) return null;
+  // A finished file can be gone (a later recording replaced and removed it): never offer a missing file.
+  if (job.status === "completed" || job.status === "needs_review") {
+    const { data: present, error } = await supabase.storage.from(job.target_bucket).exists(job.target_path);
+    if (error || !present) {
+      if (!error) await supabase.rpc("dismiss_audio_job", { p_job: job.id });
+      return null;
+    }
+  }
   return { id: job.id, provider: job.provider, status: job.status, attached: Boolean(job.attached_at),
     sameScript: job.script_hash === scriptHash(script), startedAt: job.created_at };
 }

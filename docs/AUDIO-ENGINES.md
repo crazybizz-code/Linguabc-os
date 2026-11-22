@@ -38,7 +38,7 @@ default) and never shows an engine choice.
 
 ### Recovery (closing the editor does not lose a recording)
 
-Every job stores its draft slot (`draft_key`: `test:<test id>:<section index>`
+Every job stores its draft slot (`draft_key`: `test:<test id>:<section id>`, the stored id `s1`…`s4` of the fixed IELTS slot,
 or `podcast:<id | new>`, checked against the target file) and `script_hash`.
 When the editor opens, `recoverStudioJob` asks for the person's newest job
 for that slot that is not dismissed and is not the draft's current file. A

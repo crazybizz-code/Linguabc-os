@@ -116,7 +116,7 @@ function SectionCard({ index, section: s, first, testId, skill, level, voices, e
   // The section's answer key goes with its recording job, for the worker's check only
   // (gap questions' accepted answers, numbered as students see them; nothing comes back but numbers).
   const answers = s.questions.flatMap((q, k) => (q.type === "gap" && q.accepted?.some((v) => v.trim()) ? [{ id: String(first + k), accepted: q.accepted }] : []));
-  const target = { kind: "test" as const, testId, section: index };
+  const target = { kind: "test" as const, testId, section: s.id ?? `s${index + 1}` };
   const jobs: StudioJobs = {
     start: (engine, script, cast) => startStudioJob(engine, script, cast, target, answers),
     retry: (jobId, script, cast) => retryStudioJob(jobId, script, cast, answers),

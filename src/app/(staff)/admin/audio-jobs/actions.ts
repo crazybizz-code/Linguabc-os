@@ -20,12 +20,12 @@ import {
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** The draft slot a recording is for: a test's section, or a podcast (new = not saved yet). */
-export type StudioTarget = { kind: "test"; testId: string; section: number } | { kind: "podcast"; podcastId?: string | null };
+/** The draft slot a recording is for: a test's section (its stored id, s1..s4), or a podcast (new = not saved yet). */
+export type StudioTarget = { kind: "test"; testId: string; section: string } | { kind: "podcast"; podcastId?: string | null };
 
 function draftKeyOf(target: StudioTarget): string | null {
   if (target?.kind === "test") {
-    return UUID.test(target.testId) && Number.isInteger(target.section) && target.section >= 0 && target.section < 100
+    return UUID.test(target.testId) && typeof target.section === "string" && /^s\d{1,2}$/.test(target.section)
       ? `test:${target.testId}:${target.section}` : null;
   }
   if (target?.kind === "podcast") {

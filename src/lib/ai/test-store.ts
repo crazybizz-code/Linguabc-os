@@ -9,7 +9,8 @@ import { storedAnswers, storedGroups, storedQuestions } from "./draft-store";
 import type { DraftGroup, DraftQuestion } from "./draft";
 
 export type TestSkill = "reading" | "listening";
-export type SectionDraft = { title: string; passage: string; audio_path?: string; groups: DraftGroup[]; questions: DraftQuestion[] };
+/** `id` is the stored section id (s1..s4), stable for the slot; new drafts take s<n>. */
+export type SectionDraft = { id?: string; title: string; passage: string; audio_path?: string; groups: DraftGroup[]; questions: DraftQuestion[] };
 export type TestDraft = { title: string; skill: TestSkill; level: Level; sections: SectionDraft[] };
 
 export function testToStored(t: TestDraft) {

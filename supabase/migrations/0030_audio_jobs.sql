@@ -28,7 +28,7 @@
 --     same job, so a double click never pays or records twice.
 --   * Fish recordings do not use jobs: they keep the existing direct path.
 --   * Recovery: each job names the draft slot it was made for (draft_key,
---     e.g. test:<id>:<section>) and a hash of its script, so an editor that
+--     e.g. test:<id>:s2, the stored section id) and a hash of its script, so an editor that
 --     was closed finds its running or finished job again. attach_audio_job
 --     marks a finished recording as put into the draft (idempotent);
 --     dismiss_audio_job hides one the editor does not want.
@@ -48,7 +48,7 @@ create table public.audio_jobs (
   target_bucket   text not null check (target_bucket in ('listening-audio', 'library-audio', 'library-podcasts')),
   target_path     text not null,
   idempotency_key text not null check (idempotency_key ~ '^[0-9a-f]{64}$'),
-  draft_key       text not null check (draft_key ~ '^(test:[0-9a-f-]{36}:[0-9]{1,2}|podcast:[A-Za-z0-9_-]{1,64}|homework:[A-Za-z0-9_-]{1,64})$'),
+  draft_key       text not null check (draft_key ~ '^(test:[0-9a-f-]{36}:s[0-9]{1,2}|podcast:[A-Za-z0-9_-]{1,64}|homework:[A-Za-z0-9_-]{1,64})$'),
   script_hash     text not null check (script_hash ~ '^[0-9a-f]{64}$'),
   answers_expected int not null default 0 check (answers_expected between 0 and 200),
   attached_at     timestamptz,
@@ -250,7 +250,7 @@ begin
      or not app.audio_job_draft_ok(v.purpose, v.draft_key, p_path) then raise exception 'bad target for this recording'; end if;
   update public.audio_jobs set status = 'queued', attempts = attempts + 1, progress = 0, segments_done = 0,
     target_path = p_path, error = null, qa = null, seconds = null, lease_until = null, started_at = null, finished_at = null,
-    attached_at = null, dismissed_at = null
+    attached_at = null, dismissed_at = null, reviewed_by = null, reviewed_at = null
   where id = v.id;
   update public.audio_job_tokens set token_hash = p_token_hash where job_id = v.id;
   return v.attempts + 1;

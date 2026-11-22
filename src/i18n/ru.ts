@@ -987,6 +987,7 @@ export const ru: Record<string, string> = {
   "Found a recording started earlier for this part.": "Найдена запись, начатая ранее для этой части.",
   "It was made from an earlier version of the script.": "Она сделана по предыдущей версии сценария.",
   "This recording finished while the page was closed. Listen, then use it or dismiss it.": "Эта запись завершилась, пока страница была закрыта. Прослушайте её, затем используйте или отклоните.",
+  "Answers not heard in the recording: questions {list}": "В записи не слышны ответы: вопросы {list}",
   "Use this recording": "Использовать эту запись",
   "Dismiss": "Скрыть",
   "Approve the recording before you use it.": "Одобрите запись, прежде чем использовать её.",

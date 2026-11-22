@@ -226,10 +226,39 @@ def missing_spans(reference: str, hypothesis: str) -> list[Span]:
     return [s for s in critical_spans(reference) if not contains(heard, normalize(s.text))]
 
 
+_ORDINAL = {"one": "first", "two": "second", "three": "third", "four": "fourth", "five": "fifth", "six": "sixth",
+            "seven": "seventh", "eight": "eighth", "nine": "ninth", "ten": "tenth", "eleven": "eleventh", "twelve": "twelfth",
+            "thirteen": "thirteenth", "fourteen": "fourteenth", "fifteen": "fifteenth", "sixteen": "sixteenth",
+            "seventeen": "seventeenth", "eighteen": "eighteenth", "nineteen": "nineteenth", "twenty": "twentieth", "thirty": "thirtieth"}
+_DATE_FILLER = {"the", "of"}
+
+
+def _date_forms(words: list[str]) -> list[list[str]]:
+    """A date answer as people say it: "23 March", "23rd March", "March 23" and
+    "the 23rd of March" are the same answer. Fillers (the, of) are dropped and
+    the day is an ordinal, before or after the month."""
+    if not any(w in MONTHS for w in words):
+        return [words]
+    core = [w for w in words if w not in _DATE_FILLER]
+    i = next(k for k, w in enumerate(core) if w in MONTHS)
+    before, month, after = core[:i], core[i], core[i + 1:]
+    day = before or after
+    if not day or not all(w in _NUMBER_WORDS for w in day):
+        return [words, core]
+    day = day[:-1] + [_ORDINAL.get(day[-1], day[-1])]
+    rest = after if before else []
+    return [words, core, day + [month] + rest, [month] + day + rest]
+
+
 def missing_answers(answers: list[list[str]], transcript: str) -> list[list[str]]:
     """Answers (each with accepted variants) not heard anywhere in the recording."""
     heard = normalize(transcript)
-    return [variants for variants in answers if not any(contains(heard, normalize(v)) for v in variants)]
+    plain = [w for w in heard if w not in _DATE_FILLER]
+
+    def found(v: str) -> bool:
+        return any(contains(heard, f) or contains(plain, f) for f in _date_forms(normalize(v)))
+
+    return [variants for variants in answers if not any(found(v) for v in variants)]
 
 
 def _doubled(words: list[str], n: int) -> set[tuple[str, ...]]:

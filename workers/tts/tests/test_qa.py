@@ -111,3 +111,11 @@ def test_postcode_written_with_a_dot():
     # Real ASR output on Chatterbox Turbo audio (2026-11-22).
     assert wer("the postcode is CB2 1TN.", "the postcode is CB2.1TN.") == 0
     assert wer("It costs 2.5 pounds.", "It costs two point five pounds.") == 0
+
+
+def test_date_answers_match_how_they_are_said():
+    said = "Tom: it starts on the twenty-third of March and ends on April the fifth"
+    for forms in (["23rd March"], ["23 March"], ["March 23"], ["the 23rd of March"], ["5 April"], ["April 5th"]):
+        assert missing_answers([forms], said) == [], forms
+    assert missing_answers([["24 March"]], said) == [["24 March"]]
+    assert missing_answers([["23 May"]], said) == [["23 May"]]

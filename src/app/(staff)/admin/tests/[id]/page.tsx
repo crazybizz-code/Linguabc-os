@@ -34,6 +34,7 @@ export default async function LibraryTestPage({ params }: PageProps<"/admin/test
   const sections: SectionDraft[] = SPECS[skill].map((spec, i) => {
     const s = stored[i];
     return {
+      id: s?.id ?? `s${i + 1}`,
       title: s?.title ?? spec.title,
       passage: (skill === "listening" ? transcripts[s?.id ?? ""] : s?.passage) ?? "",
       audio_path: s?.audio_path,

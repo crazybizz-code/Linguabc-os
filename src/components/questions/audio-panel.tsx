@@ -73,7 +73,8 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
 
   // Once per opening: find a recording made for this slot while the page was closed.
   useEffect(() => {
-    if (asked.current || !jobs) return;
+    // Only where a worker engine is switched on (AUDIO_ENGINES): with Fish alone nothing about jobs runs.
+    if (asked.current || !jobs || !engines?.some((e) => e.async)) return;
     asked.current = true;
     void jobs.recover(script, audioPath).then((r) => {
       if (!r) return;
@@ -113,8 +114,13 @@ export function AudioPanel({ script, audioPath, initialUrl, voices, record, onCh
         });
         return;
       }
-      const qa = (r.qa ?? {}) as { problems?: unknown };
-      setReview({ path: r.path, problems: Array.isArray(qa.problems) ? qa.problems.map(String) : [] });
+      // Problems come from the worker in English; the answer check is said in the reader's language
+      // (question numbers only: the worker never reports answers).
+      const qa = (r.qa ?? {}) as { problems?: unknown; answers_missing?: unknown };
+      const missing = Array.isArray(qa.answers_missing) ? qa.answers_missing.map(String) : [];
+      const others = Array.isArray(qa.problems) ? qa.problems.map(String).filter((p) => !/answer\(s\) not heard/.test(p)) : [];
+      setReview({ path: r.path, problems: [
+        ...(missing.length ? [t("Answers not heard in the recording: questions {list}", { list: missing.join(", ") })] : []), ...others] });
     });
   }, [job, jobId, jobs, onChange, onSeconds, recovered, script, t]);
 

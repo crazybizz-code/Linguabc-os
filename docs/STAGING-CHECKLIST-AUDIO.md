@@ -7,7 +7,7 @@ worker on a free or local machine (CPU is fine; nothing here needs a paid
 GPU). Every step needs the owner's approval; nothing below touches
 `qycffcuuavtlojkxrkiz`.
 
-Mark each box with the result and who checked it.
+Mark each box with the result and who checked it. The local, isolated run of most of these (and how to rebuild that environment) is in `docs/STAGING-QA-AUDIO.md`; this checklist is for a real Supabase project before production.
 
 ## 0. Set-up
 
