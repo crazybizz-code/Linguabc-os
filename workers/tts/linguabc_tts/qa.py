@@ -100,6 +100,8 @@ _NUMBER_WORDS = set(_ONES) | set(_TENS[2:]) | {"hundred", "thousand", "million",
 
 def normalize(text: str) -> list[str]:
     t = strip_tags(text)
+    # ASR sometimes joins a UK postcode with a dot ("CB2.1TN"): that is not a decimal.
+    t = re.sub(r"\b([A-Z]{1,2}\d[A-Z\d]?)[.\-](\d[A-Z]{2})\b", r"\1 \2", t)
     # Codes that mix letters and digits (postcodes "BS3 2LR", flight "BA207") are read character by character.
     t = re.sub(r"\b(?!\d+(?:st|nd|rd|th|s|am|pm)\b)(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,8}\b", lambda m: " ".join(m.group(0)), t)
     t = re.sub(r"\b([A-Za-z])-(?=\w)", r"\1 ", t)  # B-S-three

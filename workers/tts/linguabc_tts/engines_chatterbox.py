@@ -33,10 +33,14 @@ TURBO_OFFICIAL_TAGS = (
     "[narration]", "[advertisement]",
 )
 
-#: LinguABC expression -> Turbo tag. Our choice; tags without a sensible match are dropped.
+#: Tags that garbled the words on a real run (2026-11-22, pilot/turbo_tags.py): never sent.
+#: [whispering] WER 27% ("6.4" invented), [dramatic] 64%, [narration] 18%, [advertisement] 27%, [sarcastic] 9%.
+TURBO_UNSAFE_TAGS = ("[whispering]", "[dramatic]", "[narration]", "[advertisement]", "[sarcastic]")
+
+#: LinguABC expression -> Turbo tag. Our choice; tags without a sensible (and safe) match are dropped.
 TURBO_TAG_FOR = {
     "laughing": "[laugh]", "chuckling": "[chuckle]", "amused": "[chuckle]", "sighing": "[sigh]",
-    "whispering": "[whispering]", "surprised": "[surprised]", "sarcastic": "[sarcastic]",
+    "surprised": "[surprised]",
     "happy": "[happy]", "excited": "[happy]", "enthusiastic": "[happy]",
     "annoyed": "[angry]", "frustrated": "[angry]", "worried": "[fear]", "nervous": "[fear]",
 }
@@ -55,6 +59,10 @@ def _fingerprint(path: Path, *extra) -> str:
     for e in extra:
         h.update(str(e).encode())
     return h.hexdigest()[:16]
+
+
+assert not set(TURBO_TAG_FOR.values()) & set(TURBO_UNSAFE_TAGS)
+assert set(TURBO_TAG_FOR.values()) <= set(TURBO_OFFICIAL_TAGS)
 
 
 class ChatterboxEngine:

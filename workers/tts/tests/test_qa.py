@@ -105,3 +105,9 @@ def test_phone_number_is_one_span():
     # Real ASR output on Qwen audio (2026-11-22).
     assert missing_spans("You can reach me on 07946 328 150, any time after 4 pm.",
                          "You can reach me on 07-946-328-150 anytime after 4 p.m.") == []
+
+
+def test_postcode_written_with_a_dot():
+    # Real ASR output on Chatterbox Turbo audio (2026-11-22).
+    assert wer("the postcode is CB2 1TN.", "the postcode is CB2.1TN.") == 0
+    assert wer("It costs 2.5 pounds.", "It costs two point five pounds.") == 0

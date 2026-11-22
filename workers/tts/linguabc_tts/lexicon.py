@@ -21,12 +21,15 @@ import re
 
 #: word -> {engine key: respelling}; "default" is used for engines without an entry.
 LEXICON: dict[str, dict[str, str]] = {
+    # pilot/lexicon_test.py, 2 seeds each (2026-11-22). As written, "LinguABC" was heard right
+    # 0/2 on Chatterbox, 0/2 Turbo, 1/2 Qwen CustomVoice, 0/2 Qwen clone.
     "LinguABC": {
-        "default": "Lingua A B C",
+        "default": "Lingua A B C",     # Chatterbox 2/2, Turbo 2/2, Qwen CustomVoice 2/2, Zonos 1/2 (1 tried)
+        "qwen": "Lingua, A, B, C",     # Qwen CustomVoice 2/2, Qwen clone 2/2 (the default: 1/2 on clone)
     },
 }
 
-LEXICON_VERSION = 1
+LEXICON_VERSION = 2
 
 
 def respell(text: str, engine_key: str) -> str:

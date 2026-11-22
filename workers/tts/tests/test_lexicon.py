@@ -29,5 +29,11 @@ def test_pipeline_sends_the_respelling(tmp_path):
     engine = FakeEngine()
     req = parse_request({"version": 1, "scope": "platform", "plan": [{"kind": "speech", "voice": "Ryan", "text": "Welcome to LinguABC."}]})
     res = render(req, engine, FakeTranscriber(engine), SegmentCache(tmp_path))
-    assert engine.calls[0][0] == "Welcome to Lingua A B C."
+    assert engine.calls[0][0] == "Welcome to Lingua, A, B, C."  # FakeEngine is a "qwen" provider
     assert res.ok
+
+
+def test_chosen_entries():
+    assert respell("LinguABC", "chatterbox") == "Lingua A B C"
+    assert respell("LinguABC", "chatterbox-turbo") == "Lingua A B C"
+    assert respell("LinguABC", "qwen") == "Lingua, A, B, C"
