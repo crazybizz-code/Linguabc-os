@@ -119,3 +119,9 @@ def test_date_answers_match_how_they_are_said():
         assert missing_answers([forms], said) == [], forms
     assert missing_answers([["24 March"]], said) == [["24 March"]]
     assert missing_answers([["23 May"]], said) == [["23 May"]]
+
+
+def test_british_dotted_times_are_times_not_decimals():
+    assert normalize("The library opens at 9.30 in the morning") == normalize("The library opens at nine thirty in the morning")
+    assert normalize("10.15 am") == normalize("ten fifteen am")
+    assert normalize("it measured 6.4 metres") == ["it", "measured", "six", "point", "four", "metres"]  # still a decimal
