@@ -1,6 +1,6 @@
 """A worker with the fake engine, for the cross-language end-to-end test (tests/ts/worker.e2e.mjs).
 
-    TTS_ALLOW_HTTP=1 LINGUABC_TTS_SECRET=... uvicorn tests.e2e_server:app --port 8765   (from workers/tts)
+    TTS_ALLOW_HTTP=1 TTS_CALLBACK_HOSTS=127.0.0.1 TTS_UPLOAD_HOSTS=127.0.0.1 LINGUABC_TTS_SECRET=... uvicorn tests.e2e_server:app --port 8765   (from workers/tts)
 """
 import os
 import tempfile
