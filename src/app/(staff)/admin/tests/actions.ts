@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getPlatformContext } from "@/lib/auth/platform";
 import { AiUnavailable } from "@/lib/ai/gemini";
-import { fishConfigured, MAX_SCRIPT_CHARS, speakScript } from "@/lib/ai/fish";
+import { MAX_SCRIPT_CHARS } from "@/lib/ai/fish";
+import { audioConfigured, notConfiguredMessage, speak } from "@/lib/ai/voice";
 import { generateSection, SPECS, type TestSkill } from "@/lib/ai/test-draft";
 import { LEVELS, type Level } from "@/lib/ai/draft";
 import { testToStored, type SectionDraft, type TestDraft } from "@/lib/ai/test-store";
@@ -41,13 +42,13 @@ export async function draftSection(skill: TestSkill, part: number, lvl: string, 
 /** Records a listening section into the library bucket under its test. */
 export async function recordSection(testId: string, script: string, previous?: string, cast?: Cast): Promise<{ path?: string; url?: string; error?: string }> {
   if (!UUID.test(testId)) return { error: "Test not found." };
-  if (!fishConfigured()) return { error: "Audio is not configured yet. Add a Fish Audio key in the hosting settings." };
+  if (!audioConfigured()) return { error: notConfiguredMessage() };
   const text = String(script ?? "").trim();
   if (text.length < 20) return { error: "Write the script first." };
   if (text.length > MAX_SCRIPT_CHARS) return { error: "The script is too long for one recording (12,000 characters at most)." };
   const { supabase } = await getPlatformContext();
   const r = await withAdminAi("audio", async () => {
-    const speech = await speakScript(text, cast && typeof cast === "object" ? cast : {});
+    const speech = await speak(text, cast && typeof cast === "object" ? cast : {}, { supabase, centerId: null, purpose: "test" });
     const path = `tests/${testId}/${crypto.randomUUID()}.mp3`;
     const { error } = await supabase.storage.from(LIBRARY_AUDIO).upload(path, speech.audio, { contentType: "audio/mpeg", upsert: false });
     if (error) { console.error("Library audio upload failed", error.message); throw new AiUnavailable("The audio could not be saved. Try again."); }

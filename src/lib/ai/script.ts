@@ -116,3 +116,24 @@ export function defaultCast(speakers: string[], voices: Voice[], chosen: Cast = 
   for (const s of speakers) if (!cast[s]) cast[s] = free[n++] ?? voices[n % Math.max(voices.length, 1)]?.id ?? "";
   return cast;
 }
+
+export type PlanItem = { kind: "speech"; speaker: string; voice: string; text: string } | { kind: "pause"; seconds: number };
+
+/**
+ * A script as a list of what to say, in which voice, and every silence
+ * (pauses and the natural gap between turns): the input of the TTS worker
+ * (workers/tts). Same reading rules as the Fish path.
+ */
+export function planScript(script: string, chosen: Cast, voices: Voice[]): PlanItem[] {
+  const segments = splitScript(script);
+  const cast = defaultCast([...new Set(segments.filter((s) => !s.pause).map((s) => s.speaker ?? ""))], voices, chosen);
+  const plan: PlanItem[] = [];
+  let prev: string | null | undefined;
+  segments.forEach((s, i) => {
+    if (s.pause) { plan.push({ kind: "pause", seconds: s.pause }); prev = undefined; return; }
+    if (prev !== undefined) plan.push({ kind: "pause", seconds: Math.round(turnGap(prev, s.speaker, i) * 1000) / 1000 });
+    plan.push({ kind: "speech", speaker: s.speaker ?? "", voice: cast[s.speaker ?? ""] ?? voices[0]?.id ?? "", text: speakable(s.text, "bracket") });
+    prev = s.speaker;
+  });
+  return plan;
+}

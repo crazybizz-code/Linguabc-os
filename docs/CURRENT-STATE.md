@@ -1,6 +1,6 @@
 # Current state
 
-_Last updated: 2026-11-20. Update this file at the end of every working session._
+_Last updated: 2026-11-21. Update this file at the end of every working session._
 
 ## Code
 - `main`: the last feature merge is **`8826a16`**, "IELTS question types, server marking and vocabulary cue cards (#17)". It's followed by docs-only commits: `4f02d1c` (#18, project memory) and this state update (#19).
@@ -96,6 +96,19 @@ Both are drafts waiting for the owner's review before publishing.
 **Known marking bug:** `app.norm_answer` strips the dot from decimals, so "1.5" becomes "1 5" (two words). A gap answer with a decimal can then break its word limit. Fix it in part B.
 
  Live checks: section drafting works (one early failed attempt, cause unknown), and after #23 the owner confirmed voices stay steady across lines.
+
+## AI Audio Engine V2 (branch `claude/affectionate-gates-o40z82`, 2026-11-21, not merged)
+- **Segment cache for Fish (Phase 1):** migration `0029_audio_segments` (**not applied**), `src/lib/ai/segment-cache.ts` (hash, claim, checkpoint, retry), `segment-store.ts` (Supabase), `fish.ts` uses it. Re-recording speaks only changed turns; failures keep finished turns; parallel requests don't pay twice.
+- **Provider switch:** `src/lib/ai/voice.ts`, `AUDIO_PROVIDER` = fish (default) | qwen | kokoro (stub). All three record actions and four pages go through it.
+- **Qwen3-TTS worker (Phase 2-4):** `workers/tts` (Python). Tested only with a fake engine and fake ASR: no GPU here and huggingface.co is blocked, so **no real Qwen inference has run**. Modal config written, **not deployed**.
+- Production usage before the change (read-only, 2026-11-21): 9 Fish recordings, 26,870 bytes (~$0.40), 7 files kept (2 were re-takes). Fish dashboard said $0.57.
+- Tests: SQL suite 29 sections pass (new: 29. audio segment cache); `npm run test:ts` 17 pass; `workers/tts` pytest 40 pass; tsc, eslint, build clean.
+- **Before production:** owner approves applying 0029; the cache works without it (speaks as before) but saves nothing.
+- **Real Qwen runs (2026-11-22, free 4-vCPU container, no GPU):** CustomVoice pilot (3 recordings), VoiceDesign vs Base-clone lab (4 designed voices), and a full Part 1 section with cloned voices (400 s, 62 segments, WER 0.67%, all 10 answers heard, ~87 min of compute). Every Qwen voice, designed as British or Australian or not, was scored American by the CommonAccent check; the owner's blind listening decides. Audio is in `workers/tts/pilot/out/` (not committed); blind review kit in `workers/tts/pilot/out/blind-review/` (Fish samples to be added by the owner).
+- The environment's network allowlist now includes Hugging Face hosts and `download.pytorch.org` (added with the owner's approval, 2026-11-22).
+- **Engine bench (2026-11-22, CPU):** Chatterbox (MIT, retired upstream), Zonos v0.1 transformer (Apache-2.0) and Qwen3-TTS run on the same cases (`workers/tts/pilot/bench/`). With numbers/money/codes rewritten to words before synthesis (`linguabc_tts/spoken.py`; both Qwen cloning and Chatterbox fail on raw digits), Chatterbox passed every IELTS case and rendered the full Part 1 section first time (413 s, WER 0.45%, 10/10 answers, 69 calls for 62 segments, ~43 min on 4 vCPU vs ~87 min for Qwen). Zonos mispronounced IELTS details ("Malksh" for March) and is ~3x slower. Results and the blind review kit: `workers/tts/pilot/out/bench/` (not committed).
+- **Chatterbox Turbo and integration prep (2026-11-22):** Turbo passed every IELTS case and the podcast at ~2x the 0.5B speed (RTF 2.5 on CPU); its tokenizer has 19 official tags: 8 non-verbal ones work (laugh, chuckle, cough, sigh, gasp, sniff, shush, clear throat), whispering/dramatic/narration/advertisement/sarcastic garble the words and are never sent. "LinguABC" is respelled per engine in the worker only (`linguabc_tts/lexicon.py`; Fish untouched). Audit of the 0.5B section: no loops, no speaker drift. Ready but not built or deployed: voice registry with consent checks (`VOICES.md`), Chatterbox and Qwen GPU images (`workers/tts/docker/`), Modal configs. Plan: `workers/tts/INTEGRATION-PLAN.md`.
+- **Audio jobs (2026-11-22, not merged):** migration `0030_audio_jobs` (**not applied**), Audio Studio engine choice for platform admins (Fish / Chatterbox Turbo / Chatterbox 0.5B / Qwen; `AUDIO_ENGINES`, default Fish only), async jobs with signed dispatch, signed upload URLs, signed webhook, Realtime progress, QA review and retry. Centres' homework, players and the Fish path are unchanged. Jobs are recovered when the editor is reopened (draft slot per job, attached at most once, no re-recording), and test recordings carry the section's answer key to the worker's ASR check (ids only come back; a recording with an unheard or unchecked answer cannot complete without review). Deployment and rollback: `docs/AUDIO-ENGINES.md`; before production: `docs/STAGING-CHECKLIST-AUDIO.md`; local isolated QA results: `docs/STAGING-QA-AUDIO.md`. No worker is deployed.
 
 ## Exact next task
 1. **V1 step 4, in-app notifications:** built on the branch (0022 triggers; a bell in the student and parent portals; translated text). With the owner's go-ahead: apply 0022, then merge.

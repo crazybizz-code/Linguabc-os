@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getPlatformContext } from "@/lib/auth/platform";
-import { voiceOptions } from "@/lib/ai/fish";
+import { voiceOptions } from "@/lib/ai/voice";
+import { studioEngines } from "@/lib/ai/engines";
 import { toDraftQuestion } from "@/lib/ai/draft-store";
 import { transcriptToScript, type VocabWord } from "@/lib/ai/podcast";
 import type { Level } from "@/lib/ai/draft";
@@ -20,10 +21,12 @@ export default async function LibraryPodcastPage({ params }: PageProps<"/admin/p
   const { id } = await params;
   const { supabase, t } = await getPlatformContext();
   const voices = await voiceOptions();
+  // Engine choice is for LinguABC admins only: this page is platform-only (getPlatformContext).
+  const engines = await studioEngines();
   const back = <Link href="/admin/podcasts" className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground hover:text-[#17211D]"><ChevronLeft className="h-4 w-4" /> {t("LinguABC podcasts")}</Link>;
 
   if (id === "new") {
-    return <div className="space-y-5">{back}<PodcastEditor id={null} status="draft" initial={EMPTY} voices={voices} /></div>;
+    return <div className="space-y-5">{back}<PodcastEditor id={null} status="draft" initial={EMPTY} voices={voices} engines={engines} /></div>;
   }
 
   const [{ data: item }, { data: key }] = await Promise.all([
@@ -49,7 +52,7 @@ export default async function LibraryPodcastPage({ params }: PageProps<"/admin/p
   return (
     <div className="space-y-5">
       {back}
-      <PodcastEditor id={item.id} status={item.status} initial={initial} voices={voices} audioUrl={item.audio_url ?? undefined} />
+      <PodcastEditor id={item.id} status={item.status} initial={initial} voices={voices} audioUrl={item.audio_url ?? undefined} engines={engines} />
     </div>
   );
 }

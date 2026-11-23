@@ -1,0 +1,17 @@
+{
+  "id": "emma-gb",
+  "display_name": "Emma (British, female)",
+  "accent": "british",
+  "language": "en",
+  "transcript": "Good morning. I'd like to tell you a little about our city library. It opens at half past nine, and you can borrow up to six books at a time.",
+  "consent": {
+    "speaker": "Full legal name of the speaker",
+    "signed_on": "YYYY-MM-DD",
+    "document": "Where the signed consent is kept (outside git), e.g. contracts/2026-12-01-emma.pdf",
+    "scopes": ["voice-cloning", "commercial-use", "linguabc-platform"],
+    "expires_on": null,
+    "revoked_on": null
+  },
+  "licence": "work-for-hire",
+  "source": "Studio recording, YYYY-MM-DD, microphone and room"
+}

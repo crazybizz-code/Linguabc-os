@@ -13,6 +13,18 @@ import { MAX_SCRIPT_CHARS, type Voice } from "@/lib/ai/script";
 import type { QuestionType } from "@/lib/questions";
 import { QuestionEditor, questionProblem, typeLabel } from "../../homework/new/question-editor";
 import { deletePodcast, draftPodcast, recordPodcast, savePodcast, setPodcastStatus, type PodcastSave } from "./actions";
+import {
+  attachStudioJob, dismissStudioJob, recoverStudioJob, retryStudioJob, reviewStudioJob, startStudioJob, studioJobResult,
+} from "../audio-jobs/actions";
+import type { StudioEngineOption, StudioJobs } from "@/components/questions/audio-panel";
+
+/** Job actions for one podcast's recording (a new podcast's slot is "new" until it is saved). */
+const podcastJobs = (podcastId: string | null): StudioJobs => ({
+  start: (engine, script, cast) => startStudioJob(engine, script, cast, { kind: "podcast", podcastId }),
+  retry: (jobId, script, cast) => retryStudioJob(jobId, script, cast),
+  recover: (script, audioPath) => recoverStudioJob({ kind: "podcast", podcastId }, script, audioPath),
+  result: studioJobResult, review: reviewStudioJob, attach: attachStudioJob, dismiss: dismissStudioJob,
+});
 
 const area = `${inputClass} h-auto py-2 leading-relaxed`;
 const TONE: Record<string, Tone> = { draft: "amber", published: "green", hidden: "neutral" };
@@ -24,8 +36,8 @@ const FORMAT_LABEL: Record<string, string> = {
   "a short story told by a narrator": "Story",
 };
 
-export function PodcastEditor({ id, status, initial, voices, audioUrl }: {
-  id: string | null; status: string; initial: PodcastSave; voices: Voice[]; audioUrl?: string;
+export function PodcastEditor({ id, status, initial, voices, audioUrl, engines }: {
+  id: string | null; status: string; initial: PodcastSave; voices: Voice[]; audioUrl?: string; engines?: StudioEngineOption[];
 }) {
   const t = useT();
   const router = useRouter();
@@ -140,7 +152,8 @@ export function PodcastEditor({ id, status, initial, voices, audioUrl }: {
               if (r.seconds) update({ seconds: r.seconds });
               return r;
             }}
-            onChange={(audioPath) => update({ audioPath })} />
+            onChange={(audioPath) => update({ audioPath })}
+            engines={engines} jobs={podcastJobs(id)} onSeconds={(seconds) => update({ seconds: Math.round(seconds) })} />
         )}
       </Card>
 

@@ -1,0 +1,23 @@
+[project]
+name = "linguabc-tts"
+version = "0.1.0"
+description = "LinguABC AI Audio Engine V2: Qwen3-TTS worker (pilot)"
+requires-python = ">=3.11"
+# The core (planning, cache, QA maths, audio assembly) needs only numpy and ffmpeg.
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+# Real inference. qwen-tts 0.1.1 pins transformers 4.57.3 and accelerate 1.12.0.
+qwen = ["qwen-tts==0.1.1", "torch>=2.4", "huggingface_hub>=0.26"]
+# ASR transcript check.
+asr = ["faster-whisper==1.2.1"]
+# Optional speaker-consistency embeddings.
+speaker = ["speechbrain>=1.0", "torchaudio"]
+modal = ["modal==1.6.4", "fastapi[standard]"]
+test = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["linguabc_tts"]

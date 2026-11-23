@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
-import { voiceOptions } from "@/lib/ai/fish";
+import { voiceOptions } from "@/lib/ai/voice";
 import { AiFlow } from "../drafting";
 
 export const metadata = { title: "Create with AI" };

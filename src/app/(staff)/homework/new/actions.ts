@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { getStaffContext } from "@/lib/auth/current";
 import { aiConfigured, AiUnavailable, type Part, type Usage } from "@/lib/ai/gemini";
 import { extractDraft, generateDraft, LEVELS, SKILLS, type Draft, type Level, type Skill } from "@/lib/ai/assignment-draft";
-import { fishConfigured, MAX_SCRIPT_CHARS, speakScript } from "@/lib/ai/fish";
+import { MAX_SCRIPT_CHARS } from "@/lib/ai/fish";
+import { audioConfigured, notConfiguredMessage, speak } from "@/lib/ai/voice";
 import { AUDIO_BUCKET, audioUrl } from "@/lib/audio";
 import type { Cast } from "@/lib/ai/script";
 import { storedAnswers, storedGroups, storedQuestions } from "@/lib/ai/draft-store";
@@ -87,13 +88,14 @@ export type AudioResult = { path?: string; url?: string; error?: string };
 const AUDIO_PATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/;
 
 /**
- * Speaks a listening script with Fish Audio and keeps the MP3 in the
+ * Speaks a listening script with the active voice provider (Fish by
+ * default, see src/lib/ai/voice.ts) and keeps the MP3 in the
  * centre's private folder. Returns the storage path (saved with the
  * assignment) and a short-lived link for the preview player. A previous
  * preview the mentor is replacing is removed if no assignment uses it.
  */
 export async function generateAudio(script: string, previous?: string, cast?: Cast): Promise<AudioResult> {
-  if (!fishConfigured()) return { error: "Audio is not configured yet. Add a Fish Audio key in the hosting settings." };
+  if (!audioConfigured()) return { error: notConfiguredMessage() };
   const text = String(script ?? "").trim();
   if (text.length < 20) return { error: "Write the script first." };
   if (text.length > MAX_SCRIPT_CHARS) return { error: "The script is too long for one recording (12,000 characters at most)." };
@@ -103,14 +105,14 @@ export async function generateAudio(script: string, previous?: string, cast?: Ca
   if (error || id == null) return { error: error && /AI limit/.test(error.message) ? error.message : "You don't have permission to do that." };
 
   try {
-    const speech = await speakScript(text, cast && typeof cast === "object" ? cast : {});
+    const speech = await speak(text, cast && typeof cast === "object" ? cast : {}, { supabase, centerId: workspace.centerId, purpose: "homework" });
     const path = `${workspace.centerId}/${crypto.randomUUID()}.mp3`;
     const { error: upErr } = await supabase.storage.from(AUDIO_BUCKET).upload(path, speech.audio, { contentType: "audio/mpeg", upsert: false });
     if (upErr) {
       console.error("Audio upload failed", upErr.message);
       throw new AiUnavailable("The audio could not be saved. Try again.");
     }
-    // Fish Audio bills by UTF-8 bytes; they go in the prompt column.
+    // Billed UTF-8 bytes (turns reused from the segment cache excluded) go in the prompt column.
     await supabase.rpc("finish_ai_request", { p_id: id, p_model: speech.model, p_prompt: speech.bytes, p_completion: 0, p_cost: 0, p_ok: true });
     if (previous && AUDIO_PATH.test(previous) && previous.startsWith(`${workspace.centerId}/`)) {
       await supabase.storage.from(AUDIO_BUCKET).remove([previous]);
