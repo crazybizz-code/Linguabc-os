@@ -1,0 +1,607 @@
+{
+ "source": "pilot/section_part1.txt framed with the app's frameListening + planScript (synthetic IELTS Part 1)",
+ "plan": [
+  {
+   "kind": "speech",
+   "speaker": "Narrator",
+   "voice": "Oliver",
+   "text": "This is an eye-elts Listening test. There are four parts to the test. You will hear each part once only. As you listen, answer the questions.\nPart One. You will hear a woman phoning a sports centre to ask about joining a club. First, you have some time to look at questions 1 to 5."
+  },
+  {
+   "kind": "pause",
+   "seconds": 30
+  },
+  {
+   "kind": "speech",
+   "speaker": "Narrator",
+   "voice": "Oliver",
+   "text": "Now listen carefully and answer questions 1 to 5."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.646
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Good morning, Riverside Sports Centre. Emma speaking. How can I help you?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.362
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Oh, hi. I'm calling because I've just moved to the area and I'm thinking about joining a club. A friend told me you have a swimming club and a tennis club."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.377
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "That's right, we do. We've also got a running club that meets on Saturday mornings. Are you interested in any one in particular?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.392
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Well, I used to swim quite a lot at university, so probably the swimming club. But I'd like to hear about the tennis club as well, if that's all right."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.308
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Of course. Shall I start with swimming, then?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.323
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Yes, please."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.338
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "OK. The swimming club meets three times a week, on Monday, Wednesday and Friday evenings. The sessions start at a quarter to seven and finish at eight o'clock."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.354
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "That's quite late. Is there anything earlier in the day?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.369
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "There's an early session on Tuesday mornings at half past six, but that one is mainly for people training for competitions."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.385
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "I don't think I'm ready for that. The evening sessions sound better. How much does it cost?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.3
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Membership for the swimming club is forty-two pounds a month. That includes all the sessions and the use of the gym on the same day."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.315
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Forty-two pounds. And is there a joining fee?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.331
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "There's usually a joining fee of fifteen pounds, but this month we're not charging it for new members."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.346
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Oh, great. That's good timing, then."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.362
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "It is. And there's one more thing I should mention. Before your first session, every new member has a short meeting with one of our coaches. It takes about twenty minutes."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.377
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "What happens in the meeting?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.392
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "The coach asks about your experience and watches you swim a couple of lengths. Then they put you in the right group. We have three groups: beginners, improvers and advanced."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.308
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "I'd probably be an improver. I haven't swum regularly for about two years."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.323
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "That's very common. Most people who join us are in the improvers group at first. And the coach can also give you a training plan if you want one."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.338
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "That sounds really helpful. Is the pool very busy in the evenings?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.354
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "It can be, especially on Mondays. The club has four lanes, though, so there's usually plenty of space. And you can use the lockers next to the changing rooms. You just need a one-pound coin, and you get it back afterwards."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.369
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "OK, I'll remember to bring one."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.685
+  },
+  {
+   "kind": "speech",
+   "speaker": "Narrator",
+   "voice": "Oliver",
+   "text": "Before you hear the rest of the conversation, you have some time to look at questions 6 to 10."
+  },
+  {
+   "kind": "pause",
+   "seconds": 30
+  },
+  {
+   "kind": "speech",
+   "speaker": "Narrator",
+   "voice": "Oliver",
+   "text": "Now listen and answer questions 6 to 10."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.631
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Could I ask about the tennis club now?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.346
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Sure. The tennis club is a bit different, because it's run by volunteers. They play on Thursday evenings and on Sunday afternoons, and the courts are behind the main building, next to the car park."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.362
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Do I need my own racket?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.377
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "You can borrow one for the first month, but after that we ask members to bring their own. And you'll need proper tennis shoes. Running shoes aren't allowed on the courts."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.392
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "OK, that's useful to know. What about the price?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.308
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "It's cheaper than swimming, because there's no coaching. It's eighteen pounds a month, or you can pay a hundred and ninety pounds for the whole year."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.323
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "And is there a car park? I'll probably drive in the evenings."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.338
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Yes, there's a free car park for members, but it fills up quickly after six. There's also a bus stop right outside. The number thirty-six bus stops here every fifteen minutes."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.354
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "That's good to know. I think I'll start with swimming and maybe try tennis later. What do I need to do to join?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.369
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "I can take some details now and send you a form by email. Could I have your name, please?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.385
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Yes, it's Megan Pritchard."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.3
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Could you spell your surname for me?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.315
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Sure. It's P-R-I-T-C-H-A-R-D."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.331
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Thank you. And your address?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.346
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "It's flat four, twenty-seven Mill Street."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.362
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Twenty-seven Mill Street. And the postcode?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.377
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "It's B-S-three, two-L-R."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.392
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Lovely. And what's the best phone number to contact you on?"
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.308
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "My mobile. It's oh-seven-seven-nine-three, four-six-one, two-five-eight."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.323
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Let me read that back. Oh-seven-seven-nine-three, four-six-one, two-five-eight."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.338
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "That's right."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.354
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "Great. One last thing. Do you have any health problems we should know about? It's just a standard question we ask everyone."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.369
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "No, nothing serious. I hurt my shoulder last year, but it's completely fine now."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.385
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "OK, I'll make a note of that for the coach, just in case. You can come to your first session on Monday the fourteenth. Just ask for Daniel at the reception desk, and he'll show you around."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.3
+  },
+  {
+   "kind": "speech",
+   "speaker": "Chloe",
+   "voice": "Chloe",
+   "text": "Monday the fourteenth. Brilliant. Thanks so much for your help."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.315
+  },
+  {
+   "kind": "speech",
+   "speaker": "Emma",
+   "voice": "Emma",
+   "text": "You're welcome. Enjoy your swimming."
+  },
+  {
+   "kind": "pause",
+   "seconds": 0.631
+  },
+  {
+   "kind": "speech",
+   "speaker": "Narrator",
+   "voice": "Oliver",
+   "text": "That is the end of Part One. You now have half a minute to check your answers."
+  },
+  {
+   "kind": "pause",
+   "seconds": 30
+  },
+  {
+   "kind": "speech",
+   "speaker": "Narrator",
+   "voice": "Oliver",
+   "text": "Now turn to Part Two."
+  }
+ ],
+ "answers": [
+  {
+   "id": "1",
+   "accepted": [
+    "quarter to seven"
+   ]
+  },
+  {
+   "id": "2",
+   "accepted": [
+    "forty-two pounds",
+    "£42"
+   ]
+  },
+  {
+   "id": "3",
+   "accepted": [
+    "car park"
+   ]
+  },
+  {
+   "id": "4",
+   "accepted": [
+    "tennis shoes"
+   ]
+  },
+  {
+   "id": "5",
+   "accepted": [
+    "eighteen pounds",
+    "£18"
+   ]
+  },
+  {
+   "id": "6",
+   "accepted": [
+    "Pritchard"
+   ]
+  },
+  {
+   "id": "7",
+   "accepted": [
+    "twenty-seven Mill Street",
+    "27 Mill Street"
+   ]
+  },
+  {
+   "id": "8",
+   "accepted": [
+    "shoulder"
+   ]
+  },
+  {
+   "id": "9",
+   "accepted": [
+    "fourteenth",
+    "14th"
+   ]
+  },
+  {
+   "id": "10",
+   "accepted": [
+    "Daniel"
+   ]
+  }
+ ]
+}

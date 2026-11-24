@@ -109,6 +109,16 @@ def test_upload_failure_and_report_retries(tmp_path):
     assert not r3.report(job, "processing", 5) and len(http3.posts) == 1
 
 
+def test_jobs_need_host_allowlists(monkeypatch):
+    monkeypatch.delenv("TTS_CALLBACK_HOSTS")
+    with pytest.raises(BadRequest, match="no host allowlist"):
+        parse_job(job_body(), "chatterbox-turbo")
+    monkeypatch.setenv("TTS_CALLBACK_HOSTS", "app.linguabc.xyz")
+    monkeypatch.setenv("TTS_UPLOAD_HOSTS", " ")
+    with pytest.raises(BadRequest, match="no host allowlist"):
+        parse_job(job_body(), "chatterbox-turbo")
+
+
 def test_bad_jobs_are_refused(tmp_path, monkeypatch):
     with pytest.raises(BadRequest, match="runs chatterbox-turbo"):
         parse_job(job_body(engine="qwen"), "chatterbox-turbo")
@@ -116,8 +126,6 @@ def test_bad_jobs_are_refused(tmp_path, monkeypatch):
         parse_job(job_body(callback={"url": "http://evil.example/cb", "token": TOKEN}), "chatterbox-turbo")
     with pytest.raises(BadRequest, match="token"):
         parse_job(job_body(callback={"url": "https://app.linguabc.xyz/cb", "token": "short"}), "chatterbox-turbo")
-    monkeypatch.setenv("TTS_CALLBACK_HOSTS", "app.linguabc.xyz")
-    monkeypatch.setenv("TTS_UPLOAD_HOSTS", "project.supabase.co")
     parse_job(job_body(), "chatterbox-turbo")
     with pytest.raises(BadRequest, match="host is not allowed"):
         parse_job(job_body(callback={"url": "https://attacker.example/cb", "token": TOKEN}), "chatterbox-turbo")

@@ -37,3 +37,9 @@ def test_spoken_mode_changes_what_the_engine_hears(tmp_path):
     res = render(req, engine, FakeTranscriber(engine), SegmentCache(tmp_path), spoken=True)
     assert engine.calls[0][0] == "It costs a hundred and eighty-five pounds in total."
     assert res.ok  # QA compared the spoken words with the written script
+
+
+def test_long_spellings_are_said_in_groups_of_three():
+    assert to_spoken("Sure. It's P-R-I-T-C-H-A-R-D.") == "Sure. It's P-R-I. T-C-H. A-R-D."
+    assert to_spoken("It's W-H-I-T-F-I-E-L-D, with one L.") == "It's W-H-I. T-F-I. E-L-D, with one L."
+    assert to_spoken("S-M-I-T-H") == "S-M-I-T-H"  # short ones stay as they are

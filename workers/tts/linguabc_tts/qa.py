@@ -95,13 +95,40 @@ RESPELLED = {("eye", "elts"): "ielts"}
 #: Same word, different spelling: what the script writes vs what ASR tends to write.
 ALIASES = {"eyeelts": "ielts", "ms": "miss", "okay": "ok", "mr": "mister", "dr": "doctor", "colour": "color", "centre": "center",
            "theatre": "theater", "metre": "meter", "programme": "program", "travelling": "traveling"}
+#: British spelling -> the American spelling ASR writes ("harbour" is heard as "harbor"). IELTS
+#: scripts and answers are British; both sides of every comparison go through this map.
+_UK_STEMS = ("colour", "favour", "flavour", "harbour", "honour", "humour", "labour", "neighbour", "rumour",
+             "behaviour", "endeavour", "odour", "parlour", "savour", "vapour", "armour", "glamour")
+US_SPELLING = {w + end: w[:-3] + "or" + end for w in _UK_STEMS for end in ("", "s", "ed", "ing", "ite", "ites", "hood", "hoods", "ful")}
+US_SPELLING |= {w: w[:-2] + "er" for w in ("centre", "theatre", "metre", "litre", "fibre", "kilometre", "centimetre", "millimetre", "calibre", "sombre")}
+US_SPELLING |= {w + "s": w[:-2] + "ers" for w in ("centre", "theatre", "metre", "litre", "fibre", "kilometre", "centimetre", "millimetre")}
+US_SPELLING |= {"programme": "program", "programmes": "programs", "catalogue": "catalog", "dialogue": "dialog", "cheque": "check",
+                "cheques": "checks", "jewellery": "jewelry", "travelling": "traveling", "travelled": "traveled", "traveller": "traveler",
+                "travellers": "travelers", "cancelled": "canceled", "cancelling": "canceling", "enrol": "enroll", "enrolment": "enrollment",
+                "grey": "gray", "tyre": "tire", "tyres": "tires", "organise": "organize", "organised": "organized", "organisation": "organization",
+                "realise": "realize", "realised": "realized", "recognise": "recognize", "recognised": "recognized", "apologise": "apologize",
+                "licence": "license", "defence": "defense", "practise": "practice", "aluminium": "aluminum", "mum": "mom"}
+
 _NUMBER_WORDS = set(_ONES) | set(_TENS[2:]) | {"hundred", "thousand", "million", "billion"} | set(_ORD.values())
+
+
+def _year_words(n: int) -> str:
+    from .spoken import _year  # spoken imports this module
+    return _year(n)
 
 
 def normalize(text: str) -> list[str]:
     t = strip_tags(text)
     # ASR sometimes joins a UK postcode with a dot ("CB2.1TN"): that is not a decimal.
     t = re.sub(r"\b([A-Z]{1,2}\d[A-Z\d]?)[.\-](\d[A-Z]{2})\b", r"\1 \2", t)
+    # British times are written with a dot ("at 9.30 in the morning", "10.15 am"): a time, not a decimal,
+    # when a time word comes before or after it.
+    t = re.sub(r"(?i)\b(at|from|until|till|by|before|after|around|about|to)\s+([01]?\d|2[0-3])\.([0-5]\d)\b", r"\1 \2:\3", t)
+    t = re.sub(r"(?i)\b([01]?\d|2[0-3])\.([0-5]\d)(?=\s*(?:a\.?m\b|p\.?m\b|o'clock|in the (?:morning|afternoon|evening)|tonight))", r"\1:\2", t)
+    # A year after "in", "since", "built in"... is said as a year ("eighteen sixty"), and ASR writes 1860.
+    # Only 1100-1999: 2000s years are said two ways ("twenty oh five", "two thousand and five").
+    t = re.sub(r"(?i)\b(in|since|from|of|by|until|before|after|around),? (1[1-9]\d\d)\b",
+               lambda m: f"{m.group(1)} {_year_words(int(m.group(2)))}", t)
     # Codes that mix letters and digits (postcodes "BS3 2LR", flight "BA207") are read character by character.
     t = re.sub(r"\b(?!\d+(?:st|nd|rd|th|s|am|pm)\b)(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,8}\b", lambda m: " ".join(m.group(0)), t)
     t = re.sub(r"\b([A-Za-z])-(?=\w)", r"\1 ", t)  # B-S-three
@@ -112,7 +139,7 @@ def normalize(text: str) -> list[str]:
     t = re.sub(r"\b([a-z]{2,})-(?=([a-z]{2,})\b)", lambda m: m.group(1) + (" " if m.group(1) in _NUMBER_WORDS or m.group(2) in _NUMBER_WORDS else ""), t)
     t = re.sub(r"[^a-z0-9' ]+", " ", t.replace("-", " "))
     words = [w.strip("'") for w in t.split()]
-    words = [ALIASES.get(w, w) for w in words if w]
+    words = [US_SPELLING.get(w, w) for w in (ALIASES.get(w, w) for w in words if w)]
     out: list[str] = []
     i = 0
     while i < len(words):

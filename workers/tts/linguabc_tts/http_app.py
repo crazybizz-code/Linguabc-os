@@ -8,6 +8,8 @@ Configuration (environment):
   TTS_SPOKEN           1 (default) = numbers, money and codes are said as words (spoken.py)
   QWEN_MODEL_DIR       local Qwen weights (qwen engines); else downloaded from Hugging Face
   ASR_MODEL            faster-whisper model or path (default large-v3)
+  TTS_CALLBACK_HOSTS   required for /jobs: the app's host(s), comma separated
+  TTS_UPLOAD_HOSTS     required for /jobs: the Supabase Storage host(s), comma separated
 
 The request and reply are the same as the Modal worker's (server.handle).
 Nothing from requests (scripts, answers) is logged.

@@ -9,8 +9,9 @@ names the engine (X-LinguABC-Engine) and carries the job's own token.
 
 Safety:
   * the same (job, attempt) is accepted once (kept on disk across restarts);
-  * TTS_CALLBACK_HOSTS / TTS_UPLOAD_HOSTS (comma separated) limit where the
-    worker may send anything; https only, unless TTS_ALLOW_HTTP=1 (tests);
+  * TTS_CALLBACK_HOSTS / TTS_UPLOAD_HOSTS (comma separated) are required and
+    limit where the worker may send anything: a job is refused while either
+    list is empty; https only, unless TTS_ALLOW_HTTP=1 (local tests);
   * reports are retried (409 = upload not visible yet, 5xx, network);
   * nothing from the script is logged.
 """
@@ -58,7 +59,9 @@ def _check_url(url: str, allowed: set[str], what: str) -> None:
     u = urllib.parse.urlparse(url)
     if u.scheme != "https" and not (u.scheme == "http" and os.environ.get("TTS_ALLOW_HTTP") == "1"):
         raise BadRequest(f"{what} must be https")
-    if allowed and (u.hostname or "").lower() not in allowed:
+    if not allowed:
+        raise BadRequest(f"{what}: the worker has no host allowlist (set TTS_CALLBACK_HOSTS and TTS_UPLOAD_HOSTS)")
+    if (u.hostname or "").lower() not in allowed:
         raise BadRequest(f"{what} host is not allowed")
 
 

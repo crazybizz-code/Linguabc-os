@@ -74,7 +74,16 @@ def to_spoken(text: str) -> str:
     t = re.sub(r"\b\d{1,3}(?:,\d{3})+\b", lambda m: _british(int(m.group(0).replace(",", ""))), t)
     t = re.sub(r"\b(\d+)%", lambda m: f"{_british(int(m.group(1)))} percent", t)
     t = re.sub(r"\b\d+\b", lambda m: _digits(m.group(0)) if len(m.group(0)) > 6 else _british(int(m.group(0))), t)
+    # Long spellings in groups of three, as examiners say them ("P-R-I. T-C-H. A-R-D."): on a real
+    # Chatterbox Turbo run one breath of nine letters lost a letter in about half the takes; in threes
+    # the same voice got all four right (2026-11-23). QA still checks the written spelling.
+    t = re.sub(r"\b[A-Z](?:-[A-Z]){5,}\b(\.?)", lambda m: _grouped(m.group(0).rstrip(".")) + m.group(1), t)
     return t.replace("p.m..", "p.m.").replace("a.m..", "a.m.")
+
+
+def _grouped(spelling: str) -> str:
+    letters = spelling.split("-")
+    return ". ".join("-".join(letters[i:i + 3]) for i in range(0, len(letters), 3))
 
 
 def _spell(code: str) -> str:
