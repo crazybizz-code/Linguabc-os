@@ -124,4 +124,16 @@ def test_date_answers_match_how_they_are_said():
 def test_british_dotted_times_are_times_not_decimals():
     assert normalize("The library opens at 9.30 in the morning") == normalize("The library opens at nine thirty in the morning")
     assert normalize("10.15 am") == normalize("ten fifteen am")
-    assert normalize("it measured 6.4 metres") == ["it", "measured", "six", "point", "four", "metres"]  # still a decimal
+    assert normalize("it measured 6.4 metres") == ["it", "measured", "six", "point", "four", "meters"]  # still a decimal (metres = meters)
+
+
+def test_years_after_a_time_word_match_how_asr_writes_them():
+    assert normalize("which was built in 1860") == normalize("which was built in eighteen sixty")
+    assert normalize("since 1999") == normalize("since nineteen ninety-nine")
+    assert normalize("1860 people came")[:3] != ["eighteen", "sixty", "people"]  # a count stays a number
+
+
+def test_british_spelling_matches_what_asr_writes():
+    assert wer("the old harbour, built in eighteen sixty", "the Old Harbor, built in 1860") == 0
+    assert missing_answers([["colour"], ["city centre"], ["theatre programme"]], "the color of the city center theater program") == []
+    assert missing_answers([["Smythe"]], "it is smith") == [["Smythe"]]  # names are not respelled

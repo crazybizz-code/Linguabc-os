@@ -1,4 +1,6 @@
-# Chatterbox Turbo pilot: real model, local staging, GPU kit (2026-11-23)
+# Chatterbox Turbo pilot: real model, local staging, GPU kit (2026-11-23/24)
+
+**GPU results: not available yet.** Every number below is from a CPU (4 vCPU, no GPU). The owner runs the Kaggle notebook and sends the results; until then nothing GPU-related is marked as passed.
 
 Branch `claude/chatterbox-gpu-pilot`. Nothing in production was touched: no
 migration, no Vercel variable, no deployment, no paid resource. All content is
@@ -53,7 +55,61 @@ Other findings:
   recordings are needed (`workers/tts/VOICES.md`).
 - Emotion is not measured automatically: the six expression clips are words-correct and need listening.
 - Turbo output carries Resemble's PerthNet watermark (inaudible); note it in the voice policy.
-- QA fixes from real takes: "at 9.30 in the morning" is a time, not a decimal.
+- QA fixes from real takes (each one had failed or flagged a correct recording):
+  - "at 9.30 in the morning", "10.15 am": a British time, not a decimal;
+  - "built in 1860" = "built in eighteen sixty" (years 1100-1999 after in/since/from/by...);
+  - British spelling = what ASR writes ("harbour"/"harbor", "colour", "centre", "theatre", "programme"...),
+    on both sides, so British answer keys are not flagged.
+
+## Speaking rate (IELTS ~150 wpm; Turbo ~180-220)
+
+Cause, measured: the three references themselves are fast (Oliver 192 wpm,
+Emma 189, Chloe 219; articulation 245-286 wpm), and Turbo copies the
+reference's pace. Turbo 0.1.7 has no speed parameter; `cfg_weight` and
+`exaggeration` are ignored by Turbo (it logs a warning).
+
+Study (real model, CPU, 3 voices x 3 seeds per variant, 45 takes, two-sentence
+IELTS-style lines; `wpm` counts pauses, articulation counts voiced time only;
+WER 0 for every take with the corrected QA; similarity to the original
+reference with Resemblyzer):
+
+| Variant | wpm (Oliver / Emma / Chloe) | Articulation | Similarity | Verdict |
+|---|---|---|---|---|
+| 1. Original reference | 177 (190 / 145 / 197) | 217 | 0.933 | baseline |
+| 2. Same reference re-timed to ~150 wpm (pitch kept), output not stretched | 164 (197 / 126 / 171) | 196 | 0.928 | partial: slows Emma and Chloe, not Oliver |
+| 3. Temperature 0.6 | 174 | 216 | 0.932 | no effect |
+| 4. Each sentence alone + 0.45 s planned pause | 172 | 218 | 0.931 | small; speech itself stays fast |
+| 5. Finished take stretched to 0.85x (comparison only) | 151 | 184 | 0.932 | reaches the target, but it changes the recording after QA; needs listening for artefacts; not an automatic fix |
+
+Small sample: these are directions, not settled numbers.
+
+Options, in order:
+
+1. **Record the references at IELTS pace (~140-150 wpm, natural pauses).**
+   This is the real fix, and it is the same work as the accent blocker
+   (licensed, consented British and Australian speakers): ask them to read
+   the reference script slowly and clearly. Variant 2 shows the model follows
+   the reference's pace, but a re-timed clip is only a proxy; a naturally slow
+   reading has to be measured.
+2. **Pauses in the plan:** the planner can put a short pause between
+   sentences of a long turn (as IELTS recordings do). It lowers overall wpm a
+   little without touching the voice; it does not slow the words.
+3. **Keep the speed check as a gate:** the worker already flags parts above
+   the rate limit for review; with option 1 in place it can fail parts
+   instead.
+4. **Not automatic:** stretching the finished audio (variant 5) reaches 150
+   wpm, but it alters a recording that already passed QA and can add
+   artefacts. Only as a manual, listened-to fallback, never a default.
+
+## Production blockers (Chatterbox Turbo)
+
+| Blocker | Evidence | Needed before production |
+|---|---|---|
+| **British / Australian accent not proven** | Every clip screens American (0.93-0.999), including voices designed as British and Australian; the synthetic references themselves are the cause | Licensed references from real British and Australian speakers with signed cloning consent (`workers/tts/VOICES.md`), then the accent screen plus a blind listening review by the owner |
+| **Long spellings** | 9-letter spelling: about half the takes lost a letter; grouped in threes, Chloe 4/4 but Emma 1/4; the first section run failed on it | Re-test with the real references; keep every spelling answer in the answer check (a missing letter sends the recording to review, never to students); consider a spelling-specific retry with more seeds |
+| **Speaking rate** | ~180-220 wpm vs ~150 | Slow, natural references (option 1 above), then re-measure |
+| GPU speed and cost | Not measured | Kaggle run (owner) |
+| Cloud staging | Free plan at its 2-project limit | Owner's decision |
 
 ## Local staging end to end with the real worker
 
