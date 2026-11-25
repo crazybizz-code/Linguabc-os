@@ -8,9 +8,11 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { handleUpdate, TEXT } from "../../src/lib/telegram/bot.ts";
 import { dispatchOutbox } from "../../src/lib/telegram/dispatch.ts";
+import { processWebhook } from "../../src/lib/telegram/webhook.ts";
 
 const DB = process.env.DB ?? "linguabc_test";
 const SETOF = new Set(["tg_children", "tg_outbox_claim"]);
+const SECRET = "w".repeat(40);
 const lit = (v) => v === null || v === undefined ? "null"
   : typeof v === "number" || typeof v === "boolean" ? String(v)
   : `'${String(v).replace(/'/g, "''")}'`;
@@ -42,6 +44,7 @@ const PARENT = () => sql(`reset role; select g.membership_id from guardians g jo
 
 test("/start <token> links the parent; the same token cannot link anyone else", async () => {
   const m = PARENT();
+  sql(`reset role; delete from telegram_link_tokens where token_hash = app.tg_hash('${TOKEN}')`);
   sql(`reset role; insert into telegram_link_tokens (center_id, membership_id, token_hash, expires_at)
        select center_id, id, app.tg_hash('${TOKEN}'), now() + interval '1 hour' from memberships where id = '${m}'`);
   const t = telegram();
@@ -85,4 +88,30 @@ test("dispatch sends a queued notice once and records it", async () => {
   assert.match(t.sent[0][1].text, /To‘lov qabul qilindi/);
   const again = await dispatchOutbox({ rpc, send: t.send }, { gapMs: 0 });
   assert.equal(again.claimed, 0, "nothing sent twice");
+});
+
+test("webhook against the real claim functions: busy duplicate, failed finalise, retry after timeout", async () => {
+  const id = 880000 + Math.floor(Math.random() * 1000);
+  const body = JSON.stringify({ update_id: id, message: { message_id: 1, from: { id: 111 }, chat: { id: 111, type: "private" }, text: "/start" } });
+  const req = () => ({ secretHeader: SECRET, contentLength: null, body: async () => body });
+  const t = telegram();
+  // a slow first delivery, and a duplicate while it runs
+  let go;
+  const slow = (u, d) => new Promise((ok) => { go = () => ok(); });
+  const first = processWebhook(req(), { webhookSecret: SECRET }, { rpc, send: t.send }, () => {}, slow);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(await processWebhook(req(), { webhookSecret: SECRET }, { rpc, send: t.send }, () => {}), 503, "duplicate not acknowledged");
+  // finalising fails: 500, never 200
+  const failingFinish = async (fn, a) => fn === "tg_finish_update" ? { data: null, error: { message: "x" } } : rpc(fn, a);
+  go();
+  await first;   // (first used the real rpc and finished: 200)
+  const id2 = id + 5000;
+  const body2 = body.replace(String(id), String(id2));
+  const req2 = () => ({ secretHeader: SECRET, contentLength: null, body: async () => body2 });
+  assert.equal(await processWebhook(req2(), { webhookSecret: SECRET }, { rpc: failingFinish, send: t.send }, () => {}), 500);
+  assert.equal(await processWebhook(req2(), { webhookSecret: SECRET }, { rpc, send: t.send }, () => {}), 503, "claim still fresh");
+  sql(`reset role; update telegram_updates set claimed_at = now() - interval '91 seconds' where update_id = ${id2}`);
+  assert.equal(await processWebhook(req2(), { webhookSecret: SECRET }, { rpc, send: t.send }, () => {}), 200, "Telegram retry after the timeout");
+  assert.equal(sql(`reset role; select status from telegram_updates where update_id = ${id2}`), "done");
+  assert.equal(await processWebhook(req2(), { webhookSecret: SECRET }, { rpc, send: t.send }, () => {}), 200, "later repeats: done");
 });

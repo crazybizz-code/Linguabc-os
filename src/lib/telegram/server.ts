@@ -37,7 +37,7 @@ export async function kickTelegramDispatch() {
   if (!cfg) return;
   try {
     await dispatchOutbox(cfg, { limit: 25, maxMs: 8_000 });
-  } catch (e) {
-    console.error("telegram dispatch failed", e instanceof Error ? e.message : "error");
+  } catch {
+    console.error("telegram dispatch failed");   // fixed text: error messages can carry data
   }
 }

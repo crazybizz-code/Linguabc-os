@@ -6,10 +6,11 @@ Ota-onalar uchun V1 interfeysi. Kod: `src/lib/telegram/` (mantiq, matnlar, jo‘
 ```
 Telegram ──POST (secret header)──▶ /api/telegram/webhook
    1) X-Telegram-Bot-Api-Secret-Token == TELEGRAM_WEBHOOK_SECRET (constant time)
-   2) tg_claim_update(update_id)  → takror bo‘lsa 200
+   2) tg_claim_update(update_id) → claimed | done (200) | busy (503, Telegram qayta yuboradi)
    3) handleUpdate: faqat private chat, from.id == chat.id
         tg_children / tg_child_* (service role, har birida tg_can_see_student)
-   4) tg_finish_update(ok)  | xato → release + 500 → Telegram qayta yuboradi
+   4) tg_finish_update(update_id, claim, ok) → true bo‘lsagina 200
+      xato / yozilmadi / claim boshqaga o‘tgan → 500 → Telegram qayta yuboradi
 
 Staff action (davomat, to‘lov, mock release, eslatma)
    └─ DB trigger → notifications → telegram_outbox (faqat commit bo‘lsa)
@@ -44,6 +45,18 @@ Bot tokeni o‘rnatilmasa: webhook 503, Parents sahifasida “Telegram bot sozla
    Tekshirish: `getWebhookInfo` (`pending_update_count`, `last_error_message`). O‘chirish: `deleteWebhook`.
 5. 0033 (pg_net + cron) alohida tasdiq bilan; Vault’da `telegram_dispatch_url` va `telegram_dispatch_secret`.
 6. QA markazida (`qa-*`): asoschi telefonida bog‘lash, ikki bola, uzish, bloklash/ochish, davomat xabari.
+
+## Webhook javob kodlari
+| Kod | Qachon |
+|---|---|
+| 200 | update to‘liq ishlandi va bazada `done` deb yozildi (yoki avval yozilgan) |
+| 503 | boshqa so‘rov shu update’ni hozir ishlayapti (`busy`) yoki bot sozlanmagan |
+| 500 | claim/handler/finalize xatosi yoki claim 90 s dan keyin boshqa so‘rovga o‘tgan |
+| 401 / 400 / 413 | kalit noto‘g‘ri / JSON emas / juda katta |
+
+`maxDuration` 30 s < claim muddati 90 s: ishlayotgan so‘rov hech qachon o‘zib ketilmaydi. Finalize yozilmay qolsa, update 90 s dan keyin qayta ishlanadi — bot javobi ikki marta kelishi mumkin (at-least-once), lekin ma’lumot o‘zgarishlari idempotent (`/start` takrori bir xil javob, uzish takrori zararsiz).
+
+Loglarda faqat qat’iy matn (`telegram webhook: handler failed` kabi): so‘rov tanasi, Telegram user, bola, telefon, baza yoki Telegram xato matni, URL (tokenli) yozilmaydi. Test: `tests/ts/telegram-webhook.test.mjs`.
 
 ## Xavfsizlik qoidalari
 - Bot faqat shaxsiy chatda javob beradi; guruh/kanal update’lari jim tashlanadi.

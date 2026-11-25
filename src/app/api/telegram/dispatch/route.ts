@@ -19,8 +19,8 @@ export async function POST(request: Request) {
   if (!cfg) return new Response(null, { status: 503 });
   try {
     return Response.json(await dispatchOutbox(cfg, { limit: 25, maxMs: 20_000 }));
-  } catch (e) {
-    console.error("telegram dispatch failed", e instanceof Error ? e.message.slice(0, 120) : "error");
+  } catch {
+    console.error("telegram dispatch failed");   // fixed text: error messages can carry data
     return new Response(null, { status: 500 });
   }
 }
