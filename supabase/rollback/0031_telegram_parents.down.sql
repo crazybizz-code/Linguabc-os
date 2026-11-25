@@ -4,7 +4,7 @@
 -- linked to their guardian rows), like a web invite that was never used.
 begin;
 drop trigger notifications_telegram on public.notifications;
-drop function public.tg_claim_update(bigint), public.tg_finish_update(bigint, boolean),
+drop function public.tg_claim_update(bigint), public.tg_finish_update(bigint, uuid, boolean),
   public.tg_redeem_link(text, bigint, bigint, text), public.tg_children(bigint), public.tg_unlink(bigint),
   public.tg_set_blocked(bigint, boolean), public.tg_outbox_claim(int),
   public.tg_outbox_done(uuid, uuid, boolean, text, int, boolean),

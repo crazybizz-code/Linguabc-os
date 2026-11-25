@@ -1307,6 +1307,8 @@ select tests.assert(not (tg_redeem_link('wrong-token-wrong-token-wrong-to', 111,
 select tests.assert(not (tg_redeem_link(:'tg1', 111, -100123, 'karim')->>'ok')::boolean, 'group chats refused');
 select tests.assert((tg_redeem_link(:'tg1', 111, 111, 'karim')->>'ok')::boolean, 'parent linked');
 select tests.assert(not (tg_redeem_link(:'tg1', 999, 999, 'thief')->>'ok')::boolean, 'token is single-use');
+select tests.assert((tg_redeem_link(:'tg1', 111, 111, 'karim')->>'repeat')::boolean, 'same parent retrying /start gets the same answer');
+select tests.expect_count(format('select * from telegram_links where membership_id = %L and revoked_at is null', :'m_par'), 1);
 select tests.expect_count('select * from tg_children(111)', 1);
 select tests.expect_count('select * from tg_children(999)', 0);
 :as_superuser
@@ -1347,19 +1349,38 @@ select tests.expect_count('select * from telegram_links', 0);
 
 -- duplicate webhook deliveries
 :as_service_role
-select tests.assert(tg_claim_update(5001), 'first delivery handled');
-select tests.assert(not tg_claim_update(5001), 'repeat while processing is ignored');
-select tg_finish_update(5001, false);
-select tests.assert(tg_claim_update(5001), 'failed update is handled again on retry');
-select tg_finish_update(5001, true);
-select tests.assert(not tg_claim_update(5001), 'done update is never handled twice');
-select tests.assert(tg_claim_update(5002), 'claim 5002');
+-- first delivery is claimed; a concurrent duplicate is 'busy' (503, retried), never acked
+select tg_claim_update(5001)->>'claim' as u1 \gset
+select tests.assert(:'u1' <> '', 'first delivery claimed');
+select tests.assert(tg_claim_update(5001)->>'state' = 'busy', 'duplicate while processing is busy, not done');
+-- the original fails: its claim is released, Telegram's retry is handled
+select tests.assert(tg_finish_update(5001, :'u1', false), 'failed update released');
+select tg_claim_update(5001)->>'claim' as u2 \gset
+select tests.assert(:'u2' <> :'u1', 'retry gets a new claim');
+-- finalising with a wrong or old claim changes nothing and says so
+select tests.assert(not tg_finish_update(5001, :'u1', true), 'old claim cannot finish');
+select tests.assert(not tg_finish_update(5001, gen_random_uuid(), true), 'unknown claim cannot finish');
+select tests.assert(tg_claim_update(5001)->>'state' = 'busy', 'still processing');
+select tests.assert(tg_finish_update(5001, :'u2', true), 'finished');
+select tests.assert(tg_claim_update(5001)->>'state' = 'done', 'done update is never handled twice');
+select tests.assert(not tg_finish_update(5001, :'u2', false), 'a done update cannot be released');
+select tests.assert(tg_claim_update(5001)->>'state' = 'done', 'still done');
+-- processing timeout: a claim older than 90 s is taken over; the old one is then powerless
+select tg_claim_update(5002)->>'claim' as u3 \gset
 :as_superuser
-update telegram_updates set claimed_at = now() - interval '5 minutes' where update_id = 5002;
+update telegram_updates set claimed_at = now() - interval '89 seconds' where update_id = 5002;
 :as_service_role
-select tests.assert(tg_claim_update(5002), 'a crashed claim is taken over after 90 s');
-select tg_finish_update(5002, true);
-select tests.assert(not tg_claim_update(5002), 'and then done');
+select tests.assert(tg_claim_update(5002)->>'state' = 'busy', 'not taken over before 90 s');
+:as_superuser
+update telegram_updates set claimed_at = now() - interval '91 seconds' where update_id = 5002;
+:as_service_role
+select tg_claim_update(5002)->>'claim' as u4 \gset
+select tests.assert(:'u4' <> :'u3', 'a crashed claim is taken over after 90 s');
+select tests.assert(not tg_finish_update(5002, :'u3', false), 'the overtaken request cannot release the new claim');
+select tests.assert(not tg_finish_update(5002, :'u3', true), 'nor finish it');
+select tests.assert(tg_finish_update(5002, :'u4', true), 'the new claim finishes');
+select tests.assert(tg_claim_update(5002)->>'state' = 'done', 'and then done');
+select tests.expect_fail($$select tg_claim_update(null)$$, 'update id required');
 
 -- attendance -> outbox, only after the change, once per notification
 :as_admin

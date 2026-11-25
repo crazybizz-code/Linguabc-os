@@ -40,6 +40,7 @@ create table public.telegram_link_tokens (
   created_at    timestamptz not null default now(),
   expires_at    timestamptz not null,
   used_at       timestamptz,
+  used_by       bigint,                     -- Telegram user who redeemed it
   revoked_at    timestamptz,
   foreign key (membership_id, center_id) references public.memberships(id, center_id) on delete cascade,
   foreign key (created_by, center_id)    references public.memberships(id, center_id)
@@ -71,6 +72,7 @@ create index telegram_links_user_idx on public.telegram_links (telegram_user_id)
 create table public.telegram_updates (
   update_id   bigint primary key,
   status      text not null default 'processing' check (status in ('processing','done')),
+  claim_id    uuid,
   received_at timestamptz not null default now(),
   claimed_at  timestamptz not null default now()
 );
@@ -237,31 +239,48 @@ grant execute on function public.issue_telegram_link(uuid), public.attach_guardi
   public.revoke_telegram_link(uuid) to authenticated;
 
 -- ----------------------------------------------- bot RPCs (service role)
--- Webhook updates, in two steps so a failure never loses one:
---   tg_claim_update  -> true: handle it; false: done already, or another
---                       request is handling it right now (answer 200).
---   tg_finish_update -> ok: done for good; not ok: forget the claim, the
---                       webhook answers 500 and Telegram sends it again.
--- A request that dies mid-way leaves a 'processing' claim; after 90 seconds
--- the next delivery of the same update may take it over.
+-- Webhook updates, in two steps so a failure never loses one.
+--
+-- tg_claim_update(update_id) returns {state, claim}:
+--   'claimed' -> handle it, then call tg_finish_update with this claim id;
+--   'done'    -> handled before: answer 200;
+--   'busy'    -> another request holds a fresh claim: answer 503, NOT 200,
+--                so Telegram tries again later. If that request fails, the
+--                update is still delivered; if it succeeds, the retry
+--                finds 'done'.
+-- A claim older than 90 seconds is taken over with a new claim id. The
+-- webhook route runs at most 30 seconds (maxDuration), so a live request is
+-- never overtaken.
+--
+-- tg_finish_update(update_id, claim, ok) returns true only if this claim
+-- still holds the row: ok -> 'done' for good; not ok -> the claim is
+-- released so the retry is handled. A stale claim (taken over) returns
+-- false and changes nothing. The route answers 200 only when ok and true.
 create function public.tg_claim_update(p_update_id bigint)
-returns boolean language plpgsql security definer set search_path = '' as $$
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_claim uuid := gen_random_uuid(); v_status text;
 begin
-  insert into public.telegram_updates (update_id) values (p_update_id) on conflict do nothing;
-  if found then return true; end if;
-  update public.telegram_updates set claimed_at = now()
+  if p_update_id is null then raise exception 'update id required'; end if;
+  insert into public.telegram_updates (update_id, claim_id) values (p_update_id, v_claim) on conflict do nothing;
+  if found then return jsonb_build_object('state', 'claimed', 'claim', v_claim); end if;
+  update public.telegram_updates set claimed_at = now(), claim_id = v_claim
   where update_id = p_update_id and status = 'processing' and claimed_at < now() - interval '90 seconds';
-  return found;
+  if found then return jsonb_build_object('state', 'claimed', 'claim', v_claim); end if;
+  select status into v_status from public.telegram_updates where update_id = p_update_id;
+  return jsonb_build_object('state', case when v_status = 'done' then 'done' else 'busy' end);
 end $$;
 
-create function public.tg_finish_update(p_update_id bigint, p_ok boolean)
-returns void language plpgsql security definer set search_path = '' as $$
+create function public.tg_finish_update(p_update_id bigint, p_claim uuid, p_ok boolean)
+returns boolean language plpgsql security definer set search_path = '' as $$
 begin
   if p_ok then
-    update public.telegram_updates set status = 'done' where update_id = p_update_id;
+    update public.telegram_updates set status = 'done'
+    where update_id = p_update_id and claim_id = p_claim and status = 'processing';
   else
-    delete from public.telegram_updates where update_id = p_update_id and status = 'processing';
+    delete from public.telegram_updates
+    where update_id = p_update_id and claim_id = p_claim and status = 'processing';
   end if;
+  return found;
 end $$;
 
 -- Redeem a link token for the Telegram user who sent /start <token>.
@@ -278,6 +297,15 @@ begin
     return jsonb_build_object('ok', false);
   end if;
   select * into t from public.telegram_link_tokens where token_hash = app.tg_hash(p_token) for update;
+  -- The same person sending the same /start again (a webhook retry after
+  -- success) gets the same answer, not "invalid link". Anyone else: refused.
+  if t.id is not null and t.used_at is not null and t.used_by = p_tg_user and t.revoked_at is null
+     and exists (select 1 from public.telegram_links l where l.membership_id = t.membership_id
+                 and l.telegram_user_id = p_tg_user and l.revoked_at is null) then
+    return jsonb_build_object('ok', true, 'repeat', true, 'center_id', t.center_id,
+      'center', (select name from public.centers where id = t.center_id),
+      'children', (select count(*) from public.guardians g where g.membership_id = t.membership_id));
+  end if;
   if t.id is null or t.used_at is not null or t.revoked_at is not null or t.expires_at <= now() then
     return jsonb_build_object('ok', false);
   end if;
@@ -287,7 +315,7 @@ begin
     return jsonb_build_object('ok', false);
   end if;
 
-  update public.telegram_link_tokens set used_at = now() where id = t.id;
+  update public.telegram_link_tokens set used_at = now(), used_by = p_tg_user where id = t.id;
   -- a new phone replaces the old one
   update public.telegram_links set revoked_at = now()
   where membership_id = t.membership_id and revoked_at is null;
@@ -449,11 +477,11 @@ language sql security definer set search_path = '' as $$
 $$;
 
 
-revoke execute on function public.tg_claim_update(bigint), public.tg_finish_update(bigint, boolean), public.tg_redeem_link(text, bigint, bigint, text),
+revoke execute on function public.tg_claim_update(bigint), public.tg_finish_update(bigint, uuid, boolean), public.tg_redeem_link(text, bigint, bigint, text),
   public.tg_children(bigint), public.tg_unlink(bigint), public.tg_set_blocked(bigint, boolean),
   public.tg_outbox_claim(int), public.tg_outbox_done(uuid, uuid, boolean, text, int, boolean)
   from public, anon, authenticated;
-grant execute on function public.tg_claim_update(bigint), public.tg_finish_update(bigint, boolean), public.tg_redeem_link(text, bigint, bigint, text),
+grant execute on function public.tg_claim_update(bigint), public.tg_finish_update(bigint, uuid, boolean), public.tg_redeem_link(text, bigint, bigint, text),
   public.tg_children(bigint), public.tg_unlink(bigint), public.tg_set_blocked(bigint, boolean),
   public.tg_outbox_claim(int), public.tg_outbox_done(uuid, uuid, boolean, text, int, boolean)
   to service_role;
