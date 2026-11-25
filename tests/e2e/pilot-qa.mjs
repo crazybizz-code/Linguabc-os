@@ -402,6 +402,30 @@ if (process.env.QA_MOCK) {
   });
 }
 
+if (process.env.QA_SETTINGS) {
+  await step(owner, "owner", "saves centre phone, address and time zone", async () => {
+    await owner.goto(`${BASE}/settings`);
+    await owner.locator('input[name="phone"]').fill("+998 71 200 00 00");
+    await owner.locator('input[name="address"]').fill("Chilonzor 9, Tashkent");
+    await owner.locator('select[name="timezone"]').selectOption("Asia/Samarkand");
+    await owner.getByRole("button", { name: T("Save") }).click();
+    await expectText(owner, Tin("Saved."), 10000);
+    await owner.reload();
+    if (await owner.locator('input[name="address"]').inputValue() !== "Chilonzor 9, Tashkent") throw new Error("address not persisted");
+    if (await owner.locator('select[name="timezone"]').inputValue() !== "Asia/Samarkand") throw new Error("time zone not persisted");
+  });
+  await step(owner, "owner", "a bad phone is refused with a readable message", async () => {
+    await owner.locator('input[name="phone"]').fill("call me");
+    await owner.getByRole("button", { name: T("Save") }).click();
+    await expectText(owner, Tin("Enter a phone number such as +998 71 200 00 00."), 10000);
+  });
+  await step(admin, "admin", "sees the centre settings read-only", async () => {
+    await admin.goto(`${BASE}/settings`);
+    await expectText(admin, /Chilonzor 9, Tashkent/);
+    if (await admin.locator('input[name="address"]').count()) throw new Error("admin can edit");
+  });
+}
+
 // ------------------------------------------------------------------ owner: finance and monitoring
 await step(owner, "owner", "sees the payment in reports", async () => {
   await owner.goto(`${BASE}/reports`);
