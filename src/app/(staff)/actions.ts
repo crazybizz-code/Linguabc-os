@@ -414,12 +414,16 @@ export async function approveAssignment(id: string): Promise<ActionState> {
 
 // ------------------------------------------------------------ parent Telegram
 // Owner/admin only; the database checks it (issue/attach/revoke_telegram_link).
+// Before migrations 0031/0032 are applied the functions do not exist: say
+// the bot is not set up instead of showing a database message.
+const tgFriendly = (m: string) =>
+  /could not find the function|does not exist|schema cache/i.test(m) ? "The Telegram bot is not set up yet." : friendly(m);
 export async function issueTelegramLink(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase } = await getStaffContext();
   const bot = botUsername();
   if (!bot) return { error: "The Telegram bot is not set up yet." };
   const { data, error } = await supabase.rpc("issue_telegram_link", { p_guardian: str(form.get("guardian_id")) });
-  if (error) return { error: friendly(error.message) };
+  if (error) return { error: tgFriendly(error.message) };
   const token = data?.[0]?.token;
   if (!token) return { error: "Couldn't create the link." };
   // No revalidatePath here: the family row's key changes when its parent
@@ -431,7 +435,7 @@ export async function issueTelegramLink(_: ActionState, form: FormData): Promise
 export async function revokeTelegramLink(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase } = await getStaffContext();
   const { error } = await supabase.rpc("revoke_telegram_link", { p_membership: str(form.get("membership_id")) });
-  if (error) return { error: friendly(error.message) };
+  if (error) return { error: tgFriendly(error.message) };
   revalidatePath("/parents");
   return { ok: true };
 }
@@ -441,7 +445,7 @@ export async function attachGuardianToParent(_: ActionState, form: FormData): Pr
   const { error } = await supabase.rpc("attach_guardian_to_parent", {
     p_guardian: str(form.get("guardian_id")), p_parent: str(form.get("membership_id")),
   });
-  if (error) return { error: friendly(error.message) };
+  if (error) return { error: tgFriendly(error.message) };
   revalidatePath("/parents");
   return { ok: true };
 }
