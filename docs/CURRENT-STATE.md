@@ -1,6 +1,13 @@
 # Current state
 
-_Last updated: 2026-11-21. Update this file at the end of every working session._
+_Last updated: 2026-11-25. Update this file at the end of every working session._
+
+## 2026-11-25: final V1 pilot scope (supersedes the older plan below)
+- The founder set the final V1 scope: a 14-day pilot for one centre, 25 Nov → **9 Dec 2026**. Parents use a **Telegram bot** instead of the web portal (the portal stays in the repo). No Click/Payme/Uzum, no new TTS engines, PR #34 not merged, content targets deferred. Audit, readiness matrix, bot design and day-by-day plan: **`docs/V1-PILOT-PLAN.md`** (Uzbek).
+- `main` is at `19e8475` (#33). Production has migrations **0001–0028**; `0029_audio_segments` and `0030_audio_jobs` are merged but **not applied**. Production (read-only, 2026-11-25): 1 centre (`convora-5hqe`), 1 membership, 1 auth user, DB 19 MB, Storage 25.5 MB, extensions include `pg_cron`, not `pg_net`.
+- Branch `claude/linguabc-v1-audit-g5yk1c`: `0031_telegram_parents` (bot foundation: hashed one-time link tokens, links, update dedupe, outbox fed by the 0022 notification triggers) and SQL section 31. **Not applied.** Local: SQL suite 31 sections pass, `test:ts` 23 pass, tsc, eslint and build clean.
+- Next: 0032 bot read RPCs, then the webhook and menus (needs a BotFather token from the founder).
+
 
 ## Code
 - `main`: the last feature merge is **`8826a16`**, "IELTS question types, server marking and vocabulary cue cards (#17)". It's followed by docs-only commits: `4f02d1c` (#18, project memory) and this state update (#19).

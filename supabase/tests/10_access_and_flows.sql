@@ -1276,4 +1276,133 @@ select tests.expect_fail(format($$select retry_audio_job(%L, repeat('5', 64), 't
 :as_superuser
 select tests.assert((select count(*) from audio_jobs) = 10, 'ten jobs in all');
 
+\echo '31. parent Telegram bot: linking, access, outbox'
+-- staff side: only owner/admin of the guardian's centre may issue a link
+:as_mentor
+select tests.expect_fail(format($$select * from issue_telegram_link(%L)$$, :'g1'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select * from issue_telegram_link(%L)$$, :'g1'), 'forbidden');
+:as_admin
+select token as tg_old from issue_telegram_link(:'g1') \gset
+select token as tg1, membership_id as tg_m1 from issue_telegram_link(:'g1') \gset
+select tests.assert(:'tg_m1' = :'m_par', 'link goes to the existing parent account');
+select tests.assert(length(:'tg1') = 32, 'token is 32 url-safe characters');
+-- raw tokens are never readable by app users
+select tests.expect_fail($$select * from telegram_link_tokens$$, 'permission denied');
+:as_parent
+select tests.expect_fail(format($$select tg_redeem_link(%L, 111, 111, null)$$, :'tg1'), 'permission denied');
+select tests.expect_fail($$select * from tg_children(111)$$, 'permission denied');
+:as_service_role
+select tests.assert(not (tg_redeem_link(:'tg_old', 111, 111, 'karim')->>'ok')::boolean, 'reissued link cancels the old one');
+select tests.assert(not (tg_redeem_link('wrong-token-wrong-token-wrong-to', 111, 111, 'karim')->>'ok')::boolean, 'unknown token refused');
+select tests.assert(not (tg_redeem_link(:'tg1', 111, -100123, 'karim')->>'ok')::boolean, 'group chats refused');
+select tests.assert((tg_redeem_link(:'tg1', 111, 111, 'karim')->>'ok')::boolean, 'parent linked');
+select tests.assert(not (tg_redeem_link(:'tg1', 999, 999, 'thief')->>'ok')::boolean, 'token is single-use');
+select tests.expect_count('select * from tg_children(111)', 1);
+select tests.expect_count('select * from tg_children(999)', 0);
+:as_superuser
+select tests.assert(app.tg_can_see_student(111, :'st1'), 'parent sees own child');
+select tests.assert(not app.tg_can_see_student(111, :'st2'), 'not another child');
+select tests.assert(not app.tg_can_see_student(999, :'st1'), 'unrelated Telegram user sees nothing');
+-- expired tokens fail closed
+:as_admin
+select token as tg_exp from issue_telegram_link(:'g1') \gset
+:as_superuser
+update telegram_link_tokens set expires_at = now() - interval '1 second' where used_at is null and revoked_at is null;
+:as_service_role
+select tests.assert(not (tg_redeem_link(:'tg_exp', 222, 222, null)->>'ok')::boolean, 'expired token refused');
+
+-- second child: attach the guardian row to the same parent account
+:as_admin
+insert into guardians (center_id, student_id, full_name, relationship)
+  values (:'center_a', :'st2', 'Karim Karimov', 'father') returning id as g_tg2 \gset
+:as_mentor
+select tests.expect_fail(format($$select attach_guardian_to_parent(%L, %L)$$, :'g_tg2', :'m_par'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select attach_guardian_to_parent(%L, %L)$$, :'g_tg2', :'m_par'), 'forbidden');
+:as_admin
+select tests.expect_fail(format($$select attach_guardian_to_parent(%L, %L)$$, :'g_tg2', :'m_mentor'), 'not a parent');
+select attach_guardian_to_parent(:'g_tg2', :'m_par');
+:as_service_role
+select tests.expect_count('select * from tg_children(111)', 2);
+:as_superuser
+select tests.assert(app.tg_can_see_student(111, :'st2'), 'second child visible after attach');
+
+-- staff see link status; other centres and mentors do not
+:as_admin
+select tests.expect_count(format('select * from telegram_links where membership_id = %L and revoked_at is null', :'m_par'), 1);
+:as_mentor
+select tests.expect_count('select * from telegram_links', 0);
+:as_ownerB
+select tests.expect_count('select * from telegram_links', 0);
+
+-- duplicate webhook deliveries
+:as_service_role
+select tests.assert(tg_claim_update(5001), 'first delivery handled');
+select tests.assert(not tg_claim_update(5001), 'repeat delivery ignored');
+
+-- attendance -> outbox, only after the change, once per notification
+:as_admin
+select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"late"}]', :'st1')::jsonb);
+select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"late"}]', :'st1')::jsonb);
+:as_superuser
+select tests.assert((select count(*) from telegram_outbox o join notifications n on n.id = o.notification_id
+  where n.data->>'kind' = 'attendance' and n.data->>'status' = 'late' and o.status = 'queued') = 1, 'one late message queued');
+-- homework notices are not sent to Telegram
+select tests.assert((select count(*) from telegram_outbox o join notifications n on n.id = o.notification_id
+  where n.data->>'kind' like 'homework%') = 0, 'homework stays in-app');
+:as_service_role
+select id as ob1 from tg_outbox_claim(10) limit 1 \gset
+select tests.expect_count('select * from tg_outbox_claim(10)', 0);
+select tg_outbox_done(:'ob1', false, 'timeout');
+:as_superuser
+select tests.assert((select status = 'queued' and next_attempt_at > now() from telegram_outbox where id = :'ob1'), 'retry later');
+update telegram_outbox set next_attempt_at = now() where id = :'ob1';
+:as_service_role
+select tests.expect_count('select * from tg_outbox_claim(10)', 1);
+select tg_outbox_done(:'ob1', true);
+select tg_outbox_done(:'ob1', false, 'late echo');
+:as_superuser
+select tests.assert((select status from telegram_outbox where id = :'ob1') = 'sent', 'sent stays sent');
+
+-- a parent who blocked the bot is skipped
+:as_service_role
+select tg_set_blocked(111, true);
+:as_admin
+select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"absent"}]', :'st1')::jsonb);
+:as_superuser
+select tests.assert((select count(*) from telegram_outbox where status = 'queued') = 0, 'blocked chat gets nothing');
+:as_service_role
+select tg_set_blocked(111, false);
+
+-- Telegram-only parent: no web login, still notified
+:as_admin
+insert into guardians (center_id, student_id, full_name, phone, relationship)
+  values (:'center_a', :'st3', 'Malika Ergasheva', '+998907776655', 'mother') returning id as g_tg3 \gset
+select token as tg3, membership_id as tg_m3 from issue_telegram_link(:'g_tg3') \gset
+:as_service_role
+select tests.assert((tg_redeem_link(:'tg3', 333, 333, null)->>'ok')::boolean, 'telegram-only parent linked');
+select tests.expect_count('select * from tg_children(333)', 1);
+:as_superuser
+select app.notify(:'center_a', array[:'tg_m3']::uuid[], 'payment_due', 'Payment due soon', 'x', '{}');
+select tests.assert((select count(*) from telegram_outbox o join telegram_links l on l.id = o.link_id
+  where l.membership_id = :'tg_m3') = 1, 'invited-only parent gets Telegram message');
+
+-- revoking: link, tokens and queued messages stop at once
+:as_mentor
+select tests.expect_fail(format($$select revoke_telegram_link(%L)$$, :'tg_m3'), 'forbidden');
+:as_admin
+select tests.assert(revoke_telegram_link(:'tg_m3') = 1, 'revoked');
+:as_service_role
+select tests.expect_count('select * from tg_children(333)', 0);
+select tests.expect_count('select * from tg_outbox_claim(10)', 0);
+:as_superuser
+select tests.assert(not app.tg_can_see_student(333, :'st3'), 'revoked link sees nothing');
+select app.notify(:'center_a', array[:'tg_m3']::uuid[], 'payment_due', 'Payment due soon', 'x', '{}');
+select tests.assert((select count(*) from notifications where recipient_id = :'tg_m3') = 1, 'no new notice once revoked and not signed in');
+-- parent disconnects from the bot
+:as_service_role
+select tests.assert(tg_unlink(111) = 1, 'parent unlinked from the bot');
+select tests.expect_count('select * from tg_children(111)', 0);
+
 \echo 'ALL TESTS PASSED'
