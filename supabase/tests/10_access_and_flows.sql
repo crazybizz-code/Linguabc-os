@@ -1465,7 +1465,7 @@ update memberships set status = 'suspended' where id = :'m_par';
 select tests.expect_count('select * from tg_children(111)', 0);
 :as_superuser
 select tests.assert(not app.tg_can_see_student(111, :'st1'), 'suspended parent sees nothing');
-select app.notify(:'center_a', array[:'m_par']::uuid[], 'payment_due', 'Payment due soon', 'x', '{}');
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'payment_due', 'Payment due soon', 'x', jsonb_build_object('student_id', :'st1'));
 select tests.assert((select count(*) from telegram_outbox where status = 'queued') = 0, 'suspended parent gets nothing');
 update memberships set status = 'active' where id = :'m_par';
 :as_service_role
@@ -1497,7 +1497,7 @@ select token as tg3, membership_id as tg_m3 from issue_telegram_link(:'g_tg3') \
 select tests.assert((tg_redeem_link(:'tg3', 333, 333, null)->>'ok')::boolean, 'telegram-only parent linked');
 select tests.expect_count('select * from tg_children(333)', 1);
 :as_superuser
-select app.notify(:'center_a', array[:'tg_m3']::uuid[], 'payment_due', 'Payment due soon', 'x', '{}');
+select app.notify(:'center_a', array[:'tg_m3']::uuid[], 'payment_due', 'Payment due soon', 'x', jsonb_build_object('student_id', :'st3'));
 select tests.assert((select count(*) from telegram_outbox o join telegram_links l on l.id = o.link_id
   where l.membership_id = :'tg_m3') = 1, 'invited-only parent gets Telegram message');
 
@@ -1511,7 +1511,7 @@ select tests.expect_count('select * from tg_children(333)', 0);
 select tests.expect_count('select * from tg_outbox_claim(10)', 0);
 :as_superuser
 select tests.assert(not app.tg_can_see_student(333, :'st3'), 'revoked link sees nothing');
-select app.notify(:'center_a', array[:'tg_m3']::uuid[], 'payment_due', 'Payment due soon', 'x', '{}');
+select app.notify(:'center_a', array[:'tg_m3']::uuid[], 'payment_due', 'Payment due soon', 'x', jsonb_build_object('student_id', :'st3'));
 select tests.assert((select count(*) from notifications where recipient_id = :'tg_m3') = 1, 'no new notice once revoked and not signed in');
 -- parent disconnects from the bot
 :as_service_role
@@ -1596,5 +1596,72 @@ select tests.expect_fail($$select * from telegram_dispatch_state$$, 'permission 
 :as_superuser
 drop schema net cascade;
 drop schema vault cascade;
+\echo '39. Telegram: group notices follow the child''s current enrolment'
+-- parent 111 (m_par): Aziz (st1) in group1; Dilnoza (st2) moves to B1 Evening (g3)
+:as_admin
+select token as tg_g from issue_telegram_link(:'g1') \gset
+:as_service_role
+select tests.assert((tg_redeem_link(:'tg_g', 111, 111, null)->>'ok')::boolean, 'relinked');
+:as_superuser
+update enrollments set status = 'dropped' where student_id = :'st2' and group_id = :'group1';
+insert into enrollments (center_id, student_id, group_id, monthly_fee) values (:'center_a', :'st2', :'g3', 500000);
+delete from telegram_outbox;
+-- lesson notices now carry stable ids
+select id as les_g3 from lessons where group_id = :'g3' and starts_at > now() order by starts_at limit 1 \gset
+update lessons set status = 'cancelled' where id = :'les_g3';
+select tests.assert((select data->>'group_id' = :'g3' and data->>'lesson_id' = :'les_g3' from notifications
+  where data->>'kind' = 'lesson_cancelled' and recipient_id = :'m_par' order by created_at desc limit 1), 'group and lesson ids in the notice');
+select tests.assert((select count(*) from telegram_outbox o join notifications n on n.id = o.notification_id
+  where n.data->>'group_id' = :'g3') = 1, 'parent queued for the B1 Evening notice (Dilnoza)');
+-- Dilnoza leaves B1 Evening before the message is sent: not delivered
+update enrollments set status = 'dropped' where student_id = :'st2' and group_id = :'g3';
+:as_service_role
+select tests.expect_count('select * from tg_outbox_claim(10)', 0);
+:as_superuser
+select tests.assert((select o.status from telegram_outbox o join notifications n on n.id = o.notification_id
+  where n.data->>'group_id' = :'g3') = 'skipped', 'former group notice skipped');
+-- the other child's group still reaches the parent
+select id as les_g1 from lessons where group_id = :'group1' and status = 'scheduled' and starts_at > now() order by starts_at limit 1 \gset
+update lessons set status = 'cancelled' where id = :'les_g1';
+:as_service_role
+select tests.assert((select count(*) = 1 and bool_and(data->>'group_id' = :'group1') from tg_outbox_claim(10)), 'group1 notice delivered (Aziz)');
+-- transfer: Aziz moves from group1 to B1 Evening after a group1 notice is queued
+:as_superuser
+select id as les_g1b from lessons where group_id = :'group1' and status = 'scheduled' and starts_at > now() order by starts_at limit 1 \gset
+update lessons set starts_at = starts_at + interval '30 minutes', ends_at = ends_at + interval '30 minutes' where id = :'les_g1b';
+select tests.assert((select count(*) from telegram_outbox o join notifications n on n.id = o.notification_id
+  where n.data->>'kind' = 'lesson_moved' and o.status = 'queued') = 1, 'move queued');
+update enrollments set status = 'dropped' where student_id = :'st1' and group_id = :'group1';
+insert into enrollments (center_id, student_id, group_id, monthly_fee) values (:'center_a', :'st1', :'g3', 500000);
+:as_service_role
+select tests.expect_count('select * from tg_outbox_claim(10)', 0);
+-- a parent with no child in the group is never queued, in this or another centre
+:as_superuser
+select count(*) as before_q from telegram_outbox \gset
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'lesson_cancelled', 'Lesson cancelled', 'x',
+  jsonb_build_object('group', 'B2 Morning', 'group_id', :'group1'));
+select tests.assert((select count(*) from telegram_outbox) = :before_q, 'no child in the group: not queued');
+-- old-format notices (name only) or malformed ids are skipped, never guessed
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'lesson_cancelled', 'Lesson cancelled', 'x', jsonb_build_object('group', 'B1 Evening'));
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'lesson_moved', 'Lesson moved', 'x', jsonb_build_object('group_id', 'not-a-uuid'));
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'attendance', 'Attendance', 'x', jsonb_build_object('student_id', 'oops', 'status', 'absent'));
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'payment', 'Payment received', 'x', jsonb_build_object('student_id', 42));
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'payment', 'Payment received', 'x', jsonb_build_object('group_id', jsonb_build_object('x', 1)));
+select tests.assert((select count(*) from telegram_outbox) = :before_q, 'unattributable notices not queued');
+select tests.assert((select count(*) from notifications where recipient_id = :'m_par' and data->>'student_id' = 'oops') = 1, 'in-app notice still written');
+-- even a failing queue step never breaks the business transaction
+:as_admin
+select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"absent"}]', :'st1')::jsonb);
+:as_superuser
+alter table telegram_outbox add constraint tg_test_break check (false) not valid;
+:as_admin
+select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"late"}]', :'st1')::jsonb);
+select tests.assert((select status from attendance_records where lesson_id = :'lesson_past' and student_id = :'st1') = 'late', 'attendance saved although Telegram queuing failed');
+select b.id as inv_tg from invoice_balances b where b.student_id = :'st1' and b.balance > 0 order by b.period limit 1 \gset
+select count(*) as pay_before from payments where student_id = :'st1' \gset
+select * from record_payment(:'inv_tg', 1000, 'cash');
+select tests.assert((select count(*) from payments where student_id = :'st1') = :pay_before + 1, 'payment saved although Telegram queuing failed');
+:as_superuser
+alter table telegram_outbox drop constraint tg_test_break;
 
 \echo 'ALL TESTS PASSED'

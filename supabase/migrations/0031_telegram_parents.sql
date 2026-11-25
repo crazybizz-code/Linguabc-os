@@ -372,10 +372,42 @@ language sql immutable set search_path = '' as $$
                     'lesson_cancelled', 'lesson_moved', 'mock_released');
 $$;
 
--- Is this queued message still allowed to go out? Checked when it is
--- queued and again right before it is sent: the link is live and not
--- blocked, the parent is not suspended, and if the notice is about one
--- student, that student is still this parent's child.
+-- Lesson notices (0022) carried only the group's name. They now also carry
+-- the group and lesson ids, so Telegram delivery can be checked against the
+-- child's current enrolment. In-app behaviour is unchanged (same text, same
+-- recipients); the data just gains two ids.
+create or replace function app.notify_lesson_change() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_group text;
+begin
+  select name into v_group from public.groups where id = new.group_id;
+  if new.status = 'cancelled' and old.status <> 'cancelled' then
+    perform app.notify(new.center_id, app.group_audience(new.group_id, true), 'lesson_cancelled', 'Lesson cancelled',
+      format('The %s lesson on %s is cancelled.', v_group, app.tz_text(new.starts_at)),
+      jsonb_build_object('group', v_group, 'at', new.starts_at, 'group_id', new.group_id, 'lesson_id', new.id));
+  elsif new.status = 'scheduled' and new.starts_at is distinct from old.starts_at then
+    perform app.notify(new.center_id, app.group_audience(new.group_id, true), 'lesson_moved', 'Lesson moved',
+      format('The %s lesson on %s moved to %s.', v_group, app.tz_text(old.starts_at), app.tz_text(new.starts_at)),
+      jsonb_build_object('group', v_group, 'from', old.starts_at, 'at', new.starts_at, 'group_id', new.group_id, 'lesson_id', new.id));
+  end if;
+  return new;
+end $$;
+
+-- A uuid from notification data, or null if it is missing or malformed
+-- (never an error).
+create function app.tg_uuid(p text) returns uuid
+language sql immutable set search_path = '' as $$
+  select case when p ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then p::uuid end;
+$$;
+
+-- Is this message still allowed to go out? Checked when it is queued and
+-- again right before it is sent. The link must be live and not blocked,
+-- the parent not suspended, and the notice must be attributable:
+--   * about one student (student_id): still this parent's child;
+--   * about a group (group_id): one of this parent's children is enrolled
+--     in that group NOW (a child who moved or left no longer brings the
+--     old group's notices, and its name is never shown);
+--   * neither, or malformed ids: not sent (no guessing).
 create function app.tg_may_deliver(p_link uuid, p_data jsonb)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
@@ -383,20 +415,37 @@ returns boolean language sql stable security definer set search_path = '' as $$
     join public.memberships m on m.id = l.membership_id and m.center_id = l.center_id
     where l.id = p_link and l.revoked_at is null and l.blocked_at is null
       and m.role = 'parent' and m.status <> 'suspended'
-      and (p_data->>'student_id' is null
-           or app.tg_can_see_student(l.telegram_user_id, (p_data->>'student_id')::uuid)));
+      and case
+        when p_data ? 'student_id' then
+          app.tg_can_see_student(l.telegram_user_id, app.tg_uuid(p_data->>'student_id'))
+        when p_data ? 'group_id' then exists (
+          select 1 from public.guardians g
+          join public.enrollments e on e.student_id = g.student_id and e.center_id = g.center_id
+          join public.students s on s.id = g.student_id and s.center_id = g.center_id
+          where g.membership_id = m.id and g.center_id = m.center_id
+            and e.group_id = app.tg_uuid(p_data->>'group_id') and e.status = 'active'
+            and s.status in ('lead','active','paused'))
+        else false
+      end);
 $$;
 
+-- Queuing for Telegram must never break the change that caused the notice
+-- (an attendance mark, a payment): any error here skips Telegram for this
+-- notice and lets the transaction go on.
 create function app.tg_queue_notification() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if not app.tg_kind_wanted(new.data->>'kind') then return new; end if;
-  insert into public.telegram_outbox (center_id, notification_id, link_id)
-  select new.center_id, new.id, l.id
-  from public.telegram_links l
-  where l.membership_id = new.recipient_id and l.center_id = new.center_id
-    and app.tg_may_deliver(l.id, new.data)
-  on conflict (notification_id, link_id) do nothing;
+  begin
+    insert into public.telegram_outbox (center_id, notification_id, link_id)
+    select new.center_id, new.id, l.id
+    from public.telegram_links l
+    where l.membership_id = new.recipient_id and l.center_id = new.center_id
+      and app.tg_may_deliver(l.id, new.data)
+    on conflict (notification_id, link_id) do nothing;
+  exception when others then
+    raise warning 'telegram queue skipped for notification %', new.id;
+  end;
   return new;
 end $$;
 create trigger notifications_telegram after insert on public.notifications
@@ -485,7 +534,7 @@ grant execute on function public.tg_claim_update(bigint), public.tg_finish_updat
   public.tg_children(bigint), public.tg_unlink(bigint), public.tg_set_blocked(bigint, boolean),
   public.tg_outbox_claim(int), public.tg_outbox_done(uuid, uuid, boolean, text, int, boolean)
   to service_role;
-revoke execute on function app.tg_kind_wanted(text), app.tg_may_deliver(uuid, jsonb), app.tg_queue_notification(), app.tg_prune()
+revoke execute on function app.tg_kind_wanted(text), app.tg_may_deliver(uuid, jsonb), app.tg_uuid(text), app.tg_queue_notification(), app.tg_prune()
   from public, anon, authenticated;
 
 -- No cron job here: the pruning and sending jobs are in 0033 (needs pg_net
