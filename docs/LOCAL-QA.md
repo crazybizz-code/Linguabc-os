@@ -9,6 +9,7 @@ node tests/e2e/pilot-qa.mjs                     # 25 steps, screenshots in /tmp/
 QA_ADMIN_OPS=1 node tests/e2e/pilot-qa.mjs      # + 8 steps for PR #38 (student edit, transfer, timetable, lessons)
 QA_TELEGRAM=1 TELEGRAM_BOT_USERNAME=x ...       # + Telegram link steps for PR #36 (set the env for next dev too)
 QA_KPI=1 node tests/e2e/pilot-qa.mjs            # + mentor KPI steps for PR #39
+QA_MOCK=1 node tests/e2e/pilot-qa.mjs           # + mentor schedules a mock, enters bands, releases (PR #40)
 ```
 
 - **Stack:** local Postgres 16 (all migrations in `supabase/migrations`), `supabase/gotrue:v2.170.0` and `postgrest/postgrest:v12.2.3` from Docker Hub, `supabase/local/gateway.mjs` in place of Kong. `up.sh` drops and recreates the `linguabc_local` database each run.

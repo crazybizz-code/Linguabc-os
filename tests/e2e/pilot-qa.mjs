@@ -352,6 +352,43 @@ if (process.env.QA_KPI) {
   });
 }
 
+if (process.env.QA_MOCK) {
+  await step(mentor, "mentor", "schedules a mock for own group", async () => {
+    await mentor.goto(`${BASE}/mocks`);
+    await mentor.getByRole("button", { name: Tin("Create mock session") }).first().click();
+    const d = dialog(mentor);
+    await d.locator('input[name="name"]').fill("QA Mock 1");
+    const g = d.locator('select[name="group_id"]');
+    const o = await g.locator("option").allInnerTexts(); await g.selectOption({ index: Math.max(0, o.findIndex((x) => /QA B2 Morning/.test(x))) });
+    await d.locator('input[name="date"]').fill(new Date().toISOString().slice(0, 10));
+    await d.locator('input[name="time"]').fill("09:00");
+    await submitDialog(mentor, "Create mock session");
+    await mentor.waitForTimeout(1500);
+    await mentor.goto(`${BASE}/mocks`);
+    await expectText(mentor, /QA Mock 1/);
+  });
+  await step(student, "student", "does not see the mock result before release", async () => {
+    await student.goto(`${BASE}/student/progress`);
+    if (await student.getByText(/QA Mock 1/).count()) throw new Error("result visible before release");
+  });
+  await step(mentor, "mentor", "enters bands and releases the result", async () => {
+    mentor.on("dialog", (dlg) => dlg.accept());
+    await mentor.getByText("QA Mock 1").first().click();
+    for (const [m, v] of [["Reading", "6.5"], ["Listening", "7.0"], ["Writing", "6.0"], ["Speaking", "6.5"]]) {
+      await mentor.getByLabel(new RegExp(`Aziz QA ${m}`)).selectOption({ label: v });
+    }
+    await mentor.getByRole("button", { name: T("Save results") }).click();
+    await expectText(mentor, /^\s*Saved\s*$/, 10000);
+    await mentor.reload();
+    await mentor.getByRole("button", { name: Tin("Send results") }).click();
+    await expectText(mentor, /Sent to family/, 10000);
+  });
+  await step(student, "student", "sees the released mock result", async () => {
+    await student.goto(`${BASE}/student/progress`);
+    await expectText(student, /6\.5/, 10000);
+  });
+}
+
 // ------------------------------------------------------------------ owner: finance and monitoring
 await step(owner, "owner", "sees the payment in reports", async () => {
   await owner.goto(`${BASE}/reports`);
