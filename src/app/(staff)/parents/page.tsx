@@ -25,13 +25,16 @@ export default async function ParentsPage({ searchParams }: PageProps<"/parents"
   if (!isAdmin) redirect("/dashboard");
   const { q, portal } = await searchParams;
   const center = workspace.centerId;
-  const [guardians, students, links] = await Promise.all([
+  const [guardians, students, links, healthRes] = await Promise.all([
     supabase.from("guardians").select("id, student_id, full_name, phone, relationship, is_primary, membership_id, memberships!guardians_membership_id_center_id_fkey(id, status, invite_code, invite_expires_at)")
       .eq("center_id", center).order("full_name"),
     supabase.from("student_overview").select("id, full_name, status, open_balance, overdue_count").eq("center_id", center),
     // Status only: chat ids are not read here.
     supabase.from("telegram_links").select("membership_id, linked_at, blocked_at").eq("center_id", center).is("revoked_at", null),
+    supabase.rpc("telegram_queue_health", { p_center: center }),
   ]);
+  // Delivery health (0039): counts only. Missing before the migration: hidden.
+  const health = healthRes.error ? null : (healthRes.data as { sent: number; waiting: number; failed: number; blocked_parents: number; oldest_waiting_minutes: number | null } | null);
   const tg = new Map((links.data ?? []).map((l) => [l.membership_id, l]));
   const botReady = botUsername() !== null;
   const student = new Map((students.data ?? []).map((s) => [s.id, s]));
@@ -67,6 +70,12 @@ export default async function ParentsPage({ searchParams }: PageProps<"/parents"
           </div>
         ))}
       </Card>
+      {health && (
+        <p className={cn("-mt-3 text-[12px]", health.failed > 0 || (health.oldest_waiting_minutes ?? 0) > 15 ? "text-[#B4483D]" : "text-muted-foreground")}>
+          {t("Telegram messages, last 7 days: {sent} sent, {waiting} waiting, {failed} failed; {blocked} parents blocked the bot.",
+            { sent: health.sent, waiting: health.waiting, failed: health.failed, blocked: health.blocked_parents })}
+        </p>
+      )}
       <Card className="overflow-hidden">
         <form className="flex flex-wrap items-center gap-2 border-b border-border/60 p-4">
           <input name="q" defaultValue={query} placeholder={t("Search a parent, phone or child")} className="h-9 min-w-[240px] flex-1 rounded-[10px] border border-border/80 bg-[#FCF8F4] px-3 text-[12.5px]" />

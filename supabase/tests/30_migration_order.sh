@@ -27,6 +27,8 @@ fresh lg_rb
 apply lg_rb migrations/0031_telegram_parents.sql
 apply lg_rb migrations/0032_telegram_views.sql
 apply lg_rb migrations/0033_telegram_dispatch.sql
+apply lg_rb migrations/0039_telegram_queue_health.sql
+apply lg_rb rollback/0039_telegram_queue_health.down.sql
 apply lg_rb rollback/0033_telegram_dispatch.down.sql
 apply lg_rb rollback/0032_telegram_views.down.sql
 apply lg_rb rollback/0031_telegram_parents.down.sql

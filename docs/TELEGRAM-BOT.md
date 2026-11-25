@@ -70,6 +70,29 @@ _Holat (2026-11-25): bot BotFather’da yaratilgan, guruhlarga qo‘shish o‘ch
 - [ ] 0033 qo‘llash → `cron.job` da `telegram-dispatch`, `telegram-prune`
 - [ ] 1 soat kuzatish: `net._http_response` da 200 lar, `telegram_outbox` da `failed` yo‘q
 
+**G. Haqiqiy Telegram API bilan tekshiruv (webhook yoqilgandan keyin, QA markazida, asoschi telefoni)**
+Har birida natija va vaqtni yozing; ✅/❌. Tokenni hech qayerga yozmang.
+| # | Qadam | Kutilgan natija |
+|---|---|---|
+| 1 | `getMe` | bot nomi to‘g‘ri, `can_join_groups=false` |
+| 2 | `getWebhookInfo` | `url` = `/api/telegram/webhook`, `has_custom_certificate=false`, `pending_update_count=0`, `allowed_updates` = message, callback_query, my_chat_member |
+| 3 | Kalitsiz POST `/api/telegram/webhook` | 401 |
+| 4 | Parents → “Telegram link” → telefonda ochish → Start | “✅ Hisobingiz ulandi”, farzand menyusi |
+| 5 | Xuddi shu havolani boshqa telefonda ochish | “⚠️ Havola yaroqsiz” |
+| 6 | 8 ta menyu tugmasi | har biri to‘g‘ri bola ma’lumoti; kechikish < 3 s |
+| 7 | Ikkinchi bolani biriktirish → /start | bola tanlash ro‘yxati |
+| 8 | Davomatda “kelmadi” | 1 daqiqa ichida xabar; ikkinchi marta kelmaydi |
+| 9 | Qisman to‘lov yozish | “To‘lov qabul qilindi” xabari, summa to‘g‘ri |
+| 10 | Botni bloklash → davomat “kechikdi” | xabar yo‘q; Parents’da “Telegram: bot blocked” |
+| 11 | Botni ochish (yozish) → yangi hodisa | xabar keladi; bloklangan paytdagisi kelmaydi |
+| 12 | Botda “Botni uzish” | “🔌 Hisob uzildi”; menyular ishlamaydi |
+| 13 | Admin “Disconnect” | botdan ma’lumot olinmaydi |
+| 14 | Botni guruhga qo‘shishga urinish | BotFather sozlamasi tufayli mumkin emas |
+| 15 | Parents sahifasidagi “Telegram messages, last 7 days” qatori | sent soni oshgan, failed = 0 |
+| 16 | Vercel loglari | faqat “telegram webhook: …” kabi qat’iy matn; ism/telefon/token yo‘q |
+
+**Navbat muammosi bo‘lsa:** Parents sahifasidagi qator (0039) faqat sonlarni va xato sinfini (HTTP status: 429, 403, 400, 0 = tarmoq) ko‘rsatadi — xabar matni, ism, chat id ko‘rsatilmaydi. 15 daqiqadan uzoq kutayotgan xabar bo‘lsa qator qizil bo‘ladi.
+
 **Orqaga qaytarish:** `deleteWebhook` (darhol to‘xtaydi) → kerak bo‘lsa `cron.unschedule('telegram-dispatch')` → migratsiya rollback’lari.
 
 ## Yoqish tartibi (har bir qadam asoschi tasdig‘i bilan)

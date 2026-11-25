@@ -1024,4 +1024,5 @@ export const ru: Record<string, string> = {
   "The Telegram bot is not set up yet.": "Telegram-бот ещё не настроен.",
   "Couldn't create the link.": "Не удалось создать ссылку.",
   "No web portal (Telegram account)": "Без веб-портала (аккаунт Telegram)",
+  "Telegram messages, last 7 days: {sent} sent, {waiting} waiting, {failed} failed; {blocked} parents blocked the bot.": "Сообщения Telegram за 7 дней: отправлено {sent}, в очереди {waiting}, с ошибкой {failed}; заблокировали бота: {blocked}.",
 };

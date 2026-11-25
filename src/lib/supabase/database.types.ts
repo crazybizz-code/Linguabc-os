@@ -2015,6 +2015,7 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_code: string }; Returns: string }
+      telegram_queue_health: { Args: { p_center: string }; Returns: Json }
       issue_telegram_link: { Args: { p_guardian: string }; Returns: { token: string; expires_at: string; membership_id: string }[] }
       attach_guardian_to_parent: { Args: { p_guardian: string; p_parent: string }; Returns: undefined }
       revoke_telegram_link: { Args: { p_membership: string }; Returns: number }

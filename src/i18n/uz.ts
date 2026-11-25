@@ -1024,4 +1024,5 @@ export const uz: Record<string, string> = {
   "The Telegram bot is not set up yet.": "Telegram bot hali sozlanmagan.",
   "Couldn't create the link.": "Havolani yaratib bo'lmadi.",
   "No web portal (Telegram account)": "Veb-portal yo'q (Telegram hisobi)",
+  "Telegram messages, last 7 days: {sent} sent, {waiting} waiting, {failed} failed; {blocked} parents blocked the bot.": "Telegram xabarlari, oxirgi 7 kun: {sent} yuborildi, {waiting} kutmoqda, {failed} yiqildi; {blocked} ota-ona botni bloklagan.",
 };

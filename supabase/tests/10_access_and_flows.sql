@@ -1664,4 +1664,26 @@ select tests.assert((select count(*) from payments where student_id = :'st1') = 
 :as_superuser
 alter table telegram_outbox drop constraint tg_test_break;
 
+\echo '45. Telegram delivery health (no sensitive data)'
+:as_superuser
+insert into telegram_outbox (center_id, notification_id, link_id, status, last_error, attempts)
+select n.center_id, n.id, l.id, 'failed', '429 Too Many Requests: retry after 30 for chat 777 Karim', 6
+from notifications n, telegram_links l
+where n.center_id = :'center_a' and l.center_id = :'center_a'
+  and not exists (select 1 from telegram_outbox o where o.notification_id = n.id and o.link_id = l.id)
+limit 1;
+:as_admin
+select telegram_queue_health(:'center_a') as h \gset
+select tests.assert((:'h'::jsonb->>'failed')::int >= 1, 'failures counted');
+select tests.assert(:'h'::jsonb->'failure_classes' ? '429', 'failure class is the status only');
+select tests.assert(:'h'::text !~ '(Karim|777|chat|Too Many)', 'no names, chat ids or Telegram text');
+:as_ownerA
+select tests.assert(telegram_queue_health(:'center_a') ? 'linked_parents', 'owner sees it');
+:as_mentor
+select tests.expect_fail(format($$select telegram_queue_health(%L)$$, :'center_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select telegram_queue_health(%L)$$, :'center_a'), 'forbidden');
+:as_parent
+select tests.expect_fail(format($$select telegram_queue_health(%L)$$, :'center_a'), 'forbidden');
+
 \echo 'ALL TESTS PASSED'
