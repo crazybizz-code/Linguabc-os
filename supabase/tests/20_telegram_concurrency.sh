@@ -31,3 +31,22 @@ if [ "$WINS" != 1 ] || [ "$LIVE" != 1 ]; then
   echo "FAIL: concurrent redemption: $WINS winners, $LIVE live links"; exit 1
 fi
 echo "34. concurrent token redemption: one winner"
+
+# Two deliveries of one webhook update at the same moment: one 'claimed', one 'busy'.
+claim() {
+  psql -qtA -v ON_ERROR_STOP=1 -d "$DB" <<SQL
+begin;
+set local role service_role;
+select tg_claim_update(987654)->>'state';
+select pg_sleep(1.5);
+commit;
+SQL
+}
+claim > /tmp/tg_claim_a.out & A=$!
+sleep 0.3
+claim > /tmp/tg_claim_b.out & B=$!
+wait $A $B
+STATES=$(cat /tmp/tg_claim_a.out /tmp/tg_claim_b.out | grep -E '^(claimed|busy|done)$' | sort | tr '\n' ' ')
+rm -f /tmp/tg_claim_a.out /tmp/tg_claim_b.out
+if [ "$STATES" != "busy claimed " ]; then echo "FAIL: concurrent update claims: $STATES"; exit 1; fi
+echo "34b. concurrent duplicate webhook delivery: one claimed, one busy"
