@@ -1023,4 +1023,5 @@ export const uz: Record<string, string> = {
   "Add {child} to this account": "{child}ni shu hisobga qo'shish",
   "The Telegram bot is not set up yet.": "Telegram bot hali sozlanmagan.",
   "Couldn't create the link.": "Havolani yaratib bo'lmadi.",
+  "No web portal (Telegram account)": "Veb-portal yo'q (Telegram hisobi)",
 };

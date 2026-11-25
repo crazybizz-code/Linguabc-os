@@ -1023,4 +1023,5 @@ export const ru: Record<string, string> = {
   "Add {child} to this account": "Добавить {child} в этот аккаунт",
   "The Telegram bot is not set up yet.": "Telegram-бот ещё не настроен.",
   "Couldn't create the link.": "Не удалось создать ссылку.",
+  "No web portal (Telegram account)": "Без веб-портала (аккаунт Telegram)",
 };

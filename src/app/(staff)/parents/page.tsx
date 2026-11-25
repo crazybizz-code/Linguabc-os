@@ -104,7 +104,10 @@ export default async function ParentsPage({ searchParams }: PageProps<"/parents"
                     {r.membership?.status === "active" ? <Badge tone="green">{t("Parent portal active")}</Badge>
                       : r.membership?.status === "invited" && r.membership.invite_code
                         ? <InviteLink membershipId={r.membership.id} link={`${siteUrl()}/join?code=${r.membership.invite_code}`} expiresAt={r.membership.invite_expires_at} canReissue />
-                        : <LoginInvite label={t("Invite to parent portal")} field="guardian_id" value={r.guardianId} action={inviteParentLogin} who={r.name} />}
+                        : r.membership
+                          // Account made for Telegram, no web invite yet (the web portal is optional in the pilot).
+                          ? <Badge tone="neutral">{t("No web portal (Telegram account)")}</Badge>
+                          : <LoginInvite label={t("Invite to parent portal")} field="guardian_id" value={r.guardianId} action={inviteParentLogin} who={r.name} />}
                   </div>
                   <div className="min-w-[220px]">
                     {(() => {

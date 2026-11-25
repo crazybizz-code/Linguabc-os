@@ -422,7 +422,9 @@ export async function issueTelegramLink(_: ActionState, form: FormData): Promise
   if (error) return { error: friendly(error.message) };
   const token = data?.[0]?.token;
   if (!token) return { error: "Couldn't create the link." };
-  revalidatePath("/parents");
+  // No revalidatePath here: the family row's key changes when its parent
+  // account is created, which would unmount the dialog showing the link.
+  // The dialog refreshes the page when it is closed.
   return { ok: true, link: `https://t.me/${bot}?start=${token}` };
 }
 
