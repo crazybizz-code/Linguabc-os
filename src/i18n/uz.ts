@@ -1010,4 +1010,13 @@ export const uz: Record<string, string> = {
   "Could not prepare the upload for this recording.": "Bu yozuvni yuklashga tayyorlab bo'lmadi.",
   "Rejected after listening.": "Tinglangandan keyin rad etildi.",
   "The recording failed.": "Yozuv muvaffaqiyatsiz tugadi.",
+  "Suggestions for you": "Siz uchun tavsiyalar",
+  "Based on your attendance, homework and released mock results.": "Davomatingiz, uy vazifalaringiz va e'lon qilingan mock natijalaringiz asosida.",
+  "You missed “{title}”. Open it and finish it — it still counts for your progress.": "«{title}» vazifasini o'tkazib yubordingiz. Uni ochib tugating — u baribir natijangizga ta'sir qiladi.",
+  "You missed {n} homework tasks this month. Start with “{title}”.": "Bu oy {n} ta uy vazifasini o'tkazib yubordingiz. «{title}» dan boshlang.",
+  "Your attendance is {pct}%. Coming to every lesson is the fastest way to improve; check your timetable.": "Davomatingiz {pct}%. Har bir darsga kelish — o'sishning eng tez yo'li; jadvalingizni tekshiring.",
+  "Your {skill} homework average is {avg}%. Do one {skill} practice today.": "{skill} bo'yicha uy vazifalaringiz o'rtachasi {avg}%. Bugun bitta {skill} mashqini bajaring.",
+  "In your last mock, {skill} was {band} (overall {overall}). Practise {skill} this week.": "Oxirgi mockda {skill} bali {band} (umumiy {overall}). Bu hafta {skill} ni mashq qiling.",
+  "{late} of your last {n} homework tasks were handed in late. Start each one the day it is set.": "Oxirgi {n} ta vazifadan {late} tasi kech topshirilgan. Har birini berilgan kuniyoq boshlang.",
+  "You are on track. Keep it up with one short practice a day.": "Hammasi joyida. Kuniga bitta qisqa mashq bilan davom eting.",
 };

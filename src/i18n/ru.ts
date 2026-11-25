@@ -1010,4 +1010,13 @@ export const ru: Record<string, string> = {
   "Could not prepare the upload for this recording.": "Не удалось подготовить загрузку этой записи.",
   "Rejected after listening.": "Отклонено после прослушивания.",
   "The recording failed.": "Запись не удалась.",
+  "Suggestions for you": "Рекомендации для вас",
+  "Based on your attendance, homework and released mock results.": "На основе вашей посещаемости, домашних заданий и опубликованных результатов моков.",
+  "You missed “{title}”. Open it and finish it — it still counts for your progress.": "Вы пропустили «{title}». Откройте и выполните — это всё ещё влияет на ваш прогресс.",
+  "You missed {n} homework tasks this month. Start with “{title}”.": "В этом месяце пропущено заданий: {n}. Начните с «{title}».",
+  "Your attendance is {pct}%. Coming to every lesson is the fastest way to improve; check your timetable.": "Ваша посещаемость {pct}%. Посещать каждый урок — самый быстрый способ расти; проверьте расписание.",
+  "Your {skill} homework average is {avg}%. Do one {skill} practice today.": "Средний балл по {skill}: {avg}%. Сделайте сегодня одно упражнение по {skill}.",
+  "In your last mock, {skill} was {band} (overall {overall}). Practise {skill} this week.": "В последнем моке {skill}: {band} (общий {overall}). Потренируйте {skill} на этой неделе.",
+  "{late} of your last {n} homework tasks were handed in late. Start each one the day it is set.": "{late} из последних {n} заданий сданы с опозданием. Начинайте каждое в день выдачи.",
+  "You are on track. Keep it up with one short practice a day.": "Всё идёт хорошо. Продолжайте: одно короткое упражнение в день.",
 };

@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { BookOpen, CalendarDays, ClipboardList, Dumbbell, ChevronRight } from "lucide-react";
+import { BookOpen, CalendarDays, ClipboardList, Dumbbell, ChevronRight, Lightbulb } from "lucide-react";
 import { getPortalContext } from "@/lib/portal/context";
 import { PortalCard } from "@/components/portal/cards";
 import { Badge } from "@/components/ui/primitives";
 import { intlLocale } from "@/i18n";
+import { loadProgress } from "@/lib/progress";
+import { suggest } from "@/lib/suggestions";
 
 export const metadata = { title: "My plan" };
 const TZ = "Asia/Tashkent";
@@ -26,6 +28,14 @@ export default async function PlanPage() {
     supabase.from("mock_sessions").select("id, name, scheduled_at").gte("scheduled_at", now.toISOString()).order("scheduled_at").limit(3),
     supabase.from("mock_result_scores").select("reading_band, listening_band, writing_band, speaking_band, released_at").eq("student_id", me.id).not("released_at", "is", null).order("released_at", { ascending: false }).limit(1),
   ]);
+  // Suggestions from the student's own records only (RLS: their session).
+  const prog = await loadProgress(supabase, me.id);
+  const lastMock = prog.mocks[prog.mocks.length - 1] ?? null;
+  const tips = suggest({
+    now: now.toISOString(), attendancePct: prog.attendancePct, attendanceCounted: prog.attendanceCounted,
+    homework: prog.homework, bySkill: prog.bySkill, latestMock: lastMock,
+  });
+  const skillName = (v: string | number) => (typeof v === "string" && /^(reading|listening|writing|speaking)$/.test(v) ? t(v[0].toUpperCase() + v.slice(1)) : v);
   const done = new Set((subs.data ?? []).filter((s) => s.status === "submitted" || s.status === "reviewed").map((s) => s.homework_id));
   const todo = (hw.data ?? []).filter((h) => !done.has(h.id));
   const last = results.data?.[0];
@@ -35,6 +45,17 @@ export default async function PlanPage() {
 
   return (
     <>
+      <PortalCard icon={Lightbulb} title={t("Suggestions for you")}>
+        <ul className="space-y-2.5">
+          {tips.map((tip) => (
+            <li key={tip.kind} className="text-[13px] leading-relaxed">
+              {t(tip.text, Object.fromEntries(Object.entries(tip.vars).map(([k, v]) => [k, k === "skill" ? skillName(v) : v])))}
+              {tip.href && <> <Link href={tip.href} className="font-medium text-[#12392B] underline-offset-2 hover:underline">{t("Open")}</Link></>}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[11px] text-muted-foreground">{t("Based on your attendance, homework and released mock results.")}</p>
+      </PortalCard>
       <PortalCard icon={BookOpen} title={t("Homework to do")}>
         {todo.length === 0 ? <p className="text-[13px] text-[#3F6B4A]">{t("Nothing is waiting on you. A practice session is the best use of today.")}</p> : (
           <ul className="divide-y divide-border/60">
