@@ -1056,4 +1056,6 @@ export const uz: Record<string, string> = {
   "Why": "Sabab",
   "You can't change answers after submitting.": "Topshirgandan keyin javoblarni o'zgartirib bo'lmaydi.",
   "{n} question(s) unanswered. You can't change answers after submitting.": "{n} ta savolga javob berilmagan. Topshirgandan keyin javoblarni o'zgartirib bo'lmaydi.",
+  "Today or an earlier day; a move cannot be scheduled ahead.": "Bugun yoki oldingi kun; ko'chirishni oldindan rejalashtirib bo'lmaydi.",
+  "A transfer cannot be dated in the future; do it on the day.": "Ko'chirish sanasi kelajakda bo'lishi mumkin emas; uni o'sha kuni bajaring.",
 };

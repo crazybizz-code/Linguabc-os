@@ -1377,4 +1377,67 @@ select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_fut
 :as_ownerB
 select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_future'), 'forbidden');
 
+\echo '43. transfers never bill a month twice'
+:as_admin
+insert into courses (center_id, name, code, level, default_monthly_fee)
+  values (:'center_a', 'IELTS C1', 'C1-T', 'C1', 1000000) returning id as course_c1 \gset
+select create_group(:'center_a', 'T-A', :'course_a', :'branch_a', null, null, 20) as t_a \gset
+select create_group(:'center_a', 'T-B', :'course_c1', :'branch_a', null, null, 20) as t_b \gset
+select create_group(:'center_a', 'T-C', :'course_a', :'branch_a', null, null, 20) as t_c \gset
+insert into students (center_id, branch_id, full_name) values
+  (:'center_a', :'branch_a', 'Paid Full'), (:'center_a', :'branch_a', 'Paid Part'),
+  (:'center_a', :'branch_a', 'Void Inv'), (:'center_a', :'branch_a', 'Two Groups'), (:'center_a', :'branch_a', 'Transfer Race');
+select id as s_full from students where full_name = 'Paid Full' \gset
+select id as s_part from students where full_name = 'Paid Part' \gset
+select id as s_void from students where full_name = 'Void Inv' \gset
+select id as s_two  from students where full_name = 'Two Groups' \gset
+select id as s_race from students where full_name = 'Transfer Race' \gset
+select enroll_student(:'s_full', :'t_a') as e_full \gset
+select enroll_student(:'s_part', :'t_a') as e_part \gset
+select enroll_student(:'s_void', :'t_a') as e_void \gset
+select enroll_student(:'s_two', :'t_a') as e_two_a \gset
+select enroll_student(:'s_two', :'t_c') as e_two_c \gset
+select enroll_student(:'s_race', :'t_a') as e_race \gset
+select date_trunc('month', app.local_today())::date as this_m, (date_trunc('month', app.local_today()) + interval '1 month')::date as next_m \gset
+-- 1. fully paid this month, moved to a dearer course without keeping the fee
+select id as inv_full, amount as amt_full from invoices where enrollment_id = :'e_full' and period = :'this_m' \gset
+select * from record_payment(:'inv_full', :amt_full, 'cash');
+select transfer_student(:'e_full', :'t_b', app.local_today(), false) as e_full2 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'this_m' and status = 'open') = 1, 'fully paid: no second invoice for the month');
+select tests.assert((select balance from invoice_balances where id = :'inv_full') = 0, 'still fully paid');
+select tests.assert((select monthly_fee from enrollments where id = :'e_full2') = 1000000, 'new course fee when not kept');
+select tests.assert((select transferred_from from enrollments where id = :'e_full2') = :'e_full', 'transfer recorded');
+-- 2. partly paid: the balance stays on the original invoice, nothing new
+select id as inv_part from invoices where enrollment_id = :'e_part' and period = :'this_m' \gset
+select * from record_payment(:'inv_part', 300000, 'cash');
+select transfer_student(:'e_part', :'t_b', app.local_today(), true) as e_part2 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_part' and period = :'this_m' and status = 'open') = 1, 'partly paid: still one invoice');
+select tests.assert((select balance from invoice_balances where id = :'inv_part') = (select amount from invoices where id = :'inv_part') - 300000, 'balance carried on the original invoice');
+select tests.assert((select monthly_fee from enrollments where id = :'e_part2') = (select monthly_fee from enrollments where id = :'e_part'), 'fee kept when asked');
+-- 3. voided invoice does not count: the new group bills the month once
+select id as inv_void from invoices where enrollment_id = :'e_void' and period = :'this_m' \gset
+:as_ownerA
+select void_invoice(:'inv_void');
+:as_admin
+select transfer_student(:'e_void', :'t_c', app.local_today(), true) as e_void2 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_void' and period = :'this_m' and status = 'open') = 1, 'void invoice replaced by one open invoice');
+-- 4. a second, unrelated enrolment keeps its own invoice; the moved one is not billed again
+select transfer_student(:'e_two_a', :'t_b', app.local_today(), true) as e_two_b \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_two' and period = :'this_m' and status = 'open') = 2, 'two groups: two invoices, not three');
+-- 5. future-dated transfers are refused in V1
+select tests.expect_fail(format($$select transfer_student(%L, %L, app.local_today() + 5, true)$$, :'e_race', :'t_b'), 'future');
+-- 6. a chain of transfers in one month still bills once
+select transfer_student(:'e_full2', :'t_c', app.local_today(), true) as e_full3 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'this_m' and status = 'open') = 1, 'two hops: still one invoice');
+-- 7. monthly billing after transfers: this month unchanged, next month once per active place, at the new fee
+select generate_invoices(:'center_a', :'this_m');
+select generate_invoices(:'center_a', :'this_m');
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'this_m' and status = 'open') = 1, 'billing run: no double for the transfer month');
+select tests.assert((select count(*) from invoices where student_id = :'s_part' and period = :'this_m' and status = 'open') = 1, 'billing run: partly paid student not billed again');
+select tests.assert((select count(*) from invoices where student_id = :'s_two' and period = :'this_m' and status = 'open') = 2, 'billing run: two groups stay two');
+select generate_invoices(:'center_a', :'next_m');
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'next_m') = 1, 'next month billed once');
+select tests.assert((select enrollment_id from invoices where student_id = :'s_full' and period = :'next_m') = :'e_full3', 'next month billed to the current group');
+select tests.assert((select count(*) from invoices where student_id = :'s_part' and period = :'next_m' and enrollment_id = :'e_part2') = 1, 'partly paid: next month on the new place');
+
 \echo 'ALL TESTS PASSED'

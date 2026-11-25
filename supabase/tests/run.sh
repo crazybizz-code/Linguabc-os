@@ -15,3 +15,4 @@ done
 for f in tests/00_supabase_stub.sql migrations/*.sql tests/10_access_and_flows.sql; do
   psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$f"
 done
+bash tests/21_transfer_concurrency.sh

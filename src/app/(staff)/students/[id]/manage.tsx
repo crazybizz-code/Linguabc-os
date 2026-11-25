@@ -70,7 +70,7 @@ export function MoveGroup({ studentId, enrollmentId, groups }: { studentId: stri
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
       </FieldLabel>
-      <FieldLabel label={t("Date of the move")}><input name="date" type="date" required defaultValue={todayISO()} className={inputClass} /></FieldLabel>
+      <FieldLabel label={t("Date of the move")} hint={t("Today or an earlier day; a move cannot be scheduled ahead.")}><input name="date" type="date" required max={todayISO()} defaultValue={todayISO()} className={inputClass} /></FieldLabel>
       <label className="flex items-center gap-2 text-[12.5px]"><input type="checkbox" name="keep_fee" defaultChecked className="accent-[#12392B]" /> {t("Keep the current monthly fee and discount")}</label>
     </FormDialog>
   );

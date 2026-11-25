@@ -10,14 +10,63 @@
 -- readable "schedule conflict" message. Lessons that already have
 -- attendance are never moved, cancelled or deleted.
 --
+-- Transfers and billing: a transferred enrolment records where it came from
+-- (enrollments.transferred_from). app.issue_invoice (0008) now skips a
+-- month that is already billed (open invoice, paid or not) anywhere along
+-- that chain, so neither the transfer nor a later monthly billing run can
+-- bill the same student twice for one month. Void invoices do not count.
+--
 -- Rollback: supabase/rollback/0035_admin_operations.down.sql (drops the
--- functions; data written with them stays).
+-- functions and the column, restores app.issue_invoice from 0008; data
+-- written with the functions stays).
+
+create function app.centre_local_date(p_center uuid) returns date
+language sql stable security definer set search_path = '' as $$
+  select (now() at time zone coalesce((select timezone from public.centers where id = p_center), 'Asia/Tashkent'))::date;
+$$;
+revoke execute on function app.centre_local_date(uuid) from public, anon, authenticated;
 
 create function app.clash_message(p_when timestamptz, p_tz text) returns text
 language sql stable set search_path = '' as $$
   select format('schedule conflict on %s: room or mentor already booked',
                 to_char(p_when at time zone coalesce(p_tz, 'Asia/Tashkent'), 'Dy DD Mon HH24:MI'));
 $$;
+
+alter table public.enrollments add column transferred_from uuid;
+alter table public.enrollments add constraint enrollments_transferred_from_fkey
+  foreign key (transferred_from, center_id) references public.enrollments(id, center_id);
+
+-- Is this month already billed for this place in a group, counting the
+-- enrolments it was transferred from (any number of hops)?
+create function app.period_billed_via_transfer(p_enrollment uuid, p_period date)
+returns boolean language sql stable security definer set search_path = '' as $$
+  with recursive chain(id, hops) as (
+    select transferred_from, 1 from public.enrollments where id = p_enrollment and transferred_from is not null
+    union all
+    select e.transferred_from, c.hops + 1 from chain c join public.enrollments e on e.id = c.id
+    where e.transferred_from is not null and c.hops < 50
+  )
+  select exists (select 1 from public.invoices i join chain c on c.id = i.enrollment_id
+                 where i.period = date_trunc('month', p_period)::date and i.status = 'open');
+$$;
+revoke execute on function app.period_billed_via_transfer(uuid, date) from public, anon, authenticated;
+
+-- 0008's app.issue_invoice, plus: no invoice for a month already billed
+-- before a transfer.
+create or replace function app.issue_invoice(p_enrollment uuid, p_period date)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_e public.enrollments; v_id uuid; v_period date := date_trunc('month', p_period)::date;
+begin
+  select * into v_e from public.enrollments where id = p_enrollment;
+  if app.period_billed_via_transfer(p_enrollment, v_period) then return null; end if;
+  insert into public.invoices (center_id, student_id, enrollment_id, period, amount, due_date)
+  values (v_e.center_id, v_e.student_id, v_e.id, v_period,
+          round(v_e.monthly_fee * (100 - v_e.discount_percent) / 100)::bigint,
+          greatest(v_period + (v_e.due_day - 1), v_e.start_date))
+  on conflict (enrollment_id, period) do nothing
+  returning id into v_id;
+  return v_id;
+end $$;
 
 -- ------------------------------------------------------------- students
 create function public.update_student(p_student uuid, p_full_name text, p_phone text, p_email text,
@@ -123,18 +172,18 @@ begin
   select count(*) into v_taken from public.enrollments where group_id = g.id and status = 'active';
   if g.capacity is not null and v_taken >= g.capacity then raise exception 'group is full (% / %)', v_taken, g.capacity; end if;
   if p_date is null or p_date < e.start_date then raise exception 'The transfer date is before the start date.'; end if;
+  -- V1: no scheduled transfers. A future date would take the student out of
+  -- the current group today (rosters, attendance) although they still attend.
+  if p_date > app.centre_local_date(e.center_id) then raise exception 'A transfer cannot be dated in the future; do it on the day.'; end if;
 
   update public.enrollments set status = 'completed', end_date = p_date where id = e.id;
   select case when p_keep_fee then e.monthly_fee else c.default_monthly_fee end into v_fee
   from public.courses c where c.id = g.course_id;
-  insert into public.enrollments (center_id, student_id, group_id, monthly_fee, discount_percent, due_day, start_date)
-  values (e.center_id, e.student_id, g.id, v_fee, e.discount_percent, e.due_day, p_date)
+  insert into public.enrollments (center_id, student_id, group_id, monthly_fee, discount_percent, due_day, start_date, transferred_from)
+  values (e.center_id, e.student_id, g.id, v_fee, e.discount_percent, e.due_day, p_date, e.id)
   returning id into v_id;
-  -- bill the new group from the next month the old one did not cover
-  if not exists (select 1 from public.invoices i where i.enrollment_id = e.id and i.status = 'open'
-                 and i.period = date_trunc('month', p_date)::date) then
-    perform app.issue_invoice(v_id, p_date);
-  end if;
+  -- bills the transfer month only if no enrolment in the chain already did
+  perform app.issue_invoice(v_id, p_date);
   select name into v_from from public.groups where id = e.group_id;
   perform app.add_activity(e.center_id, e.student_id, 'enrollment', 'Moved to another group',
     format('%s → %s', v_from, g.name), app.my_staff_membership(e.center_id), v_id);

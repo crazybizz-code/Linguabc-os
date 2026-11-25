@@ -1056,4 +1056,6 @@ export const ru: Record<string, string> = {
   "Why": "Причина",
   "You can't change answers after submitting.": "После отправки ответы изменить нельзя.",
   "{n} question(s) unanswered. You can't change answers after submitting.": "Без ответа вопросов: {n}. После отправки ответы изменить нельзя.",
+  "Today or an earlier day; a move cannot be scheduled ahead.": "Сегодня или раньше; перевод нельзя запланировать заранее.",
+  "A transfer cannot be dated in the future; do it on the day.": "Дата перевода не может быть в будущем; сделайте его в этот день.",
 };
