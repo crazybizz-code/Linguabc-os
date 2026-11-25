@@ -64,7 +64,7 @@ const NAV: Record<StaffRole, { sections: Section[]; mobile: Item[] }> = {
     sections: [
       { title: "Centre", items: [I.overview, I.branches, I.groups] },
       { title: "Operations", items: [I.payments, I.parents] },
-      { title: "Performance", items: [I.progress, I.reports, I.staffMentors] },
+      { title: "Performance", items: [I.progress, I.reports, I.mentors, I.staffMentors] },
     ],
     mobile: [I.overview, I.branches, I.groups, I.payments, I.reports],
   },

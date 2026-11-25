@@ -1276,4 +1276,56 @@ select tests.expect_fail(format($$select retry_audio_job(%L, repeat('5', 64), 't
 :as_superuser
 select tests.assert((select count(*) from audio_jobs) = 10, 'ten jobs in all');
 
+\echo '41. mentor KPIs'
+:as_superuser
+select app.local_today() - 60 as k_from, app.local_today() as k_to \gset
+-- independent counts for Mentor A over the same window
+select count(*) filter (where status <> 'cancelled' and starts_at < now()) as k_due,
+       count(*) filter (where status <> 'cancelled' and starts_at < now() and exists (select 1 from attendance_records a where a.lesson_id = l.id)) as k_rec
+from lessons l where mentor_id = :'m_mentor'
+  and starts_at >= (:'k_from'::date)::timestamp at time zone 'Asia/Tashkent' and starts_at < (:'k_to'::date + 1)::timestamp at time zone 'Asia/Tashkent' \gset
+select tests.assert(:k_due > 0 and :k_rec > 0, 'fixture has lessons with attendance');
+:as_ownerA
+select mentor_kpis(:'center_a', :'k_from', :'k_to') as kp \gset
+select (select x from jsonb_array_elements(:'kp'::jsonb->'mentors') x where x->>'mentor_id' = :'m_mentor') as kpa \gset
+select tests.assert((:'kpa'::jsonb->>'lessons_due')::int = :k_due, 'lessons due counted from lessons');
+select tests.assert((:'kpa'::jsonb->>'attendance_recorded')::int = :k_rec, 'attendance recorded counted');
+select tests.assert((:'kpa'::jsonb->>'attendance_completion')::int = round(100.0 * :k_rec / :k_due), 'completion = recorded / due');
+select tests.assert(jsonb_array_length(:'kp'::jsonb->'mentors') = (select count(*) from memberships where center_id = :'center_a' and role = 'mentor' and status in ('active','invited')), 'owner sees every mentor');
+-- reviews: a hand-in needing review, then reviewed; turnaround is measured
+:as_superuser
+select count(*) as rv_before from submissions s join homework h on h.id = s.homework_id join groups g on g.id = h.group_id
+  where g.mentor_id = :'m_mentor' and s.status = 'reviewed' \gset
+select tests.assert((:'kpa'::jsonb->>'reviews_done')::int <= (:'kpa'::jsonb->>'reviews_needed')::int, 'done never above needed');
+select count(*) as k_need, count(*) filter (where s.status = 'reviewed') as k_done
+from submissions s join homework h on h.id = s.homework_id join groups g on g.id = h.group_id
+where g.mentor_id = :'m_mentor' and s.submitted_at >= (:'k_from'::date)::timestamp at time zone 'Asia/Tashkent'
+  and s.submitted_at < (:'k_to'::date + 1)::timestamp at time zone 'Asia/Tashkent'
+  and (s.status = 'reviewed' or (s.status = 'submitted' and s.score is null)) \gset
+select tests.assert((:'kpa'::jsonb->>'reviews_needed')::int = :k_need and (:'kpa'::jsonb->>'reviews_done')::int = :k_done, 'reviews counted from submissions');
+select tests.assert(:k_need > 0, 'fixture has work needing review');
+select tests.assert(:'kpa'::jsonb->'mock_band_avg' is not null, 'mock band key present');
+-- access: academic manager sees all; a mentor only themself; strangers nothing
+:as_acad
+select tests.assert(jsonb_array_length(mentor_kpis(:'center_a', :'k_from', :'k_to')->'mentors') = jsonb_array_length(:'kp'::jsonb->'mentors'), 'academic manager sees all');
+:as_mentor
+select tests.assert((select count(*) = 1 and bool_and(x->>'mentor_id' = :'m_mentor') from jsonb_array_elements(mentor_kpis(:'center_a', :'k_from', :'k_to')->'mentors') x), 'mentor sees only own row');
+:as_student
+select tests.expect_fail(format($$select mentor_kpis(%L, %L, %L)$$, :'center_a', :'k_from', :'k_to'), 'forbidden');
+:as_parent
+select tests.expect_fail(format($$select mentor_kpis(%L, %L, %L)$$, :'center_a', :'k_from', :'k_to'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select mentor_kpis(%L, %L, %L)$$, :'center_a', :'k_from', :'k_to'), 'forbidden');
+:as_ownerA
+select tests.expect_fail(format($$select mentor_kpis(%L, %L, %L)$$, :'center_a', :'k_to', :'k_from'), 'period');
+-- a new review moves review_completion, and a cancelled lesson is not counted as due
+:as_superuser
+select id as k_les from lessons where mentor_id = :'m_mentor' and status = 'scheduled' and starts_at < now()
+  and starts_at >= (:'k_from'::date)::timestamp at time zone 'Asia/Tashkent'
+  and not exists (select 1 from attendance_records a where a.lesson_id = lessons.id) order by starts_at desc limit 1 \gset
+update lessons set status = 'cancelled' where id = :'k_les';
+:as_ownerA
+select (select x from jsonb_array_elements(mentor_kpis(:'center_a', :'k_from', :'k_to')->'mentors') x where x->>'mentor_id' = :'m_mentor') as kpb \gset
+select tests.assert((:'kpb'::jsonb->>'lessons_due')::int = :k_due - 1 and (:'kpb'::jsonb->>'lessons_cancelled')::int = (:'kpa'::jsonb->>'lessons_cancelled')::int + 1, 'cancelled lesson leaves "due"');
+
 \echo 'ALL TESTS PASSED'
