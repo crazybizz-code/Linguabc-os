@@ -1,4 +1,4 @@
-# PR #36–#40: merge and migration compatibility
+# PR #36–#43: merge and migration compatibility
 
 _2026-11-25. `main` = `e120631` (#35 merged). Production database: migrations 0001–0028 only. Every PR below is open; nothing applied._
 
@@ -11,10 +11,15 @@ _2026-11-25. `main` = `e120631` (#35 merged). Production database: migrations 00
 | #38 Admin ops | 0035 | 0001–0028 (tested also with 0031/0032) | **`app.issue_invoice`** (0008) | `enrollments.transferred_from`, 8 RPCs, `app.period_billed_via_transfer`, `app.centre_local_date` | `actions.ts`, `database.types.ts`, i18n, `supabase/tests/run.sh` |
 | #39 Mentor KPI | 0036 | 0001–0028 | — | `mentor_kpis` (read only) | `sidebar.tsx`, `database.types.ts`, i18n |
 | #40 Mentor mocks | 0037 | 0011 | **`create_mock_session`** (0011) | — | — |
+| #36 (cont.) | 0039 | 0031 | — | `telegram_queue_health` (read only) | — |
+| #42 Settings | 0038 | 0032 (`centers.phone/address`) | **drops policy `centers_update`, revokes UPDATE on `centers`** | `update_center_settings` | `actions.ts` (replaces `renameCentre`), `database.types.ts`, i18n, `settings/*` |
+| #43 Suggestions | — | — | — | — (TS only) | `progress.ts`, `student/plan`, i18n |
 
 No two migrations create or replace the same object. `app.center_today` (0034) and `app.centre_local_date` (0035) are different names on purpose.
 
-**Every migration is backward compatible with the code already on `main`:** they only add objects, or widen/narrow behaviour that the current UI does not reach (0035's `issue_invoice` change only matters for enrolments with `transferred_from`, which no current code writes; 0037 lets mentors create sessions, which the current UI does not offer them; 0031 adds Telegram-linked parents to `app.notify`, of which there are none). So **"migration first, then merge the code"** is safe.
+**0038 is the one exception to "backward compatible": it removes the direct `UPDATE centers` that the current `renameCentre` uses, so apply 0038 and merge #42 together (migration, then merge within minutes); in between, renaming the centre fails with a permission message and nothing else is affected.**
+
+**Every other migration is backward compatible with the code already on `main`:** they only add objects, or widen/narrow behaviour that the current UI does not reach (0035's `issue_invoice` change only matters for enrolments with `transferred_from`, which no current code writes; 0037 lets mentors create sessions, which the current UI does not offer them; 0031 adds Telegram-linked parents to `app.notify`, of which there are none). So **"migration first, then merge the code"** is safe.
 
 ## 2. What happens if the code is deployed before its migration
 Merging to `main` deploys to Vercel production. Checked by reading the code and, for #36, on a local stack without 0031–0033:
@@ -25,6 +30,8 @@ Merging to `main` deploys to Vercel production. Checked by reading the code and,
 | #38 | Student 360 / group buttons appear but their RPCs fail with a database message; "Partial" and translations work. | **medium — apply 0035 first** |
 | #39 | Mentors page: the KPI card says "could not be loaded"; the old table still works. | low |
 | #40 | Mentors see "Create mock session" but get "You don't have permission". | **medium — apply 0037 first** |
+| #42 | Settings save fails with a database message; renaming the centre no longer works. | **medium — apply 0038 first** |
+| #43 | Nothing: no migration. | none |
 
 ## 3. Sequence (each step needs the owner's approval)
 1. **0031 + 0032 → production** (procedure: `DEPLOY-TELEGRAM-MIGRATIONS.md`). No visible change.
@@ -33,6 +40,9 @@ Merging to `main` deploys to Vercel production. Checked by reading the code and,
 4. **0035 → production**, then merge **#38** (rebase on `main` first: conflicts in `actions.ts`, i18n and the SQL test file are append-only).
 5. **0036 → production**, then merge **#39**.
 6. **0037 → production**, then merge **#40**.
+6b. **0038 → production**, then merge **#42** right after (see the exception above).
+6c. Merge **#43** (no migration).
+6d. **0039** with #36 or later (read only).
 7. Follow-up PR (small): `schedule_changed` added to the Telegram kinds; new admin actions call the Telegram dispatch.
 8. Telegram go-live: env vars → `setWebhook` → 0033 (pg_net, Vault, cron) — `TELEGRAM-BOT.md` checklist.
 
