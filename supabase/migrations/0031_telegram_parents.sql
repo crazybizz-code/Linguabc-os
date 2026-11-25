@@ -23,8 +23,9 @@
 --   message is queued only if the change commits. The app sends the outbox
 --   and retries with backoff; (notification, link) is unique, so a message
 --   is never queued twice. A parent who blocks the bot is marked and skipped.
--- * Duplicate webhook deliveries: `tg_claim_update` records each update_id
---   once; a repeat returns false and is ignored.
+-- * Webhook deliveries: `tg_claim_update` / `tg_finish_update` handle each
+--   update_id once, and a failed one is handed back to Telegram's retry.
+-- * Delivery is at least once, never "exactly once": see tg_outbox_claim.
 --
 -- Rollback: drop the functions and the four tables below, and restore
 -- app.notify from 0022. No existing row is changed by this migration.
@@ -69,7 +70,9 @@ create index telegram_links_user_idx on public.telegram_links (telegram_user_id)
 -- Webhook deliveries already handled (Telegram retries until it gets a 200).
 create table public.telegram_updates (
   update_id   bigint primary key,
-  received_at timestamptz not null default now()
+  status      text not null default 'processing' check (status in ('processing','done')),
+  received_at timestamptz not null default now(),
+  claimed_at  timestamptz not null default now()
 );
 
 create table public.telegram_outbox (
@@ -79,6 +82,7 @@ create table public.telegram_outbox (
   link_id         uuid not null,
   status          text not null default 'queued' check (status in ('queued','sending','sent','failed','skipped')),
   attempts        int not null default 0,
+  claim_id        uuid,                    -- current send attempt (lease)
   next_attempt_at timestamptz not null default now(),
   last_error      text,
   created_at      timestamptz not null default now(),
@@ -233,21 +237,44 @@ grant execute on function public.issue_telegram_link(uuid), public.attach_guardi
   public.revoke_telegram_link(uuid) to authenticated;
 
 -- ----------------------------------------------- bot RPCs (service role)
--- Record a webhook update id. False means "seen before: ignore".
+-- Webhook updates, in two steps so a failure never loses one:
+--   tg_claim_update  -> true: handle it; false: done already, or another
+--                       request is handling it right now (answer 200).
+--   tg_finish_update -> ok: done for good; not ok: forget the claim, the
+--                       webhook answers 500 and Telegram sends it again.
+-- A request that dies mid-way leaves a 'processing' claim; after 90 seconds
+-- the next delivery of the same update may take it over.
 create function public.tg_claim_update(p_update_id bigint)
 returns boolean language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.telegram_updates (update_id) values (p_update_id) on conflict do nothing;
+  if found then return true; end if;
+  update public.telegram_updates set claimed_at = now()
+  where update_id = p_update_id and status = 'processing' and claimed_at < now() - interval '90 seconds';
   return found;
 end $$;
 
+create function public.tg_finish_update(p_update_id bigint, p_ok boolean)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if p_ok then
+    update public.telegram_updates set status = 'done' where update_id = p_update_id;
+  else
+    delete from public.telegram_updates where update_id = p_update_id and status = 'processing';
+  end if;
+end $$;
+
 -- Redeem a link token for the Telegram user who sent /start <token>.
--- Every failure gives the same answer, so a guess learns nothing.
+-- Private chats only: there the chat id is the user's own id, so a token
+-- pasted into a group can never link the group. Every failure gives the
+-- same answer, so a guess learns nothing. The row lock makes two parallel
+-- redemptions of one token wait for each other: only the first succeeds.
 create function public.tg_redeem_link(p_token text, p_tg_user bigint, p_chat bigint, p_username text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare t public.telegram_link_tokens%rowtype; v_status public.member_status; v_role public.member_role;
 begin
-  if p_token is null or length(p_token) not between 20 and 64 or p_tg_user is null or p_chat is null or p_chat <= 0 then
+  if p_token is null or length(p_token) not between 20 and 64 or p_tg_user is null or p_tg_user <= 0
+     or p_chat is distinct from p_tg_user then
     return jsonb_build_object('ok', false);
   end if;
   select * into t from public.telegram_link_tokens where token_hash = app.tg_hash(p_token) for update;
@@ -290,18 +317,24 @@ create function public.tg_unlink(p_tg_user bigint)
 returns int language plpgsql security definer set search_path = '' as $$
 declare n int;
 begin
+  update public.telegram_outbox o set status = 'skipped', last_error = 'unlinked'
+  from public.telegram_links l
+  where o.link_id = l.id and l.telegram_user_id = p_tg_user and l.revoked_at is null and o.status in ('queued','sending');
   update public.telegram_links set revoked_at = now() where telegram_user_id = p_tg_user and revoked_at is null;
   get diagnostics n = row_count;
   return n;
 end $$;
 
--- Mark a chat as blocked (Telegram answered 403) or seen again.
-create function public.tg_set_blocked(p_chat bigint, p_blocked boolean)
+-- Blocked: Telegram answered 403, or a my_chat_member update said
+-- "kicked". Unblocked: the parent wrote to the bot again, pressed a button,
+-- or a my_chat_member update said "member". Messages skipped while blocked
+-- are not replayed (they are out of date); new ones are queued again.
+create function public.tg_set_blocked(p_tg_user bigint, p_blocked boolean)
 returns void language sql security definer set search_path = '' as $$
   update public.telegram_links
   set blocked_at = case when p_blocked then coalesce(blocked_at, now()) end,
       last_seen_at = case when p_blocked then last_seen_at else now() end
-  where chat_id = p_chat and revoked_at is null;
+  where telegram_user_id = p_tg_user and revoked_at is null;
 $$;
 
 -- Kinds a parent gets on Telegram (priority list of the V1 pilot).
@@ -311,6 +344,21 @@ language sql immutable set search_path = '' as $$
                     'lesson_cancelled', 'lesson_moved', 'mock_released');
 $$;
 
+-- Is this queued message still allowed to go out? Checked when it is
+-- queued and again right before it is sent: the link is live and not
+-- blocked, the parent is not suspended, and if the notice is about one
+-- student, that student is still this parent's child.
+create function app.tg_may_deliver(p_link uuid, p_data jsonb)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.telegram_links l
+    join public.memberships m on m.id = l.membership_id and m.center_id = l.center_id
+    where l.id = p_link and l.revoked_at is null and l.blocked_at is null
+      and m.role = 'parent' and m.status <> 'suspended'
+      and (p_data->>'student_id' is null
+           or app.tg_can_see_student(l.telegram_user_id, (p_data->>'student_id')::uuid)));
+$$;
+
 create function app.tg_queue_notification() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -318,51 +366,66 @@ begin
   insert into public.telegram_outbox (center_id, notification_id, link_id)
   select new.center_id, new.id, l.id
   from public.telegram_links l
-  join public.memberships m on m.id = l.membership_id and m.center_id = l.center_id
   where l.membership_id = new.recipient_id and l.center_id = new.center_id
-    and l.revoked_at is null and l.blocked_at is null
-    and m.role = 'parent' and m.status <> 'suspended'
+    and app.tg_may_deliver(l.id, new.data)
   on conflict (notification_id, link_id) do nothing;
   return new;
 end $$;
 create trigger notifications_telegram after insert on public.notifications
   for each row execute function app.tg_queue_notification();
 
--- Take a batch of due messages to send. Rows stay 'sending' for 2 minutes;
--- if the sender dies they come back on their own.
+-- Take a batch of due messages (1-50). Each gets a fresh claim id and a
+-- 2-minute lease; `for update skip locked` keeps two senders from taking the
+-- same row, and an expired lease lets another sender retry it. Messages
+-- that may no longer go out (revoked, blocked, suspended, child unlinked)
+-- or are older than 24 hours are skipped here, not sent.
+--
+-- Delivery is at least once: if Telegram accepted a message but the sender
+-- died before tg_outbox_done, the lease expires and it is sent again. The
+-- sender keeps that window small (10 s request timeout, lease 120 s), and
+-- tg_outbox_done only accepts the current claim id, so a late answer from
+-- an old attempt changes nothing.
 create function public.tg_outbox_claim(p_limit int default 25)
-returns table (id uuid, chat_id bigint, kind text, data jsonb, title text, body text, attempts int)
+returns table (id uuid, claim uuid, chat_id bigint, kind text, data jsonb, title text, body text, attempts int)
 language plpgsql security definer set search_path = '' as $$
+declare r record; v_claim uuid; n int := 0; v_max int := least(greatest(coalesce(p_limit, 25), 1), 50);
 begin
-  return query
-  with due as (
-    select o.id from public.telegram_outbox o
+  for r in
+    select o.id, o.link_id, o.attempts, o.created_at, nt.data, nt.title, nt.body, l.chat_id
+    from public.telegram_outbox o
+    join public.notifications nt on nt.id = o.notification_id
+    join public.telegram_links l on l.id = o.link_id
     where o.status in ('queued','sending') and o.next_attempt_at <= now()
     order by o.next_attempt_at
-    limit least(greatest(coalesce(p_limit, 25), 1), 100)
-    for update skip locked
-  ), upd as (
-    update public.telegram_outbox o
-    set status = 'sending', attempts = o.attempts + 1, next_attempt_at = now() + interval '2 minutes'
-    from due where o.id = due.id
-    returning o.id, o.notification_id, o.link_id, o.attempts
-  )
-  select upd.id, l.chat_id, n.data->>'kind', n.data, n.title, n.body, upd.attempts
-  from upd
-  join public.telegram_links l on l.id = upd.link_id
-  join public.notifications n on n.id = upd.notification_id
-  where l.revoked_at is null and l.blocked_at is null;
+    limit v_max * 2
+    for update of o skip locked
+  loop
+    if r.created_at < now() - interval '24 hours' then
+      update public.telegram_outbox set status = 'skipped', last_error = 'stale' where telegram_outbox.id = r.id;
+    elsif not app.tg_may_deliver(r.link_id, r.data) then
+      update public.telegram_outbox set status = 'skipped', last_error = 'not allowed any more' where telegram_outbox.id = r.id;
+    elsif n < v_max then
+      v_claim := gen_random_uuid();
+      update public.telegram_outbox
+      set status = 'sending', claim_id = v_claim, attempts = r.attempts + 1, next_attempt_at = now() + interval '2 minutes'
+      where telegram_outbox.id = r.id;
+      n := n + 1;
+      id := r.id; claim := v_claim; chat_id := r.chat_id; kind := r.data->>'kind';
+      data := r.data; title := r.title; body := r.body; attempts := r.attempts + 1;
+      return next;
+    end if;
+  end loop;
 end $$;
 
 -- Report how a send went. p_retry_after: seconds Telegram asked us to wait
--- (429). After 6 failed attempts the message is given up.
-create function public.tg_outbox_done(p_id uuid, p_ok boolean, p_error text default null,
+-- (429). After 6 attempts the message is given up.
+create function public.tg_outbox_done(p_id uuid, p_claim uuid, p_ok boolean, p_error text default null,
                                       p_retry_after int default null, p_blocked boolean default false)
 returns void language plpgsql security definer set search_path = '' as $$
 declare o public.telegram_outbox%rowtype;
 begin
   select * into o from public.telegram_outbox where id = p_id for update;
-  if o.id is null or o.status not in ('sending','queued') then return; end if;
+  if o.id is null or o.status <> 'sending' or o.claim_id is distinct from p_claim then return; end if;
   if p_ok then
     update public.telegram_outbox set status = 'sent', sent_at = now(), last_error = null where id = p_id;
   elsif p_blocked then
@@ -373,7 +436,7 @@ begin
   else
     update public.telegram_outbox
     set status = 'queued', last_error = left(p_error, 300),
-        next_attempt_at = now() + make_interval(secs => greatest(coalesce(p_retry_after, 0), 30 * power(2, o.attempts)::int))
+        next_attempt_at = now() + make_interval(secs => least(3600, greatest(coalesce(p_retry_after, 0), 30 * power(2, o.attempts - 1)::int)))
     where id = p_id;
   end if;
 end $$;
@@ -385,20 +448,17 @@ language sql security definer set search_path = '' as $$
   delete from public.telegram_outbox where status in ('sent','failed','skipped') and created_at < now() - interval '30 days';
 $$;
 
-revoke execute on function public.tg_claim_update(bigint), public.tg_redeem_link(text, bigint, bigint, text),
+
+revoke execute on function public.tg_claim_update(bigint), public.tg_finish_update(bigint, boolean), public.tg_redeem_link(text, bigint, bigint, text),
   public.tg_children(bigint), public.tg_unlink(bigint), public.tg_set_blocked(bigint, boolean),
-  public.tg_outbox_claim(int), public.tg_outbox_done(uuid, boolean, text, int, boolean)
+  public.tg_outbox_claim(int), public.tg_outbox_done(uuid, uuid, boolean, text, int, boolean)
   from public, anon, authenticated;
-grant execute on function public.tg_claim_update(bigint), public.tg_redeem_link(text, bigint, bigint, text),
+grant execute on function public.tg_claim_update(bigint), public.tg_finish_update(bigint, boolean), public.tg_redeem_link(text, bigint, bigint, text),
   public.tg_children(bigint), public.tg_unlink(bigint), public.tg_set_blocked(bigint, boolean),
-  public.tg_outbox_claim(int), public.tg_outbox_done(uuid, boolean, text, int, boolean)
+  public.tg_outbox_claim(int), public.tg_outbox_done(uuid, uuid, boolean, text, int, boolean)
   to service_role;
-revoke execute on function app.tg_kind_wanted(text), app.tg_queue_notification(), app.tg_prune()
+revoke execute on function app.tg_kind_wanted(text), app.tg_may_deliver(uuid, jsonb), app.tg_queue_notification(), app.tg_prune()
   from public, anon, authenticated;
 
-do $$
-begin
-  if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    perform cron.schedule('telegram-prune', '17 3 * * *', 'select app.tg_prune()');
-  end if;
-end $$;
+-- No cron job here: the pruning and sending jobs are in 0033 (needs pg_net
+-- and a separate go-ahead for production).

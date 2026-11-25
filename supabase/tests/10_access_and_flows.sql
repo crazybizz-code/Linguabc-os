@@ -6,7 +6,7 @@
 
 -- ---------------------------------------------------------------- harness
 create schema tests;
-grant usage on schema tests to authenticated, anon;
+grant usage on schema tests to authenticated, anon, service_role;
 
 create function tests.expect_fail(p_sql text, p_pattern text default '') returns void
 language plpgsql as $$
@@ -38,7 +38,7 @@ create function tests.assert(p_ok boolean, p_msg text) returns void language plp
 begin
   if not coalesce(p_ok, false) then raise exception 'assertion failed: %', p_msg; end if;
 end $$;
-grant execute on all functions in schema tests to authenticated, anon;
+grant execute on all functions in schema tests to authenticated, anon, service_role;
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-0000000000a1', 'owner@a.uz',   '{"full_name":"Owner A"}'),
@@ -64,6 +64,11 @@ insert into auth.users (id, email, raw_user_meta_data) values
 \set as_anon     'reset role; select tests.login(''''); set role anon;'
 \set as_service  'reset role; select set_config(''request.jwt.claims'', ''{"role":"service_role"}'', false); set role authenticated;'
 \set as_superuser 'reset role;'
+\set as_service_role 'reset role; select set_config(''request.jwt.claims'', '''', false); set role service_role;'
+\if :{?with_audio}
+\else
+\set with_audio true
+\endif
 
 \echo '1. registration, centers, invites'
 :as_ownerA
@@ -1017,6 +1022,8 @@ select tests.expect_count('select * from practice_attempts', 0);
 select tests.expect_count('select * from practice_attempts', 0);
 select tests.expect_fail($$insert into practice_attempts (center_id, student_id, item_id, skill) values (gen_random_uuid(), gen_random_uuid(), 'lib-p', 'reading')$$, 'row-level security|permission denied');
 
+-- 0029/0030 are not on production yet: PROD_SHAPE=1 run.sh skips them.
+\if :with_audio
 \echo '29. audio segment cache'
 select repeat('a', 64) as seg_h, repeat('b', 64) as seg_h2, repeat('c', 64) as seg_hp \gset
 -- a miss is claimed by one caller; everyone else in the centre waits
@@ -1106,8 +1113,6 @@ select tests.assert((select count(*) from storage.buckets where id in ('listenin
 
 \echo '30. audio jobs'
 :as_superuser
-grant usage on schema tests to service_role;
-\set as_service_role 'reset role; select set_config(''request.jwt.claims'', '''', false); set role service_role;'
 select repeat('1', 64) as tok1, repeat('2', 64) as tok2, repeat('3', 64) as tok3, repeat('4', 64) as tok4,
        repeat('a', 64) as idem1, repeat('b', 64) as idem2, repeat('c', 64) as idem3, repeat('d', 64) as idem4,
        :'center_a' || '/aaaaaaaa-0000-4000-8000-000000000001.mp3' as jp1,
@@ -1276,6 +1281,10 @@ select tests.expect_fail(format($$select retry_audio_job(%L, repeat('5', 64), 't
 :as_superuser
 select tests.assert((select count(*) from audio_jobs) = 10, 'ten jobs in all');
 
+\else
+\echo '29-30. skipped (production shape: 0029/0030 not applied)'
+\endif
+
 \echo '31. parent Telegram bot: linking, access, outbox'
 -- staff side: only owner/admin of the guardian's centre may issue a link
 :as_mentor
@@ -1339,7 +1348,18 @@ select tests.expect_count('select * from telegram_links', 0);
 -- duplicate webhook deliveries
 :as_service_role
 select tests.assert(tg_claim_update(5001), 'first delivery handled');
-select tests.assert(not tg_claim_update(5001), 'repeat delivery ignored');
+select tests.assert(not tg_claim_update(5001), 'repeat while processing is ignored');
+select tg_finish_update(5001, false);
+select tests.assert(tg_claim_update(5001), 'failed update is handled again on retry');
+select tg_finish_update(5001, true);
+select tests.assert(not tg_claim_update(5001), 'done update is never handled twice');
+select tests.assert(tg_claim_update(5002), 'claim 5002');
+:as_superuser
+update telegram_updates set claimed_at = now() - interval '5 minutes' where update_id = 5002;
+:as_service_role
+select tests.assert(tg_claim_update(5002), 'a crashed claim is taken over after 90 s');
+select tg_finish_update(5002, true);
+select tests.assert(not tg_claim_update(5002), 'and then done');
 
 -- attendance -> outbox, only after the change, once per notification
 :as_admin
@@ -1352,16 +1372,24 @@ select tests.assert((select count(*) from telegram_outbox o join notifications n
 select tests.assert((select count(*) from telegram_outbox o join notifications n on n.id = o.notification_id
   where n.data->>'kind' like 'homework%') = 0, 'homework stays in-app');
 :as_service_role
-select id as ob1 from tg_outbox_claim(10) limit 1 \gset
+select id as ob1, claim as cl1 from tg_outbox_claim(10) limit 1 \gset
 select tests.expect_count('select * from tg_outbox_claim(10)', 0);
-select tg_outbox_done(:'ob1', false, 'timeout');
+select tg_outbox_done(:'ob1', gen_random_uuid(), true);
+:as_superuser
+select tests.assert((select status from telegram_outbox where id = :'ob1') = 'sending', 'wrong claim id changes nothing');
+:as_service_role
+select tg_outbox_done(:'ob1', :'cl1', false, 'timeout');
 :as_superuser
 select tests.assert((select status = 'queued' and next_attempt_at > now() from telegram_outbox where id = :'ob1'), 'retry later');
 update telegram_outbox set next_attempt_at = now() where id = :'ob1';
 :as_service_role
-select tests.expect_count('select * from tg_outbox_claim(10)', 1);
-select tg_outbox_done(:'ob1', true);
-select tg_outbox_done(:'ob1', false, 'late echo');
+select claim as cl2 from tg_outbox_claim(10) \gset
+select tg_outbox_done(:'ob1', :'cl1', true);
+:as_superuser
+select tests.assert((select status from telegram_outbox where id = :'ob1') = 'sending', 'answer from an old attempt ignored');
+:as_service_role
+select tg_outbox_done(:'ob1', :'cl2', true);
+select tg_outbox_done(:'ob1', :'cl2', false, 'late echo');
 :as_superuser
 select tests.assert((select status from telegram_outbox where id = :'ob1') = 'sent', 'sent stays sent');
 
@@ -1374,6 +1402,70 @@ select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"abs
 select tests.assert((select count(*) from telegram_outbox where status = 'queued') = 0, 'blocked chat gets nothing');
 :as_service_role
 select tg_set_blocked(111, false);
+-- unblocked: new messages flow again, the skipped one is not replayed
+:as_admin
+select mark_attendance(:'lesson_past', format('[{"student_id":"%s","status":"late"}]', :'st1')::jsonb);
+:as_superuser
+select tests.assert((select count(*) from telegram_outbox where status = 'queued') = 1, 'unblocked parent gets the next message');
+-- Telegram answers 403 while sending: the chat is marked blocked
+:as_service_role
+select id as ob2, claim as cl3 from tg_outbox_claim(10) \gset
+select tg_outbox_done(:'ob2', :'cl3', false, 'Forbidden: bot was blocked by the user', null, true);
+:as_superuser
+select tests.assert((select blocked_at is not null from telegram_links where telegram_user_id = 111 and revoked_at is null), '403 marks the chat blocked');
+:as_service_role
+select tg_set_blocked(111, false);
+-- 429: wait at least as long as Telegram asked
+:as_superuser
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'attendance', 'Attendance', 'x', jsonb_build_object('student_id', :'st2', 'status', 'absent'));
+:as_service_role
+select id as ob3, claim as cl4 from tg_outbox_claim(10) \gset
+select tg_outbox_done(:'ob3', :'cl4', false, 'Too Many Requests', 600);
+:as_superuser
+select tests.assert((select next_attempt_at > now() + interval '590 seconds' from telegram_outbox where id = :'ob3'), '429 retry_after respected');
+-- a queued message whose child was unlinked from this parent is not sent
+update telegram_outbox set next_attempt_at = now() where id = :'ob3';
+update guardians set membership_id = null where id = :'g_tg2';
+:as_service_role
+select tests.expect_count('select * from tg_outbox_claim(10)', 0);
+:as_superuser
+select tests.assert((select status from telegram_outbox where id = :'ob3') = 'skipped', 'unlinked child: skipped');
+update guardians set membership_id = :'m_par' where id = :'g_tg2';
+-- stale messages (older than a day) are dropped, not sent late
+:as_superuser
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'attendance', 'Attendance', 'x', jsonb_build_object('student_id', :'st2', 'status', 'late'));
+update telegram_outbox set created_at = now() - interval '25 hours' where status = 'queued';
+:as_service_role
+select tests.expect_count('select * from tg_outbox_claim(10)', 0);
+-- suspended parent: no data, no messages
+:as_superuser
+update memberships set status = 'suspended' where id = :'m_par';
+:as_service_role
+select tests.expect_count('select * from tg_children(111)', 0);
+:as_superuser
+select tests.assert(not app.tg_can_see_student(111, :'st1'), 'suspended parent sees nothing');
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'payment_due', 'Payment due soon', 'x', '{}');
+select tests.assert((select count(*) from telegram_outbox where status = 'queued') = 0, 'suspended parent gets nothing');
+update memberships set status = 'active' where id = :'m_par';
+:as_service_role
+select tests.expect_count('select * from tg_children(111)', 2);
+
+-- cross-centre: centre B parent sees only centre B; staff cannot cross
+:as_ownerB
+insert into branches (center_id, name) values (:'center_b', 'Yunusobod') returning id as branch_tgb \gset
+insert into students (center_id, branch_id, full_name) values (:'center_b', :'branch_tgb', 'Beta Kid') returning id as st_b \gset
+insert into guardians (center_id, student_id, full_name, relationship) values (:'center_b', :'st_b', 'Beta Parent', 'mother') returning id as g_b \gset
+select tests.expect_fail(format($$select attach_guardian_to_parent(%L, %L)$$, :'g_b', :'m_par'), 'forbidden');
+select tests.expect_fail(format($$select revoke_telegram_link(%L)$$, :'m_par'), 'forbidden');
+select token as tgb from issue_telegram_link(:'g_b') \gset
+:as_admin
+select tests.expect_fail(format($$select * from issue_telegram_link(%L)$$, :'g_b'), 'forbidden');
+:as_service_role
+select tests.assert((tg_redeem_link(:'tgb', 444, 444, null)->>'ok')::boolean, 'centre B parent linked');
+select tests.assert((select bool_and(center_id = :'center_b') and count(*) = 1 from tg_children(444)), 'B parent sees only the B child');
+:as_superuser
+select tests.assert(not app.tg_can_see_student(444, :'st1'), 'no cross-centre access');
+select tests.assert(not app.tg_can_see_student(111, :'st_b'), 'no cross-centre access the other way');
 
 -- Telegram-only parent: no web login, still notified
 :as_admin
@@ -1404,5 +1496,50 @@ select tests.assert((select count(*) from notifications where recipient_id = :'t
 :as_service_role
 select tests.assert(tg_unlink(111) = 1, 'parent unlinked from the bot');
 select tests.expect_count('select * from tg_children(111)', 0);
+
+\echo '33. parent Telegram bot: what each menu shows'
+:as_admin
+select token as tg_v from issue_telegram_link(:'g1') \gset
+:as_service_role
+select tests.assert((tg_redeem_link(:'tg_v', 111, 111, null)->>'ok')::boolean, 'relinked for the menu checks');
+select tests.assert(jsonb_array_length(tg_child_profile(111, :'st1')->'groups') >= 1, 'profile lists the group');
+select tests.assert((tg_child_profile(111, :'st1')->'groups'->0->>'mentor') is not null, 'profile names the mentor');
+select tests.assert(jsonb_typeof(tg_child_schedule(111, :'st1')->'lessons') = 'array', 'schedule');
+select tests.assert((tg_child_attendance(111, :'st1')->'recent'->0->>'status') is not null, 'attendance history');
+select tests.assert(jsonb_typeof(tg_child_homework(111, :'st1')->'items') = 'array', 'homework list');
+select tests.assert(not exists (select 1 from jsonb_array_elements(tg_child_homework(111, :'st1')->'items') i
+                                where i ?| array['key','answers','transcript']), 'no keys or answers in homework');
+select tg_child_payments(111, :'st1') as pay_v \gset
+select tg_child_results(111, :'st1') as res_v \gset
+:as_superuser
+select tests.assert((:'pay_v'::jsonb->>'due_total')::bigint = (select coalesce(sum(balance), 0) from invoice_balances
+  where student_id = :'st1' and payment_status in ('pending','partial','overdue')), 'amount due matches the ledger');
+select tests.assert(jsonb_array_length(:'res_v'::jsonb->'mocks') = least(5, (select count(*) from mock_results
+  where student_id = :'st1' and released_at is not null)), 'only released mock results');
+create temp table tg_unrel as select id, released_at from mock_results where student_id = :'st1' and released_at is not null;
+select tests.assert((select count(*) from tg_unrel) > 0, 'st1 has released results');
+update mock_results set released_at = null where id in (select id from tg_unrel);
+:as_service_role
+select tests.assert(jsonb_array_length(tg_child_results(111, :'st1')->'mocks') = 0, 'unreleased result hidden');
+:as_superuser
+update mock_results m set released_at = u.released_at from tg_unrel u where m.id = u.id;
+update centers set phone = '+998712000000', address = 'Toshkent, Chilonzor 1' where id = :'center_a';
+:as_service_role
+select tests.assert(tg_center_contact(111, :'st1')->>'phone' = '+998712000000', 'centre phone');
+-- refused: someone else's child, a stranger, other centres, app users
+select tests.expect_fail(format($$select tg_child_profile(111, %L)$$, :'st3'), 'forbidden');
+select tests.expect_fail(format($$select tg_child_payments(999, %L)$$, :'st1'), 'forbidden');
+select tests.expect_fail(format($$select tg_child_results(444, %L)$$, :'st1'), 'forbidden');
+select tests.expect_fail(format($$select tg_center_contact(111, %L)$$, :'st_b'), 'forbidden');
+select tests.expect_fail($$select tg_child_profile(111, null)$$, 'forbidden');
+:as_parent
+select tests.expect_fail(format($$select tg_child_profile(111, %L)$$, :'st1'), 'permission denied');
+:as_ownerA
+select tests.expect_fail(format($$select tg_child_payments(111, %L)$$, :'st1'), 'permission denied');
+-- after revoking, every menu is closed
+:as_admin
+select revoke_telegram_link(:'m_par');
+:as_service_role
+select tests.expect_fail(format($$select tg_child_attendance(111, %L)$$, :'st1'), 'forbidden');
 
 \echo 'ALL TESTS PASSED'
