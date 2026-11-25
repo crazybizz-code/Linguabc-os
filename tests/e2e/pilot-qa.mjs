@@ -256,6 +256,85 @@ await step(mentor, "mentor", "sees the submission and its score", async () => {
   await expectText(mentor, /100/);
 });
 
+if (process.env.QA_ADMIN_OPS) {
+  await step(admin, "admin", "students list shows Partial for a partly paid invoice", async () => {
+    await admin.goto(`${BASE}/students`);
+    await admin.locator("td").filter({ hasText: /^\s*Partial\s*$/ }).first().waitFor({ timeout: 8000 });
+  });
+  await step(admin, "admin", "edits the student's details", async () => {
+    await admin.goto(`${BASE}/students`);
+    await admin.getByText("Aziz QA").first().click();
+    await admin.getByRole("button", { name: T("Edit details") }).click();
+    await dialog(admin).locator('input[name="full_name"]').fill("Aziz QA Edited");
+    await dialog(admin).getByRole("button", { name: T("Save") }).click();
+    await expectText(admin, /Aziz QA Edited/, 10000);
+  });
+  await step(admin, "admin", "adds a parent on the Parent tab", async () => {
+    await admin.goto(admin.url().split("?")[0] + "?tab=parent");
+    await admin.getByRole("button", { name: T("Add parent") }).click();
+    await dialog(admin).locator('input[name="full_name"]').fill("Malika QA");
+    await dialog(admin).locator('input[name="phone"]').fill("+998901000012");
+    await dialog(admin).getByRole("button", { name: T("Save") }).click();
+    await expectText(admin, /Malika QA/, 10000);
+  });
+  await step(admin, "admin", "second group at another time, then moves the student there", async () => {
+    await admin.goto(`${BASE}/groups`);
+    await admin.getByRole("button", { name: Tin("Create group") }).first().click();
+    const d = dialog(admin);
+    await d.locator('input[name="name"]').fill("QA B1 Evening");
+    await d.locator('[name="room"]').fill("102");
+    await d.locator('input[name="start_time"]').fill("18:00");
+    await d.locator('input[name="end_time"]').fill("19:30");
+    await submitDialog(admin, "Create group");
+    await expectText(admin, /QA B1 Evening/, 10000);
+    await admin.goto(`${BASE}/students`);
+    await admin.getByText("Aziz QA Edited").first().click();
+    await admin.getByRole("button", { name: T("Move to another group") }).click();
+    const m = dialog(admin);
+    const sel = m.locator('select[name="to_group"]');
+    const o = await sel.locator("option").allInnerTexts(); await sel.selectOption({ index: o.findIndex((x) => /QA B1 Evening/.test(x)) });
+    await m.getByRole("button", { name: T("Move") }).click();
+    await expectText(admin, /QA B1 Evening/, 10000);
+    await expectText(admin, /Moved to another group/, 10000);
+  });
+  await step(admin, "admin", "changes the timetable and cancels a lesson", async () => {
+    await admin.goto(`${BASE}/groups`);
+    await admin.getByText("QA B1 Evening").first().click();
+    await admin.getByRole("button", { name: T("Change timetable") }).click();
+    const d = dialog(admin);
+    await d.locator('input[name="start_time"]').fill("17:00");
+    await d.locator('input[name="end_time"]').fill("18:30");
+    await d.getByRole("button", { name: T("Save timetable") }).click();
+    await expectText(admin, /17:00–18:30/, 10000);
+    await admin.getByRole("button", { name: T("Cancel") }).first().click();
+    await dialog(admin).locator('input[name="reason"]').fill("QA");
+    await dialog(admin).getByRole("button", { name: T("Cancel lesson") }).click();
+    await admin.waitForTimeout(1500);
+  });
+  await step(admin, "admin", "a clashing move (same mentor, morning group's time) is refused", async () => {
+    // the morning group meets Mon/Wed/Fri 10:00-11:30 with the same mentor
+    let d0 = new Date(Date.now() + 86400000);
+    while (![1, 3, 5].includes(d0.getUTCDay())) d0 = new Date(d0.getTime() + 86400000);
+    await admin.getByRole("button", { name: T("Move") }).first().click();
+    const d = dialog(admin);
+    await d.locator('input[name="date"]').fill(d0.toISOString().slice(0, 10));
+    await d.locator('input[name="start_time"]').fill("10:00");
+    await d.locator('input[name="end_time"]').fill("11:00");
+    await d.getByRole("button", { name: T("Move lesson") }).click();
+    await d.locator('[role="alert"]').filter({ hasText: /Schedule conflict/ }).waitFor({ timeout: 10000 });
+  });
+  await step(student, "student", "sees the new timetable and the cancelled lesson notice", async () => {
+    await student.goto(`${BASE}/student/schedule`);
+    await expectText(student, /17:00/);
+  });
+  await step(mentor, "mentor", "cannot see the edit buttons on a group", async () => {
+    await mentor.goto(`${BASE}/groups`);
+    const link = mentor.getByText("QA B2 Morning").first();
+    await link.click();
+    if (await mentor.getByRole("button", { name: T("Change timetable") }).count()) throw new Error("mentor sees timetable editing");
+  });
+}
+
 // ------------------------------------------------------------------ owner: finance and monitoring
 await step(owner, "owner", "sees the payment in reports", async () => {
   await owner.goto(`${BASE}/reports`);
