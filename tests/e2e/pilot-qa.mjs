@@ -335,6 +335,23 @@ if (process.env.QA_ADMIN_OPS) {
   });
 }
 
+if (process.env.QA_KPI) {
+  await step(owner, "owner", "sees mentor KPIs counted from real records", async () => {
+    await owner.goto(`${BASE}/mentors`);
+    await expectText(owner, Tin("Mentor KPIs"));
+    const row = owner.locator("tr").filter({ hasText: "QA Mentor" }).first();
+    await row.waitFor({ timeout: 8000 });
+    const text = await row.innerText();
+    if (!/\(1\/\d+\)/.test(text)) throw new Error(`attendance recorded not counted: ${text}`);
+    // homework is due in 3 days: not counted as handed in yet; auto-marked work needs no review
+    if (!/\t1\t— \(0\/0\)\t— \(0\/0\)/.test(text)) throw new Error(`homework/reviews not counted as expected: ${text}`);
+  });
+  await step(mentor, "mentor", "cannot open the mentors KPI page", async () => {
+    await mentor.goto(`${BASE}/mentors`);
+    await mentor.waitForURL(/dashboard/, { timeout: 10000 });
+  });
+}
+
 // ------------------------------------------------------------------ owner: finance and monitoring
 await step(owner, "owner", "sees the payment in reports", async () => {
   await owner.goto(`${BASE}/reports`);
