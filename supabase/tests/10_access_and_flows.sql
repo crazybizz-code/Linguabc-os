@@ -1276,4 +1276,105 @@ select tests.expect_fail(format($$select retry_audio_job(%L, repeat('5', 64), 't
 :as_superuser
 select tests.assert((select count(*) from audio_jobs) = 10, 'ten jobs in all');
 
+\echo '40. admin operations: edit students, move between groups, change timetables'
+-- edit a student: owner/admin only, validated
+:as_mentor
+select tests.expect_fail(format($$select update_student(%L, 'X Y', null, null, null, null, null)$$, :'st3'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select update_student(%L, 'X Y', null, null, null, null, null)$$, :'st3'), 'forbidden');
+:as_admin
+select update_student(:'st3', 'Third Student Edited', '+998 90 555 44 33', 'Third@Mail.uz', '2010-05-01', :'branch_a', 'note');
+select tests.assert((select full_name = 'Third Student Edited' and email = 'third@mail.uz' and date_of_birth = '2010-05-01' from students where id = :'st3'), 'student edited');
+select tests.expect_fail(format($$select update_student(%L, 'X', null, null, null, null, null)$$, :'st3'), 'full name');
+select tests.expect_fail(format($$select update_student(%L, 'Xx Yy', null, 'not-an-email', null, null, null)$$, :'st3'), 'valid email');
+select tests.expect_fail(format($$select update_student(%L, 'Xx Yy', null, null, current_date + 1, null, null)$$, :'st3'), 'date of birth');
+-- parents: add and edit; one primary
+:as_admin
+select save_guardian(:'st3', null, 'Mother Three', '+998901110000', 'mother', true) as g_new \gset
+select save_guardian(:'st3', null, 'Father Three', '+998901110001', 'father', true) as g_new2 \gset
+select tests.assert((select count(*) filter (where is_primary) = 1 and bool_or(id = :'g_new2' and is_primary) from guardians where student_id = :'st3'), 'one primary parent');
+select save_guardian(:'st3', :'g_new', 'Mother Three-Edited', '+998901110009', 'mother', false);
+select tests.assert((select full_name from guardians where id = :'g_new') = 'Mother Three-Edited', 'parent edited');
+select tests.expect_fail(format($$select save_guardian(%L, %L, 'Wrong child', null, 'mother', false)$$, :'st1', :'g_new'), 'forbidden');
+select tests.expect_fail(format($$select save_guardian(%L, null, 'Bad Rel', null, 'uncle', false)$$, :'st3'), 'relationship');
+:as_mentor
+select tests.expect_fail(format($$select save_guardian(%L, null, 'Nope Nope', null, 'mother', false)$$, :'st3'), 'forbidden');
+
+-- transfer: one step, same fee terms, no second invoice for a month already billed
+:as_admin
+select e.id as en1, e.monthly_fee as fee1 from enrollments e where e.student_id = :'st1' and e.group_id = :'group1' and e.status = 'active' \gset
+select count(*) as inv_before from invoices where student_id = :'st1' and period = date_trunc('month', current_date) \gset
+:as_mentor
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'g3'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'g3'), 'forbidden');
+:as_admin
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'group1'), 'already in this group');
+select transfer_student(:'en1', :'g3', current_date, true) as en1b \gset
+select tests.assert((select status = 'completed' and end_date = current_date from enrollments where id = :'en1'), 'old enrolment ended');
+select tests.assert((select status = 'active' and group_id = :'g3' and monthly_fee = :fee1 from enrollments where id = :'en1b'), 'new enrolment with the same fee');
+select tests.assert((select count(*) from invoices where student_id = :'st1' and period = date_trunc('month', current_date)) = :inv_before, 'no double billing this month');
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'group1'), 'not active');
+-- the mentor of the old group no longer sees the student's new work; the new group's mentor does
+:as_mentor2
+select tests.assert(exists (select 1 from students where id = :'st1'), 'new mentor sees the student');
+
+-- leaving a group: status follows; a second end is refused
+:as_admin
+select e.id as en2 from enrollments e where e.student_id = :'st2' and e.status = 'active' order by start_date desc limit 1 \gset
+select tests.expect_fail(format($$select end_enrollment(%L, 'expelled', current_date, null)$$, :'en2'), 'Choose why');
+select tests.expect_fail(format($$select end_enrollment(%L, 'dropped', '2000-01-01', null)$$, :'en2'), 'before the start');
+select end_enrollment(:'en2', 'dropped', current_date, 'moved away');
+select tests.assert((select status from students where id = :'st2') = 'left', 'student with no group is marked left');
+select tests.assert((select count(*) from activities where student_id = :'st2' and title = 'Left the group') = 1, 'timeline entry');
+select tests.expect_fail(format($$select end_enrollment(%L, 'dropped', current_date, null)$$, :'en2'), 'not active');
+:as_mentor
+select tests.expect_fail(format($$select end_enrollment(%L, 'dropped', current_date, null)$$, :'en1b'), 'forbidden');
+
+-- timetable: a clashing timetable is refused and nothing changes
+:as_admin
+select count(*) as g2_lessons from lessons where group_id = :'group2' \gset
+select tests.expect_fail(format($$select update_group_schedule(%L, '{1}', '10:00', '11:00', current_date + 1)$$, :'group2'), 'schedule conflict');
+select tests.assert((select count(*) from lessons where group_id = :'group2') = :g2_lessons, 'nothing saved after a clash');
+select tests.expect_fail(format($$select update_group_schedule(%L, '{1}', '10:00', '11:00', current_date - 1)$$, :'group2'), 'past');
+select tests.expect_fail(format($$select update_group_schedule(%L, '{}', '10:00', '11:00', current_date + 1)$$, :'group2'), 'at least one day');
+-- a valid change: future lessons without attendance are rebuilt; past and attended ones stay
+select count(*) as g3_past from lessons where group_id = :'g3' and starts_at < now() \gset
+select update_group_schedule(:'g3', '{5,6}', '15:00', '16:30', current_date + 1) as g3_new \gset
+select tests.assert(:g3_new between 20 and 26, 'new lessons made');
+select tests.assert((select count(*) from lessons where group_id = :'g3' and starts_at < now()) = :g3_past, 'past lessons kept');
+select tests.assert((select count(*) from lessons where group_id = :'g3' and starts_at > (current_date + 1)::timestamp at time zone 'Asia/Tashkent'
+  and extract(isodow from starts_at at time zone 'Asia/Tashkent') not in (5, 6)) = 0, 'only the new days from that date');
+select tests.assert((select count(*) from group_schedule_slots where group_id = :'g3') = 2, 'slots replaced');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'schedule_changed' and data->>'group_id' = :'g3') = 1, 'student in the group told once');
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'schedule_changed') = 1, 'parent told too');
+:as_mentor
+select tests.expect_fail(format($$select update_group_schedule(%L, '{1}', '15:00', '16:00', current_date + 1)$$, :'g3'), 'forbidden');
+
+-- group details: mentor and room follow into future lessons; clashes refused
+:as_admin
+select update_group(:'g3', 'B1 Evening (renamed)', :'m_mentor', 'Room 7', 12);
+select tests.assert((select bool_and(mentor_id = :'m_mentor') from lessons where group_id = :'g3' and starts_at > now() and status = 'scheduled'), 'future lessons follow the mentor');
+select tests.expect_fail(format($$select update_group(%L, 'B1 Evening', null, null, 0)$$, :'g3'), 'Capacity');
+-- one lesson: move onto group1's lesson time with the same mentor -> clash; then a free time
+select id as g3l, starts_at as g3s from lessons where group_id = :'g3' and status = 'scheduled' and starts_at > now() order by starts_at limit 1 \gset
+select starts_at as g1s, ends_at as g1e from lessons where group_id = :'group1' and status = 'scheduled' and starts_at > now() order by starts_at limit 1 \gset
+select tests.expect_fail(format($$select move_lesson(%L, %L, %L)$$, :'g3l', :'g1s', :'g1e'), 'schedule conflict');
+select tests.expect_fail(format($$select move_lesson(%L, now() - interval '1 day', now() - interval '23 hours')$$, :'g3l'), 'past');
+select move_lesson(:'g3l', :'g3s'::timestamptz + interval '2 hours', :'g3s'::timestamptz + interval '3 hours 30 minutes');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'lesson_moved') >= 1, 'move announced');
+:as_admin
+select cancel_lesson(:'g3l', 'teacher ill');
+select tests.assert((select status from lessons where id = :'g3l') = 'cancelled', 'cancelled');
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'g3l'), 'already cancelled');
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_past'), 'Attendance was already taken');
+select tests.expect_fail(format($$select move_lesson(%L, now() + interval '3 days', now() + interval '3 days 1 hour')$$, :'lesson_past'), '');
+:as_mentor2
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_future'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_future'), 'forbidden');
+
 \echo 'ALL TESTS PASSED'

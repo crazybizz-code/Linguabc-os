@@ -405,3 +405,123 @@ export async function approveAssignment(id: string): Promise<ActionState> {
   revalidatePath("/homework", "layout");
   return { ok: true };
 }
+
+// ------------------------------------------------- students, groups, lessons
+// The database re-checks every role (0035): owner/admin for students and
+// enrolments, owner/admin/academic manager for groups and lessons.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const HHMM = /^\d{2}:\d{2}$/;
+const TASHKENT = "+05:00";   // Asia/Tashkent has no daylight saving
+
+function clash(message: string): string {
+  if (/schedule conflict/i.test(message)) return message.replace(/^.*schedule conflict/i, "Schedule conflict");
+  return friendly(message);
+}
+
+export async function updateStudent(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const id = str(form.get("student_id"));
+  const dob = str(form.get("date_of_birth"));
+  const { error } = await supabase.rpc("update_student", {
+    p_student: id, p_full_name: str(form.get("full_name")), p_phone: str(form.get("phone")), p_email: str(form.get("email")),
+    p_date_of_birth: ISO_DATE.test(dob) ? dob : null, p_branch: optional(form.get("branch_id")), p_notes: str(form.get("notes")),
+  });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/students");
+  return { ok: true };
+}
+
+export async function saveGuardian(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const id = str(form.get("student_id"));
+  const { error } = await supabase.rpc("save_guardian", {
+    p_student: id, p_guardian: optional(form.get("guardian_id")), p_full_name: str(form.get("full_name")),
+    p_phone: str(form.get("phone")), p_relationship: str(form.get("relationship")), p_is_primary: form.get("is_primary") === "on",
+  });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/parents");
+  return { ok: true };
+}
+
+export async function endEnrollment(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const date = str(form.get("end_date"));
+  if (!ISO_DATE.test(date)) return { error: "Choose the last day in the group." };
+  const { error } = await supabase.rpc("end_enrollment", {
+    p_enrollment: str(form.get("enrollment_id")), p_status: str(form.get("status")), p_end_date: date, p_reason: str(form.get("reason")),
+  });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath(`/students/${str(form.get("student_id"))}`);
+  revalidatePath("/students");
+  revalidatePath("/groups", "layout");
+  return { ok: true };
+}
+
+export async function transferStudent(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const date = str(form.get("date"));
+  if (!ISO_DATE.test(date)) return { error: "Choose the date of the move." };
+  const to = str(form.get("to_group"));
+  if (!to) return { error: "Choose the new group." };
+  const { error } = await supabase.rpc("transfer_student", {
+    p_enrollment: str(form.get("enrollment_id")), p_to_group: to, p_date: date, p_keep_fee: form.get("keep_fee") === "on",
+  });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath(`/students/${str(form.get("student_id"))}`);
+  revalidatePath("/students");
+  revalidatePath("/groups", "layout");
+  return { ok: true };
+}
+
+export async function updateGroup(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const id = str(form.get("group_id"));
+  const cap = str(form.get("capacity"));
+  const { error } = await supabase.rpc("update_group", {
+    p_group: id, p_name: str(form.get("name")), p_mentor: optional(form.get("mentor_id")),
+    p_room_name: str(form.get("room")), p_capacity: cap ? Number(cap) : null,
+  });
+  if (error) return { error: clash(error.message) };
+  revalidatePath(`/groups/${id}`);
+  revalidatePath("/groups");
+  return { ok: true };
+}
+
+export async function updateGroupSchedule(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const id = str(form.get("group_id"));
+  const days = form.getAll("weekday").map((d) => Number(d)).filter((d) => d >= 1 && d <= 7);
+  const from = str(form.get("from")), start = str(form.get("start_time")), end = str(form.get("end_time"));
+  if (!days.length) return { error: "Choose at least one day." };
+  if (!ISO_DATE.test(from)) return { error: "Choose the date the new timetable starts." };
+  if (!HHMM.test(start) || !HHMM.test(end)) return { error: "Set a start and end time for the lessons." };
+  const { error } = await supabase.rpc("update_group_schedule", { p_group: id, p_weekdays: days, p_start_time: start, p_end_time: end, p_from: from });
+  if (error) return { error: clash(error.message) };
+  revalidatePath(`/groups/${id}`);
+  revalidatePath("/schedule");
+  return { ok: true };
+}
+
+export async function cancelLesson(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const { error } = await supabase.rpc("cancel_lesson", { p_lesson: str(form.get("lesson_id")), p_reason: str(form.get("reason")) });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath(`/groups/${str(form.get("group_id"))}`);
+  revalidatePath("/schedule");
+  return { ok: true };
+}
+
+export async function moveLesson(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const date = str(form.get("date")), start = str(form.get("start_time")), end = str(form.get("end_time"));
+  if (!ISO_DATE.test(date) || !HHMM.test(start) || !HHMM.test(end)) return { error: "Set the new date and times." };
+  const { error } = await supabase.rpc("move_lesson", {
+    p_lesson: str(form.get("lesson_id")), p_starts_at: `${date}T${start}:00${TASHKENT}`, p_ends_at: `${date}T${end}:00${TASHKENT}`,
+  });
+  if (error) return { error: clash(error.message) };
+  revalidatePath(`/groups/${str(form.get("group_id"))}`);
+  revalidatePath("/schedule");
+  return { ok: true };
+}

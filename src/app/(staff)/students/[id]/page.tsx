@@ -8,6 +8,7 @@ import { InviteLink } from "../../staff/invite-staff";
 import { RecordPayment } from "../../payments/record-payment";
 import { inviteParentLogin, inviteStudentLogin } from "../../actions";
 import { LoginInvite } from "./login-invite";
+import { EditStudent, GuardianForm, LeaveGroup, MoveGroup } from "./manage";
 import { intlLocale } from "@/i18n";
 import { loadProgress } from "@/lib/progress";
 import { ProgressView } from "@/components/progress/progress-view";
@@ -33,7 +34,7 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
   const tabs = TABS.filter((t) => t !== "payments" || isAdmin);
   const tab = (tabs as readonly string[]).includes(String(rawTab)) ? (rawTab as (typeof TABS)[number]) : "overview";
 
-  const [overview, enrollments, guardians, attendance, activities, mock, invoices, payments] = await Promise.all([
+  const [overview, enrollments, guardians, attendance, activities, mock, invoices, payments, groupsList, branchList] = await Promise.all([
     supabase.from("student_overview").select("*").eq("id", id).maybeSingle(),
     supabase.from("enrollments").select("id, group_id, start_date, monthly_fee, discount_percent, due_day, status, groups(name, mentor_id, course_id, courses(name))").eq("student_id", id).order("start_date", { ascending: false }),
     supabase.from("guardians").select("id, full_name, phone, relationship, is_primary, membership_id, memberships!guardians_membership_id_center_id_fkey(id, status, invite_code, invite_expires_at)").eq("student_id", id),
@@ -42,6 +43,8 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
     supabase.from("mock_result_scores").select("reading_band, listening_band, writing_band, speaking_band, overall_band").eq("student_id", id).eq("status", "completed").order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     isAdmin ? supabase.from("invoice_balances").select("*").eq("student_id", id).order("period", { ascending: false }) : Promise.resolve({ data: null }),
     isAdmin ? supabase.from("payments").select("id, kind, amount, method, receipt_no, paid_at, invoice_id").eq("student_id", id).order("paid_at", { ascending: false }) : Promise.resolve({ data: null }),
+    isAdmin ? supabase.from("groups").select("id, name").eq("center_id", student.center_id).eq("status", "active").order("name") : Promise.resolve({ data: null }),
+    isAdmin ? supabase.from("branches").select("id, name").eq("center_id", student.center_id).order("name") : Promise.resolve({ data: null }),
   ]);
 
   const active = (enrollments.data ?? []).find((e) => e.status === "active");
@@ -87,7 +90,10 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
             )}
             {isAdmin && !studentLogin && <LoginInvite label={t("Invite student")} field="student_id" value={student.id} action={inviteStudentLogin} who={student.full_name} />}
             {isAdmin && primary && !primary.membership_id && <LoginInvite label={t("Invite parent")} field="guardian_id" value={primary.id} action={inviteParentLogin} who={primary.full_name} />}
-            {groupId && <Link href="/groups" className={`${buttonPrimary} h-9 text-[12.5px]`}>{t("Open group")} <ArrowUpRight className="h-4 w-4" /></Link>}
+            {isAdmin && <EditStudent s={student} branches={branchList.data ?? []} />}
+            {isAdmin && active && <MoveGroup studentId={student.id} enrollmentId={active.id} groups={(groupsList.data ?? []).filter((g) => g.id !== active.group_id)} />}
+            {isAdmin && active && <LeaveGroup studentId={student.id} enrollmentId={active.id} group={active.groups?.name ?? ""} />}
+            {groupId && <Link href={`/groups/${groupId}`} className={`${buttonPrimary} h-9 text-[12.5px]`}>{t("Open group")} <ArrowUpRight className="h-4 w-4" /></Link>}
           </div>
         </div>
         <nav className="flex gap-1 border-t border-border/60 px-4">
@@ -245,6 +251,7 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
 
       {tab === "parent" && (
         <Card className="overflow-hidden">
+          {isAdmin && <div className="flex justify-end border-b border-border/60 px-5 py-3"><GuardianForm studentId={student.id} /></div>}
           {(guardians.data ?? []).length === 0 ? <p className="p-8 text-center text-[12.5px] text-muted-foreground">{t("No parent recorded.")}</p> : (
             <ul className="divide-y divide-border/60">
               {(guardians.data ?? []).map((g) => (
@@ -253,7 +260,8 @@ export default async function StudentPage({ params, searchParams }: PageProps<"/
                     <Avatar name={g.full_name} />
                     <div><p className="text-[13.5px] font-medium">{g.full_name}{g.is_primary && <span className="ml-2 text-[11px] text-muted-foreground">{t("primary")}</span>}</p><p className="text-[12px] text-muted-foreground">{[g.relationship && t(cap(g.relationship)), g.phone].filter(Boolean).join(" · ")}</p></div>
                   </div>
-                  <div className="min-w-[260px]">
+                  <div className="flex min-w-[260px] flex-wrap items-center gap-2">
+                    {isAdmin && <GuardianForm studentId={student.id} g={g} />}
                     {g.memberships?.status === "active" ? <Badge tone="green">{t("Parent portal active")}</Badge>
                       : g.memberships?.status === "invited" && g.memberships.invite_code ? (isAdmin ? <InviteLink membershipId={g.memberships.id} link={`${siteUrl()}/join?code=${g.memberships.invite_code}`} expiresAt={g.memberships.invite_expires_at} canReissue /> : <Badge tone="amber">{t("Invited")}</Badge>)
                       : isAdmin ? <LoginInvite label={t("Invite to parent portal")} field="guardian_id" value={g.id} action={inviteParentLogin} who={g.full_name} /> : <Badge tone="neutral">{t("No portal access")}</Badge>}

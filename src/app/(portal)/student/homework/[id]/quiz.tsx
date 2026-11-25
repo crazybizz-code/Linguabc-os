@@ -7,6 +7,7 @@ import { buttonPrimary } from "@/components/ui/primitives";
 import { AnswerInput } from "@/components/questions/answer-input";
 import { blocksOf, isAnswered, type Answers, type Question, type QuestionGroup } from "@/lib/questions";
 import { saveHomework } from "../../../actions";
+import { useT } from "@/i18n/client";
 
 export function Quiz({
   homeworkId, questions, groups, initial,
@@ -19,6 +20,7 @@ export function Quiz({
   const [answers, setAnswers] = useState<Answers>(initial);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
+  const t = useT();
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -34,7 +36,7 @@ export function Quiz({
       const r = await saveHomework(homeworkId, answers, submit);
       if (r.error) setMsg({ error: r.error });
       else {
-        setMsg({ ok: submit ? "Submitted" : "Progress saved" });
+        setMsg({ ok: submit ? t("Submitted") : t("Progress saved") });
         setConfirm(false);
         router.refresh();
       }
@@ -75,28 +77,28 @@ export function Quiz({
           <span className="text-[12.5px] text-muted-foreground">{answered} of {questions.length} answered</span>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={() => save(false)} className="h-10 rounded-[11px] border border-border/80 px-3.5 text-[13px] font-medium">
-              Save
+              {t("Save")}
             </button>
             {confirm ? (
               <button type="button" disabled={pending} onClick={() => save(true)} className={buttonPrimary}>
-                {pending && <Loader2 className="h-4 w-4 animate-spin" />} Confirm submit
+                {pending && <Loader2 className="h-4 w-4 animate-spin" />} {t("Confirm submit")}
               </button>
             ) : (
               <button type="button" disabled={pending || answered === 0} onClick={() => setConfirm(true)} className={buttonPrimary}>
-                Submit
+                {t("Submit")}
               </button>
             )}
           </div>
         </div>
         {confirm && answered < questions.length && (
           <p className="mt-2 text-[12px] text-[#9A5B1E]">
-            {questions.length - answered} question(s) unanswered. You can&apos;t change answers after submitting.
+            {t("{n} question(s) unanswered. You can't change answers after submitting.", { n: questions.length - answered })}
           </p>
         )}
         {confirm && answered === questions.length && (
-          <p className="mt-2 text-[12px] text-muted-foreground">You can&apos;t change answers after submitting.</p>
+          <p className="mt-2 text-[12px] text-muted-foreground">{t("You can't change answers after submitting.")}</p>
         )}
-        {msg.error && <p className="mt-2 text-[12px] text-[#B4483D]">{msg.error}</p>}
+        {msg.error && <p className="mt-2 text-[12px] text-[#B4483D]">{t(msg.error)}</p>}
         {msg.ok && (
           <p className="mt-2 flex items-center gap-1 text-[12px] text-[#3F6B4A]">
             <Check className="h-3.5 w-3.5" />

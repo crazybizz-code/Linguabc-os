@@ -4,6 +4,7 @@ import { ChevronLeft, ClipboardCheck, BookOpen, ClipboardList } from "lucide-rea
 import { getStaffContext } from "@/lib/auth/current";
 import { Avatar, Badge, Card, buttonSecondary, cn } from "@/components/ui/primitives";
 import { intlLocale } from "@/i18n";
+import { EditGroup, EditTimetable, LessonActions } from "./manage";
 
 export const metadata = { title: "Group" };
 const TZ = "Asia/Tashkent";
@@ -12,14 +13,14 @@ const WEEKDAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /** One group: who is in it, how they are doing, and what is coming up. RLS keeps mentors to their own groups. */
 export default async function GroupPage({ params }: PageProps<"/groups/[id]">) {
   const { id } = await params;
-  const { supabase, workspace, t, locale } = await getStaffContext();
+  const { supabase, workspace, isStaff, t, locale } = await getStaffContext();
   const L = intlLocale(locale);
   const center = workspace.centerId;
   const { data: g } = await supabase.from("group_overview").select("*").eq("id", id).eq("center_id", center).maybeSingle();
   if (!g) notFound();
 
   const nowIso = new Date().toISOString();
-  const [course, branch, mentor, room, slots, enrollments, homework, lessons, mocks] = await Promise.all([
+  const [course, branch, mentor, room, slots, enrollments, homework, lessons, mocks, mentorList] = await Promise.all([
     supabase.from("courses").select("name, level").eq("id", g.course_id!).maybeSingle(),
     supabase.from("branches").select("id, name").eq("id", g.branch_id!).maybeSingle(),
     g.mentor_id ? supabase.from("memberships").select("full_name").eq("id", g.mentor_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -27,8 +28,9 @@ export default async function GroupPage({ params }: PageProps<"/groups/[id]">) {
     supabase.from("group_schedule_slots").select("weekday, start_time, end_time").eq("group_id", id).order("weekday"),
     supabase.from("enrollments").select("student_id").eq("group_id", id).eq("status", "active"),
     supabase.from("homework").select("id, due_at, assignments(title)").eq("group_id", id).order("due_at", { ascending: false }).limit(8),
-    supabase.from("lessons").select("id, starts_at, status").eq("group_id", id).gte("starts_at", nowIso).neq("status", "cancelled").order("starts_at").limit(5),
+    supabase.from("lessons").select("id, starts_at, ends_at, status").eq("group_id", id).gte("starts_at", nowIso).neq("status", "cancelled").order("starts_at").limit(8),
     supabase.from("mock_sessions").select("id, name, scheduled_at, status").eq("group_id", id).order("scheduled_at", { ascending: false }).limit(5),
+    isStaff ? supabase.from("memberships").select("id, full_name").eq("center_id", center).eq("role", "mentor").in("status", ["active", "invited"]).order("full_name") : Promise.resolve({ data: null }),
   ]);
   const studentIds = (enrollments.data ?? []).map((e) => e.student_id);
   const hwIds = (homework.data ?? []).map((h) => h.id);
@@ -59,6 +61,10 @@ export default async function GroupPage({ params }: PageProps<"/groups/[id]">) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {isStaff && <EditGroup g={{ id, name: g.name!, mentor_id: g.mentor_id, capacity: g.capacity }} room={room.data?.name ?? null}
+              mentors={(mentorList.data ?? []).map((m) => ({ id: m.id, name: m.full_name }))} />}
+            {isStaff && <EditTimetable groupId={id} days={(slots.data ?? []).map((s) => s.weekday)}
+              start={slots.data?.[0]?.start_time.slice(0, 5) ?? "10:00"} end={slots.data?.[0]?.end_time.slice(0, 5) ?? "11:30"} />}
             <Link href="/attendance" className={buttonSecondary}><ClipboardCheck className="h-4 w-4" /> {t("Attendance")}</Link>
             <Link href="/homework" className={buttonSecondary}><BookOpen className="h-4 w-4" /> {t("Homework")}</Link>
             <Link href="/mocks" className={buttonSecondary}><ClipboardList className="h-4 w-4" /> {t("Mocks")}</Link>
@@ -112,7 +118,15 @@ export default async function GroupPage({ params }: PageProps<"/groups/[id]">) {
             <h2 className="text-[15px] font-semibold">{t("Upcoming lessons")}</h2>
             {(lessons.data ?? []).length === 0 ? <p className="mt-2 text-[12.5px] text-muted-foreground">{t("No lessons scheduled.")}</p> : (
               <ul className="mt-2 divide-y divide-border/50">
-                {(lessons.data ?? []).map((l) => <li key={l.id}><Link href={`/attendance/${l.id}`} className="block py-2 text-[12.5px] hover:underline">{day(l.starts_at)}</Link></li>)}
+                {(lessons.data ?? []).map((l) => {
+                  const local = (iso: string) => new Date(iso).toLocaleString("sv-SE", { timeZone: TZ }).replace(" ", "T");
+                  return (
+                    <li key={l.id} className="flex items-center justify-between gap-2 py-1.5">
+                      <Link href={`/attendance/${l.id}`} className="text-[12.5px] hover:underline">{day(l.starts_at)}</Link>
+                      {isStaff && <LessonActions groupId={id} lessonId={l.id} date={local(l.starts_at).slice(0, 10)} start={local(l.starts_at).slice(11, 16)} end={local(l.ends_at).slice(11, 16)} />}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
