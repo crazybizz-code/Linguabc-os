@@ -1,25 +1,49 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
+import { FieldLabel } from "@/components/ui/dialog";
 import { buttonPrimary, inputClass } from "@/components/ui/primitives";
 import { useT } from "@/i18n/client";
-import { renameCentre } from "../actions";
+import { updateCenterSettings, type ActionState } from "../actions";
 
-export function CentreName({ name, canEdit }: { name: string; canEdit: boolean }) {
+export type Centre = { name: string; phone: string | null; address: string | null; timezone: string };
+
+/** Owner: name, contact and time zone (update_center_settings, 0038). Others read only. */
+export function CentreSettings({ c, canEdit }: { c: Centre; canEdit: boolean }) {
   const t = useT();
-  const router = useRouter();
-  const [value, setValue] = useState(name);
-  const [msg, setMsg] = useState<{ ok?: boolean; error?: string }>();
-  const [pending, start] = useTransition();
-  if (!canEdit) return <p className="text-[18px] font-semibold">{name}</p>;
+  const [state, run] = useActionState(updateCenterSettings, undefined as ActionState);
+  if (!canEdit) {
+    return (
+      <div className="space-y-1">
+        <p className="text-[18px] font-semibold">{c.name}</p>
+        <p className="text-[12.5px] text-muted-foreground">{[c.phone, c.address].filter(Boolean).join(" · ") || "—"}</p>
+      </div>
+    );
+  }
   return (
-    <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await renameCentre(value); setMsg(r.error ? r : { ok: true }); if (!r.error) router.refresh(); }); }}>
-      <input value={value} onChange={(e) => setValue(e.target.value)} minLength={2} maxLength={120} className={`${inputClass} min-w-[220px] flex-1`} aria-label={t("Centre name")} />
-      <button disabled={pending || value.trim() === name || value.trim().length < 2} className={buttonPrimary}>{pending && <Loader2 className="h-4 w-4 animate-spin" />} {t("Save")}</button>
-      {msg?.error && <p className="w-full text-[12px] text-[#B4483D]">{t(msg.error)}</p>}
-      {msg?.ok && <p className="w-full text-[12px] text-[#3F6B4A]">{t("Saved.")}</p>}
+    <form action={run} className="space-y-3">
+      <FieldLabel label={t("Centre name")}><input name="name" required minLength={2} maxLength={120} defaultValue={c.name} className={inputClass} /></FieldLabel>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FieldLabel label={t("Phone")} hint={t("Shown to parents in the Telegram bot")}><input name="phone" type="tel" maxLength={32} defaultValue={c.phone ?? ""} placeholder="+998 71 200 00 00" className={inputClass} /></FieldLabel>
+        <FieldLabel label={t("Time zone")} hint={t("Uzbekistan, UTC+5")}>
+          <select name="timezone" defaultValue={c.timezone} className={inputClass}>
+            {["Asia/Tashkent", "Asia/Samarkand"].map((z) => <option key={z} value={z}>{z}</option>)}
+          </select>
+        </FieldLabel>
+      </div>
+      <FieldLabel label={t("Address")} hint={t("Shown to parents in the Telegram bot")}><input name="address" maxLength={300} defaultValue={c.address ?? ""} placeholder="Chilonzor 9, Tashkent" className={inputClass} /></FieldLabel>
+      <div className="flex items-center gap-3">
+        <Submit label={t("Save")} />
+        {state?.error && <p className="text-[12px] text-[#B4483D]">{t(state.error)}</p>}
+        {state?.ok && <p className="text-[12px] text-[#3F6B4A]">{t("Saved.")}</p>}
+      </div>
     </form>
   );
+}
+
+function Submit({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={pending} className={buttonPrimary}>{pending && <Loader2 className="h-4 w-4 animate-spin" />} {label}</button>;
 }

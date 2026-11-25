@@ -158,14 +158,16 @@ export async function reissueInvite(membershipId: string): Promise<{ link?: stri
 }
 
 /** The owner renames the centre (RLS: owner only). */
-export async function renameCentre(name: string): Promise<{ error?: string }> {
+/** Owner: centre name, phone, address and time zone (update_center_settings, 0038). */
+export async function updateCenterSettings(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase, workspace } = await getStaffContext();
-  const v = String(name ?? "").trim();
-  if (v.length < 2 || v.length > 120) return { error: "Enter a name of 2 to 120 characters." };
-  const { data, error } = await supabase.from("centers").update({ name: v }).eq("id", workspace.centerId).select("id");
-  if (error || !data?.length) return { error: "You don't have permission to do that." };
+  const { error } = await supabase.rpc("update_center_settings", {
+    p_center: workspace.centerId, p_name: str(form.get("name")), p_phone: str(form.get("phone")),
+    p_address: str(form.get("address")), p_timezone: str(form.get("timezone")),
+  });
+  if (error) return { error: friendly(error.message) };
   revalidatePath("/", "layout");
-  return {};
+  return { ok: true };
 }
 
 /** Changes the signed-in person's password after checking the current one. */

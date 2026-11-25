@@ -1631,4 +1631,26 @@ select tests.assert((select count(*) from payments where student_id = :'st1') = 
 :as_superuser
 alter table telegram_outbox drop constraint tg_test_break;
 
+\echo '44. centre settings'
+:as_ownerA
+select update_center_settings(:'center_a', 'Alpha English Centre', '+998 71 200 00 00', 'Chilonzor 9, Tashkent', 'Asia/Samarkand');
+select tests.assert((select name = 'Alpha English Centre' and phone = '+998 71 200 00 00' and address = 'Chilonzor 9, Tashkent' and timezone = 'Asia/Samarkand' from centers where id = :'center_a'), 'settings saved');
+select tests.expect_fail(format($$select update_center_settings(%L, 'A', null, null, 'Asia/Tashkent')$$, :'center_a'), '2 to 120');
+select tests.expect_fail(format($$select update_center_settings(%L, 'Alpha', 'call me', null, 'Asia/Tashkent')$$, :'center_a'), 'phone number');
+select tests.expect_fail(format($$select update_center_settings(%L, 'Alpha', null, null, 'Europe/London')$$, :'center_a'), 'Asia/Tashkent');
+select tests.expect_fail(format($$select update_center_settings(%L, 'Alpha', null, repeat('x', 301), 'Asia/Tashkent')$$, :'center_a'), 'address');
+select update_center_settings(:'center_a', 'Alpha English', null, null, 'Asia/Tashkent');
+select tests.assert((select phone is null and address is null and timezone = 'Asia/Tashkent' from centers where id = :'center_a'), 'cleared and back');
+-- direct writes are closed, even for the owner (receipt numbering is safe)
+select tests.expect_fail(format($$update centers set receipt_seq = 0 where id = %L$$, :'center_a'), 'permission denied');
+select tests.expect_fail(format($$update centers set name = 'Direct' where id = %L$$, :'center_a'), 'permission denied');
+:as_admin
+select tests.expect_fail(format($$select update_center_settings(%L, 'Hacked', null, null, 'Asia/Tashkent')$$, :'center_a'), 'forbidden');
+:as_mentor
+select tests.expect_fail(format($$select update_center_settings(%L, 'Hacked', null, null, 'Asia/Tashkent')$$, :'center_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select update_center_settings(%L, 'Hacked', null, null, 'Asia/Tashkent')$$, :'center_a'), 'forbidden');
+:as_superuser
+select tests.assert((select name from centers where id = :'center_a') = 'Alpha English', 'nobody else changed it');
+
 \echo 'ALL TESTS PASSED'

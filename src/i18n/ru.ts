@@ -1010,4 +1010,9 @@ export const ru: Record<string, string> = {
   "Could not prepare the upload for this recording.": "Не удалось подготовить загрузку этой записи.",
   "Rejected after listening.": "Отклонено после прослушивания.",
   "The recording failed.": "Запись не удалась.",
+  "Shown to parents in the Telegram bot": "Показывается родителям в Telegram-боте",
+  "Uzbekistan, UTC+5": "Узбекистан, UTC+5",
+  "Enter a phone number such as +998 71 200 00 00.": "Введите номер телефона, например +998 71 200 00 00.",
+  "Choose Asia/Tashkent or Asia/Samarkand.": "Выберите Asia/Tashkent или Asia/Samarkand.",
+  "Keep the address under 300 characters.": "Адрес не длиннее 300 символов.",
 };
