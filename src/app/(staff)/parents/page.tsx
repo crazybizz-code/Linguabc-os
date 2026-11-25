@@ -7,6 +7,8 @@ import { Avatar, Badge, Card, EmptyState, formatUZS, PageHeader, cn } from "@/co
 import { InviteLink } from "../staff/invite-staff";
 import { LoginInvite } from "../students/[id]/login-invite";
 import { inviteParentLogin } from "../actions";
+import { botUsername } from "@/lib/telegram/server";
+import { TelegramCell, type TelegramStatus } from "./telegram-cell";
 
 export const metadata = { title: "Parents" };
 
@@ -14,6 +16,7 @@ type Row = {
   key: string; name: string; phone: string | null; relationship: string | null;
   guardianId: string; membership: { id: string; status: string; invite_code: string | null; invite_expires_at: string | null } | null;
   children: { id: string; name: string; balance: number; overdue: number }[];
+  unattached: { guardianId: string; child: string }[];
 };
 
 /** Every family in one place: who the parent is, their children, portal access and money owed. Owner and admin only. */
@@ -22,21 +25,26 @@ export default async function ParentsPage({ searchParams }: PageProps<"/parents"
   if (!isAdmin) redirect("/dashboard");
   const { q, portal } = await searchParams;
   const center = workspace.centerId;
-  const [guardians, students] = await Promise.all([
+  const [guardians, students, links] = await Promise.all([
     supabase.from("guardians").select("id, student_id, full_name, phone, relationship, is_primary, membership_id, memberships!guardians_membership_id_center_id_fkey(id, status, invite_code, invite_expires_at)")
       .eq("center_id", center).order("full_name"),
     supabase.from("student_overview").select("id, full_name, status, open_balance, overdue_count").eq("center_id", center),
+    // Status only: chat ids are not read here.
+    supabase.from("telegram_links").select("membership_id, linked_at, blocked_at").eq("center_id", center).is("revoked_at", null),
   ]);
+  const tg = new Map((links.data ?? []).map((l) => [l.membership_id, l]));
+  const botReady = botUsername() !== null;
   const student = new Map((students.data ?? []).map((s) => [s.id, s]));
 
   // One row per parent: the same login, or else the same phone (or name), across children.
   const rows = new Map<string, Row>();
   for (const g of guardians.data ?? []) {
     const key = g.membership_id ?? (g.phone ? `p:${g.phone.replace(/\D/g, "")}` : `n:${g.full_name.toLowerCase()}`);
-    const row = rows.get(key) ?? { key, name: g.full_name, phone: g.phone, relationship: g.relationship, guardianId: g.id, membership: null, children: [] };
+    const row = rows.get(key) ?? { key, name: g.full_name, phone: g.phone, relationship: g.relationship, guardianId: g.id, membership: null, children: [], unattached: [] };
     const m = g.memberships as Row["membership"];
     if (m && (!row.membership || m.status === "active")) { row.membership = m; row.guardianId = g.id; }
     const s = student.get(g.student_id);
+    if (s && !g.membership_id) row.unattached.push({ guardianId: g.id, child: s.full_name ?? "—" });
     if (s && !row.children.some((c) => c.id === s.id)) row.children.push({ id: s.id!, name: s.full_name ?? "—", balance: Number(s.open_balance ?? 0), overdue: Number(s.overdue_count ?? 0) });
     rows.set(key, row);
   }
@@ -52,7 +60,7 @@ export default async function ParentsPage({ searchParams }: PageProps<"/parents"
       <PageHeader eyebrow={t("Parent experience")} title={t("Parents")}
         description={t("One row per family, connected to the student records their children's progress lives on.")} />
       <Card className="grid grid-cols-2 divide-border/60 md:grid-cols-4 md:divide-x">
-        {[[t("Families"), all.length], [t("Portal active"), count("active")], [t("Invited"), count("invited")], [t("No portal access"), count("none")]].map(([k, v]) => (
+        {[[t("Families"), all.length], [t("Telegram connected"), all.filter((r) => r.membership && tg.has(r.membership.id)).length], [t("Portal active"), count("active")], [t("No portal access"), count("none")]].map(([k, v]) => (
           <div key={String(k)} className="p-5">
             <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#5F6B66]">{k}</p>
             <p className="mt-2 text-[24px] font-semibold tracking-[-0.03em]">{v}</p>
@@ -97,6 +105,16 @@ export default async function ParentsPage({ searchParams }: PageProps<"/parents"
                       : r.membership?.status === "invited" && r.membership.invite_code
                         ? <InviteLink membershipId={r.membership.id} link={`${siteUrl()}/join?code=${r.membership.invite_code}`} expiresAt={r.membership.invite_expires_at} canReissue />
                         : <LoginInvite label={t("Invite to parent portal")} field="guardian_id" value={r.guardianId} action={inviteParentLogin} who={r.name} />}
+                  </div>
+                  <div className="min-w-[220px]">
+                    {(() => {
+                      const l = r.membership ? tg.get(r.membership.id) : undefined;
+                      const st: TelegramStatus = !l ? "none" : l.blocked_at ? "blocked" : "linked";
+                      // Other children of this family not yet on the parent account; the admin adds each one by hand.
+                      const attachable = r.membership ? r.unattached.filter((a) => a.guardianId !== r.guardianId) : [];
+                      return <TelegramCell guardianId={r.guardianId} membershipId={r.membership?.id ?? null} status={st}
+                        linkedAt={l?.linked_at ?? null} attachable={attachable} botReady={botReady} />;
+                    })()}
                   </div>
                 </li>
               );

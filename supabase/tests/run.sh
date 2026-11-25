@@ -30,3 +30,5 @@ done
 psql -q -v ON_ERROR_STOP=1 -v with_audio=$WITH_AUDIO -d "$DB" -f tests/10_access_and_flows.sql
 bash tests/20_telegram_concurrency.sh
 bash tests/30_migration_order.sh
+# The bot code against the real tg_* functions (needs Node 22+).
+if command -v node >/dev/null; then (cd .. && node --no-warnings --test tests/ts/telegram.db.e2e.mjs | grep -E '^# (pass|fail)'); fi

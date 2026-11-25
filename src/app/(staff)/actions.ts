@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { botUsername, kickTelegramDispatch } from "@/lib/telegram/server";
 import { z } from "zod";
 import { getStaffContext } from "@/lib/auth/current";
 import { siteUrl } from "@/lib/supabase/config";
@@ -190,6 +192,7 @@ export async function remindPayment(invoiceId: string): Promise<{ sent?: number;
   const { supabase } = await getStaffContext();
   const { data, error } = await supabase.rpc("remind_payment", { p_invoice: invoiceId });
   if (error) return { error: friendly(error.message.replace(/^.*?(This family)/, "$1")) };
+  after(kickTelegramDispatch);   // committed: tell linked parents on Telegram now
   revalidatePath("/payments");
   return { sent: data ?? 0 };
 }
@@ -233,6 +236,7 @@ export async function saveAttendance(lessonId: string, marks: Record<string, str
   if (!records.length) return { error: "Mark at least one student." };
   const { error } = await supabase.rpc("mark_attendance", { p_lesson: lessonId, p_records: records });
   if (error) return { error: friendly(error.message) };
+  after(kickTelegramDispatch);   // committed: tell linked parents on Telegram now
   revalidatePath("/attendance");
   revalidatePath("/students", "layout");
   return { ok: true };
@@ -264,6 +268,7 @@ export async function recordPayment(_: ActionState, form: FormData): Promise<Act
   revalidatePath("/payments");
   revalidatePath("/students", "layout");
   revalidatePath("/dashboard");
+  after(kickTelegramDispatch);   // committed: tell linked parents on Telegram now
   return { ok: true, id: data?.[0]?.payment_id, link: data?.[0]?.receipt_no };
 }
 
@@ -340,6 +345,7 @@ export async function releaseMockResults(sessionId: string): Promise<ActionState
   const { supabase } = await getStaffContext();
   const { data, error } = await supabase.rpc("release_mock_results", { p_session: sessionId });
   if (error) return { error: friendly(error.message) };
+  after(kickTelegramDispatch);   // committed: tell linked parents on Telegram now
   revalidatePath("/mocks", "layout");
   revalidatePath("/students", "layout");
   return data ? { ok: true } : { error: "No finished results to send yet." };
@@ -403,5 +409,37 @@ export async function approveAssignment(id: string): Promise<ActionState> {
   const { error } = await supabase.rpc("approve_assignment", { p_assignment: id });
   if (error) return { error: friendly(error.message) };
   revalidatePath("/homework", "layout");
+  return { ok: true };
+}
+
+// ------------------------------------------------------------ parent Telegram
+// Owner/admin only; the database checks it (issue/attach/revoke_telegram_link).
+export async function issueTelegramLink(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const bot = botUsername();
+  if (!bot) return { error: "The Telegram bot is not set up yet." };
+  const { data, error } = await supabase.rpc("issue_telegram_link", { p_guardian: str(form.get("guardian_id")) });
+  if (error) return { error: friendly(error.message) };
+  const token = data?.[0]?.token;
+  if (!token) return { error: "Couldn't create the link." };
+  revalidatePath("/parents");
+  return { ok: true, link: `https://t.me/${bot}?start=${token}` };
+}
+
+export async function revokeTelegramLink(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const { error } = await supabase.rpc("revoke_telegram_link", { p_membership: str(form.get("membership_id")) });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/parents");
+  return { ok: true };
+}
+
+export async function attachGuardianToParent(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const { error } = await supabase.rpc("attach_guardian_to_parent", {
+    p_guardian: str(form.get("guardian_id")), p_parent: str(form.get("membership_id")),
+  });
+  if (error) return { error: friendly(error.message) };
+  revalidatePath("/parents");
   return { ok: true };
 }
