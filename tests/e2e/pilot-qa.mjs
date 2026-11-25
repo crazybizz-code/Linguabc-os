@@ -181,6 +181,19 @@ await step(admin, "admin", "overpaying is refused", async () => {
   await expectText(d, /more than what is owed/i);
 });
 
+if (process.env.QA_TG_INACTIVE) {
+  await step(admin, "admin", "Parents page works while Telegram migrations are not applied", async () => {
+    await admin.goto(`${BASE}/parents`);
+    await expectText(admin, /Karim QA/);
+    await admin.getByRole("button", { name: T("Telegram link") }).first().click();
+    // the RPC does not exist yet: a readable error, no crash, no link
+    await dialog(admin).waitFor({ timeout: 10000 });
+    const txt = await dialog(admin).innerText();
+    if (/t\.me\//.test(txt)) throw new Error("a link was issued without the migration");
+    if (!/not set up/i.test(txt) || /schema|function/i.test(txt)) throw new Error(`unexpected dialog: ${txt.slice(0, 120)}`);
+  });
+}
+
 // ------------------------------------------------------------------ mentor
 await step(mentor, "mentor", "sees own group and timetable", async () => {
   await mentor.goto(`${BASE}/schedule`);

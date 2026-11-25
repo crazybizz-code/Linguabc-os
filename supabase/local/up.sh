@@ -24,7 +24,7 @@ docker run -d --name lg-gotrue --network host \
 for i in $(seq 1 60); do curl -fs http://127.0.0.1:9999/health >/dev/null 2>&1 && break; sleep 1; done
 curl -fs http://127.0.0.1:9999/health >/dev/null || { docker logs lg-gotrue | tail -20; exit 1; }
 
-for f in ../migrations/*.sql; do su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB -f $f" >/dev/null; done
+for f in ../migrations/*.sql; do if [ -n "${SKIP_MIGRATIONS:-}" ] && [[ "$(basename "$f")" =~ $SKIP_MIGRATIONS ]]; then echo "skip $(basename "$f")"; continue; fi; su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB -f $f" >/dev/null; done
 su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB -f seed.sql" >/dev/null
 su postgres -c "psql -q -d $DB -c \"notify pgrst, 'reload schema'\""
 
