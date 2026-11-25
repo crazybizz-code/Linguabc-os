@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Building2, BookOpen, ShieldCheck, ChevronRight, Check, Minus } from "lucide-react";
 import { getStaffContext } from "@/lib/auth/current";
 import { Card, PageHeader } from "@/components/ui/primitives";
-import { CentreName } from "./centre-name";
+import { CentreSettings } from "./centre-name";
 
 export const metadata = { title: "Settings" };
 
@@ -24,7 +24,7 @@ const ACCESS: [string, boolean[]][] = [
 export default async function SettingsPage() {
   const { supabase, workspace, isStaff, t } = await getStaffContext();
   if (!isStaff) redirect("/dashboard");
-  const { data: centre } = await supabase.from("centers").select("name, slug, timezone, currency, created_at").eq("id", workspace.centerId).single();
+  const { data: centre } = await supabase.from("centers").select("name, slug, timezone, currency, created_at, phone, address").eq("id", workspace.centerId).single();
   const owner = workspace.role === "owner";
 
   return (
@@ -33,7 +33,7 @@ export default async function SettingsPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="p-5">
           <h2 className="text-[15px] font-semibold">{t("Centre")}</h2>
-          <div className="mt-3"><CentreName name={centre?.name ?? workspace.centerName} canEdit={owner} /></div>
+          <div className="mt-3"><CentreSettings canEdit={owner} c={{ name: centre?.name ?? workspace.centerName, phone: centre?.phone ?? null, address: centre?.address ?? null, timezone: centre?.timezone ?? "Asia/Tashkent" }} /></div>
           <dl className="mt-4 divide-y divide-border/60 text-[12.5px]">
             {[[t("Centre code"), centre?.slug ?? "—"], [t("Time zone"), centre?.timezone ?? "Asia/Tashkent"], [t("Currency"), centre?.currency ?? "UZS"],
               [t("On LinguABC since"), centre ? new Date(centre.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"]].map(([k, v]) => (

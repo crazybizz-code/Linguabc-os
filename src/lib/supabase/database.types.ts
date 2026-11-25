@@ -453,6 +453,8 @@ export type Database = {
           receipt_seq: number
           slug: string
           timezone: string
+          phone: string | null
+          address: string | null
         }
         Insert: {
           created_at?: string
@@ -2003,6 +2005,7 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_code: string }; Returns: string }
+      update_center_settings: { Args: { p_center: string; p_name: string; p_phone: string; p_address: string; p_timezone: string }; Returns: undefined }
       approve_assignment: { Args: { p_assignment: string }; Returns: undefined }
       assign_homework: {
         Args: { p_assignment: string; p_due_at: string; p_group: string }
