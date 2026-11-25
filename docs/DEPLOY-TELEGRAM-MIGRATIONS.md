@@ -1,6 +1,6 @@
 # Telegram migratsiyalarini productionga qo‘llash (taklif, tasdiq kutilmoqda)
 
-_2026-11-26. **Hech qanday production migratsiyasiga ruxsat yo‘q.** Bu hujjat — asoschi tasdiqlashi uchun aniq tartib._
+_2026-11-25. **Hech qanday production migratsiyasiga ruxsat yo‘q.** Bu hujjat — asoschi tasdiqlashi uchun aniq tartib._
 
 ## Faktlar (production, faqat o‘qib tekshirildi)
 - `supabase_migrations.schema_migrations`: 0001–0028 yozuvlari. Har birining `version` i — **qo‘llangan vaqt** (`20261121073304` kabi), `name` i — fayl nomi (`0028_practice`). Ular avval Supabase MCP `apply_migration` orqali bittadan qo‘llangan.
