@@ -20,13 +20,13 @@ export type StudentRow = {
   groupId: string;
   mentor: string;
   attendance: number | null;
-  payment: "Paid" | "Pending" | "Overdue" | "Lead" | null;
+  payment: "Paid" | "Partial" | "Pending" | "Overdue" | "Lead" | null;
   academic: "On track" | "Needs attention" | "At risk" | "New";
   status: string;
   lastActivity: string | null;
 };
 
-const PAY_TONE: Record<string, Tone> = { Paid: "green", Pending: "amber", Overdue: "red", Lead: "neutral" };
+const PAY_TONE: Record<string, Tone> = { Paid: "green", Partial: "amber", Pending: "amber", Overdue: "red", Lead: "neutral" };
 const ACAD_TONE: Record<string, Tone> = { "On track": "green", "Needs attention": "amber", "At risk": "red", New: "neutral" };
 
 function ago(iso: string | null, t: T) {
@@ -75,7 +75,7 @@ export function StudentsTable({ rows, showPayment }: { rows: StudentRow[]; showP
         {select("branch", "Branch", uniq("branch"))}
         {select("group", "Group", uniq("group"))}
         {select("status", "Academic", ["On track", "Needs attention", "At risk", "New"])}
-        {showPayment && select("payment", "Payment", ["Paid", "Pending", "Overdue", "Lead"])}
+        {showPayment && select("payment", "Payment", ["Paid", "Partial", "Pending", "Overdue", "Lead"])}
         <span className="ml-auto text-[12px] text-muted-foreground">{t("{a} of {b} students", { a: filtered.length, b: rows.length })}</span>
       </div>
       <div className="overflow-x-auto">

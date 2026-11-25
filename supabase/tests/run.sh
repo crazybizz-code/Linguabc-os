@@ -30,3 +30,4 @@ done
 psql -q -v ON_ERROR_STOP=1 -v with_audio=$WITH_AUDIO -d "$DB" -f tests/10_access_and_flows.sql
 bash tests/20_telegram_concurrency.sh
 bash tests/30_migration_order.sh
+bash tests/21_transfer_concurrency.sh

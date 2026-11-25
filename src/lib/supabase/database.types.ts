@@ -2003,6 +2003,14 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_code: string }; Returns: string }
+      update_student: { Args: { p_student: string; p_full_name: string; p_phone: string; p_email: string; p_date_of_birth: string | null; p_branch: string | null; p_notes: string }; Returns: undefined }
+      save_guardian: { Args: { p_student: string; p_guardian: string | null; p_full_name: string; p_phone: string; p_relationship: string; p_is_primary: boolean }; Returns: string }
+      end_enrollment: { Args: { p_enrollment: string; p_status: string; p_end_date: string; p_reason: string }; Returns: undefined }
+      transfer_student: { Args: { p_enrollment: string; p_to_group: string; p_date: string; p_keep_fee: boolean }; Returns: string }
+      update_group: { Args: { p_group: string; p_name: string; p_mentor: string | null; p_room_name: string; p_capacity: number | null }; Returns: undefined }
+      update_group_schedule: { Args: { p_group: string; p_weekdays: number[]; p_start_time: string; p_end_time: string; p_from: string }; Returns: number }
+      cancel_lesson: { Args: { p_lesson: string; p_reason: string }; Returns: undefined }
+      move_lesson: { Args: { p_lesson: string; p_starts_at: string; p_ends_at: string }; Returns: undefined }
       approve_assignment: { Args: { p_assignment: string }; Returns: undefined }
       assign_homework: {
         Args: { p_assignment: string; p_due_at: string; p_group: string }

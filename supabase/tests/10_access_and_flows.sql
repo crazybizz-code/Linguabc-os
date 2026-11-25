@@ -1630,5 +1630,172 @@ select * from record_payment(:'inv_tg', 1000, 'cash');
 select tests.assert((select count(*) from payments where student_id = :'st1') = :pay_before + 1, 'payment saved although Telegram queuing failed');
 :as_superuser
 alter table telegram_outbox drop constraint tg_test_break;
+-- put the enrolments back as the earlier sections left them
+:as_superuser
+delete from enrollments where student_id in (:'st1', :'st2') and group_id = :'g3';
+update enrollments set status = 'active', end_date = null where id in (:'e1', :'e2');
 
+\echo '40. admin operations: edit students, move between groups, change timetables'
+-- edit a student: owner/admin only, validated
+:as_mentor
+select tests.expect_fail(format($$select update_student(%L, 'X Y', null, null, null, null, null)$$, :'st3'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select update_student(%L, 'X Y', null, null, null, null, null)$$, :'st3'), 'forbidden');
+:as_admin
+select update_student(:'st3', 'Third Student Edited', '+998 90 555 44 33', 'Third@Mail.uz', '2010-05-01', :'branch_a', 'note');
+select tests.assert((select full_name = 'Third Student Edited' and email = 'third@mail.uz' and date_of_birth = '2010-05-01' from students where id = :'st3'), 'student edited');
+select tests.expect_fail(format($$select update_student(%L, 'X', null, null, null, null, null)$$, :'st3'), 'full name');
+select tests.expect_fail(format($$select update_student(%L, 'Xx Yy', null, 'not-an-email', null, null, null)$$, :'st3'), 'valid email');
+select tests.expect_fail(format($$select update_student(%L, 'Xx Yy', null, null, current_date + 1, null, null)$$, :'st3'), 'date of birth');
+-- parents: add and edit; one primary
+:as_admin
+select save_guardian(:'st3', null, 'Mother Three', '+998901110000', 'mother', true) as g_new \gset
+select save_guardian(:'st3', null, 'Father Three', '+998901110001', 'father', true) as g_new2 \gset
+select tests.assert((select count(*) filter (where is_primary) = 1 and bool_or(id = :'g_new2' and is_primary) from guardians where student_id = :'st3'), 'one primary parent');
+select save_guardian(:'st3', :'g_new', 'Mother Three-Edited', '+998901110009', 'mother', false);
+select tests.assert((select full_name from guardians where id = :'g_new') = 'Mother Three-Edited', 'parent edited');
+select tests.expect_fail(format($$select save_guardian(%L, %L, 'Wrong child', null, 'mother', false)$$, :'st1', :'g_new'), 'forbidden');
+select tests.expect_fail(format($$select save_guardian(%L, null, 'Bad Rel', null, 'uncle', false)$$, :'st3'), 'relationship');
+:as_mentor
+select tests.expect_fail(format($$select save_guardian(%L, null, 'Nope Nope', null, 'mother', false)$$, :'st3'), 'forbidden');
+
+-- transfer: one step, same fee terms, no second invoice for a month already billed
+:as_admin
+select e.id as en1, e.monthly_fee as fee1 from enrollments e where e.student_id = :'st1' and e.group_id = :'group1' and e.status = 'active' \gset
+select count(*) as inv_before from invoices where student_id = :'st1' and period = date_trunc('month', current_date) \gset
+:as_mentor
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'g3'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'g3'), 'forbidden');
+:as_admin
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'group1'), 'already in this group');
+select transfer_student(:'en1', :'g3', current_date, true) as en1b \gset
+select tests.assert((select status = 'completed' and end_date = current_date from enrollments where id = :'en1'), 'old enrolment ended');
+select tests.assert((select status = 'active' and group_id = :'g3' and monthly_fee = :fee1 from enrollments where id = :'en1b'), 'new enrolment with the same fee');
+select tests.assert((select count(*) from invoices where student_id = :'st1' and period = date_trunc('month', current_date)) = :inv_before, 'no double billing this month');
+select tests.expect_fail(format($$select transfer_student(%L, %L, current_date, true)$$, :'en1', :'group1'), 'not active');
+-- the mentor of the old group no longer sees the student's new work; the new group's mentor does
+:as_mentor2
+select tests.assert(exists (select 1 from students where id = :'st1'), 'new mentor sees the student');
+
+-- leaving a group: status follows; a second end is refused
+:as_admin
+select e.id as en2 from enrollments e where e.student_id = :'st2' and e.status = 'active' order by start_date desc limit 1 \gset
+select tests.expect_fail(format($$select end_enrollment(%L, 'expelled', current_date, null)$$, :'en2'), 'Choose why');
+select tests.expect_fail(format($$select end_enrollment(%L, 'dropped', '2000-01-01', null)$$, :'en2'), 'before the start');
+select end_enrollment(:'en2', 'dropped', current_date, 'moved away');
+select tests.assert((select status from students where id = :'st2') = 'left', 'student with no group is marked left');
+select tests.assert((select count(*) from activities where student_id = :'st2' and title = 'Left the group') = 1, 'timeline entry');
+select tests.expect_fail(format($$select end_enrollment(%L, 'dropped', current_date, null)$$, :'en2'), 'not active');
+:as_mentor
+select tests.expect_fail(format($$select end_enrollment(%L, 'dropped', current_date, null)$$, :'en1b'), 'forbidden');
+
+-- timetable: a clashing timetable is refused and nothing changes
+:as_admin
+select count(*) as g2_lessons from lessons where group_id = :'group2' \gset
+select tests.expect_fail(format($$select update_group_schedule(%L, '{1}', '10:00', '11:00', current_date + 1)$$, :'group2'), 'schedule conflict');
+select tests.assert((select count(*) from lessons where group_id = :'group2') = :g2_lessons, 'nothing saved after a clash');
+select tests.expect_fail(format($$select update_group_schedule(%L, '{1}', '10:00', '11:00', current_date - 1)$$, :'group2'), 'past');
+select tests.expect_fail(format($$select update_group_schedule(%L, '{}', '10:00', '11:00', current_date + 1)$$, :'group2'), 'at least one day');
+-- a valid change: future lessons without attendance are rebuilt; past and attended ones stay
+select count(*) as g3_past from lessons where group_id = :'g3' and starts_at < now() \gset
+select update_group_schedule(:'g3', '{5,6}', '15:00', '16:30', current_date + 1) as g3_new \gset
+select tests.assert(:g3_new between 20 and 26, 'new lessons made');
+select tests.assert((select count(*) from lessons where group_id = :'g3' and starts_at < now()) = :g3_past, 'past lessons kept');
+select tests.assert((select count(*) from lessons where group_id = :'g3' and starts_at > (current_date + 1)::timestamp at time zone 'Asia/Tashkent'
+  and extract(isodow from starts_at at time zone 'Asia/Tashkent') not in (5, 6)) = 0, 'only the new days from that date');
+select tests.assert((select count(*) from group_schedule_slots where group_id = :'g3') = 2, 'slots replaced');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'schedule_changed' and data->>'group_id' = :'g3') = 1, 'student in the group told once');
+:as_parent
+select tests.assert((select count(*) from notifications where data->>'kind' = 'schedule_changed') = 1, 'parent told too');
+:as_mentor
+select tests.expect_fail(format($$select update_group_schedule(%L, '{1}', '15:00', '16:00', current_date + 1)$$, :'g3'), 'forbidden');
+
+-- group details: mentor and room follow into future lessons; clashes refused
+:as_admin
+select update_group(:'g3', 'B1 Evening (renamed)', :'m_mentor', 'Room 7', 12);
+select tests.assert((select bool_and(mentor_id = :'m_mentor') from lessons where group_id = :'g3' and starts_at > now() and status = 'scheduled'), 'future lessons follow the mentor');
+select tests.expect_fail(format($$select update_group(%L, 'B1 Evening', null, null, 0)$$, :'g3'), 'Capacity');
+-- one lesson: move onto group1's lesson time with the same mentor -> clash; then a free time
+select id as g3l, starts_at as g3s from lessons where group_id = :'g3' and status = 'scheduled' and starts_at > now() order by starts_at limit 1 \gset
+select starts_at as g1s, ends_at as g1e from lessons where group_id = :'group1' and status = 'scheduled' and starts_at > now() order by starts_at limit 1 \gset
+select tests.expect_fail(format($$select move_lesson(%L, %L, %L)$$, :'g3l', :'g1s', :'g1e'), 'schedule conflict');
+select tests.expect_fail(format($$select move_lesson(%L, now() - interval '1 day', now() - interval '23 hours')$$, :'g3l'), 'past');
+select move_lesson(:'g3l', :'g3s'::timestamptz + interval '2 hours', :'g3s'::timestamptz + interval '3 hours 30 minutes');
+:as_student
+select tests.assert((select count(*) from notifications where data->>'kind' = 'lesson_moved') >= 1, 'move announced');
+:as_admin
+select cancel_lesson(:'g3l', 'teacher ill');
+select tests.assert((select status from lessons where id = :'g3l') = 'cancelled', 'cancelled');
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'g3l'), 'already cancelled');
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_past'), 'Attendance was already taken');
+select tests.expect_fail(format($$select move_lesson(%L, now() + interval '3 days', now() + interval '3 days 1 hour')$$, :'lesson_past'), '');
+:as_mentor2
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_future'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select cancel_lesson(%L, null)$$, :'lesson_future'), 'forbidden');
+
+\echo '43. transfers never bill a month twice'
+:as_admin
+insert into courses (center_id, name, code, level, default_monthly_fee)
+  values (:'center_a', 'IELTS C1', 'C1-T', 'C1', 1000000) returning id as course_c1 \gset
+select create_group(:'center_a', 'T-A', :'course_a', :'branch_a', null, null, 20) as t_a \gset
+select create_group(:'center_a', 'T-B', :'course_c1', :'branch_a', null, null, 20) as t_b \gset
+select create_group(:'center_a', 'T-C', :'course_a', :'branch_a', null, null, 20) as t_c \gset
+insert into students (center_id, branch_id, full_name) values
+  (:'center_a', :'branch_a', 'Paid Full'), (:'center_a', :'branch_a', 'Paid Part'),
+  (:'center_a', :'branch_a', 'Void Inv'), (:'center_a', :'branch_a', 'Two Groups'), (:'center_a', :'branch_a', 'Transfer Race');
+select id as s_full from students where full_name = 'Paid Full' \gset
+select id as s_part from students where full_name = 'Paid Part' \gset
+select id as s_void from students where full_name = 'Void Inv' \gset
+select id as s_two  from students where full_name = 'Two Groups' \gset
+select id as s_race from students where full_name = 'Transfer Race' \gset
+select enroll_student(:'s_full', :'t_a') as e_full \gset
+select enroll_student(:'s_part', :'t_a') as e_part \gset
+select enroll_student(:'s_void', :'t_a') as e_void \gset
+select enroll_student(:'s_two', :'t_a') as e_two_a \gset
+select enroll_student(:'s_two', :'t_c') as e_two_c \gset
+select enroll_student(:'s_race', :'t_a') as e_race \gset
+select date_trunc('month', app.local_today())::date as this_m, (date_trunc('month', app.local_today()) + interval '1 month')::date as next_m \gset
+-- 1. fully paid this month, moved to a dearer course without keeping the fee
+select id as inv_full, amount as amt_full from invoices where enrollment_id = :'e_full' and period = :'this_m' \gset
+select * from record_payment(:'inv_full', :amt_full, 'cash');
+select transfer_student(:'e_full', :'t_b', app.local_today(), false) as e_full2 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'this_m' and status = 'open') = 1, 'fully paid: no second invoice for the month');
+select tests.assert((select balance from invoice_balances where id = :'inv_full') = 0, 'still fully paid');
+select tests.assert((select monthly_fee from enrollments where id = :'e_full2') = 1000000, 'new course fee when not kept');
+select tests.assert((select transferred_from from enrollments where id = :'e_full2') = :'e_full', 'transfer recorded');
+-- 2. partly paid: the balance stays on the original invoice, nothing new
+select id as inv_part from invoices where enrollment_id = :'e_part' and period = :'this_m' \gset
+select * from record_payment(:'inv_part', 300000, 'cash');
+select transfer_student(:'e_part', :'t_b', app.local_today(), true) as e_part2 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_part' and period = :'this_m' and status = 'open') = 1, 'partly paid: still one invoice');
+select tests.assert((select balance from invoice_balances where id = :'inv_part') = (select amount from invoices where id = :'inv_part') - 300000, 'balance carried on the original invoice');
+select tests.assert((select monthly_fee from enrollments where id = :'e_part2') = (select monthly_fee from enrollments where id = :'e_part'), 'fee kept when asked');
+-- 3. voided invoice does not count: the new group bills the month once
+select id as inv_void from invoices where enrollment_id = :'e_void' and period = :'this_m' \gset
+:as_ownerA
+select void_invoice(:'inv_void');
+:as_admin
+select transfer_student(:'e_void', :'t_c', app.local_today(), true) as e_void2 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_void' and period = :'this_m' and status = 'open') = 1, 'void invoice replaced by one open invoice');
+-- 4. a second, unrelated enrolment keeps its own invoice; the moved one is not billed again
+select transfer_student(:'e_two_a', :'t_b', app.local_today(), true) as e_two_b \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_two' and period = :'this_m' and status = 'open') = 2, 'two groups: two invoices, not three');
+-- 5. future-dated transfers are refused in V1
+select tests.expect_fail(format($$select transfer_student(%L, %L, app.local_today() + 5, true)$$, :'e_race', :'t_b'), 'future');
+-- 6. a chain of transfers in one month still bills once
+select transfer_student(:'e_full2', :'t_c', app.local_today(), true) as e_full3 \gset
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'this_m' and status = 'open') = 1, 'two hops: still one invoice');
+-- 7. monthly billing after transfers: this month unchanged, next month once per active place, at the new fee
+select generate_invoices(:'center_a', :'this_m');
+select generate_invoices(:'center_a', :'this_m');
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'this_m' and status = 'open') = 1, 'billing run: no double for the transfer month');
+select tests.assert((select count(*) from invoices where student_id = :'s_part' and period = :'this_m' and status = 'open') = 1, 'billing run: partly paid student not billed again');
+select tests.assert((select count(*) from invoices where student_id = :'s_two' and period = :'this_m' and status = 'open') = 2, 'billing run: two groups stay two');
+select generate_invoices(:'center_a', :'next_m');
+select tests.assert((select count(*) from invoices where student_id = :'s_full' and period = :'next_m') = 1, 'next month billed once');
+select tests.assert((select enrollment_id from invoices where student_id = :'s_full' and period = :'next_m') = :'e_full3', 'next month billed to the current group');
+select tests.assert((select count(*) from invoices where student_id = :'s_part' and period = :'next_m' and enrollment_id = :'e_part2') = 1, 'partly paid: next month on the new place');
 \echo 'ALL TESTS PASSED'

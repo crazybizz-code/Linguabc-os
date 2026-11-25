@@ -16,7 +16,7 @@ export default async function StudentsPage() {
     supabase.from("courses").select("id, name, default_monthly_fee").eq("center_id", center),
     supabase.from("branches").select("id, name").eq("center_id", center).eq("status", "active").order("name"),
     supabase.from("memberships").select("id, full_name").eq("center_id", center).eq("role", "mentor"),
-    isAdmin ? supabase.from("invoice_balances").select("student_id").eq("center_id", center) : Promise.resolve({ data: [] as { student_id: string | null }[] }),
+    isAdmin ? supabase.from("invoice_balances").select("student_id, payment_status").eq("center_id", center) : Promise.resolve({ data: [] as { student_id: string | null; payment_status: string | null }[] }),
   ]);
 
   const byId = <T extends { id: string | null }>(rows: T[] | null) => new Map((rows ?? []).map((r) => [r.id!, r]));
@@ -27,6 +27,8 @@ export default async function StudentsPage() {
   const enrolledIn = new Map<string, string>();
   (enrollments.data ?? []).forEach((e) => enrolledIn.set(e.student_id, e.group_id));
   const invoiced = new Set((invoices.data ?? []).map((i) => i.student_id));
+  // Something paid but not all of it: same word as the Payments page.
+  const partial = new Set((invoices.data ?? []).filter((i) => i.payment_status === "partial").map((i) => i.student_id));
 
   const rows: StudentRow[] = (students.data ?? []).map((s) => {
     const g = groupMap.get(enrolledIn.get(s.id!) ?? "");
@@ -36,7 +38,7 @@ export default async function StudentsPage() {
       : (s.overdue_count ?? 0) > 0
         ? "Overdue"
         : (s.open_balance ?? 0) > 0
-          ? "Pending"
+          ? (partial.has(s.id) ? "Partial" : "Pending")
           : invoiced.has(s.id)
             ? "Paid"
             : "Lead";

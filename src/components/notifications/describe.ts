@@ -64,6 +64,9 @@ function describeRaw(n: Note, t: T, locale: string, audience: Audience): { title
     case "lesson_moved":
       return { title: t("Lesson moved"), body: t("The {group} lesson on {from} moved to {date}.", { group: s("group"), from: when("from"), date: when("at") }),
         href: audience === "student" ? "/student/schedule" : null };
+    case "schedule_changed":
+      return { title: t("Timetable changed"), body: t("The {group} timetable changes from {date}: {time}.", { group: s("group"), date: String(d.from ?? ""), time: `${s("start")}–${s("end")}` }),
+        href: audience === "student" ? "/student/schedule" : null };
     default:
       return { title: t(n.title), body: n.body ?? "", href: null };
   }
