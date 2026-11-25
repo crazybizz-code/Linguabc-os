@@ -331,7 +331,7 @@ select tests.expect_fail(format($$select create_mock_session(%L, 'Bad examiner',
 select tests.expect_fail(format($$select create_mock_session(%L, 'No modules', %L, now(), null, null, '{}')$$, :'center_a', :'group1'), 'at least one');
 select tests.expect_fail(format($$select create_mock_session(%L, 'Vocab', %L, now(), null, null, '{vocabulary}')$$, :'center_a', :'group1'), 'at least one');
 :as_mentor
-select tests.expect_fail(format($$select create_mock_session(%L, 'Mentor mock', %L, now())$$, :'center_a', :'group1'), 'forbidden');
+-- 0037 lets a mentor schedule a mock for a group they lead; see section 42.
 select save_mock_results(:'ms2', jsonb_build_array(jsonb_build_object('student_id', :'st1', 'reading', 6.5, 'listening', 7)));
 select tests.assert((select status from mock_results where mock_session_id = :'ms2' and student_id = :'st1') = 'in_progress', 'partial result');
 select tests.assert((select status from mock_sessions where id = :'ms2') = 'in_progress', 'session in progress');
@@ -1275,5 +1275,33 @@ select audio_job_update(:'jq2', repeat('5', 63) || '9', 2, 'failed', 0, null, nu
 select tests.expect_fail(format($$select retry_audio_job(%L, repeat('5', 64), 'tests/%s/aaaaaaaa-0000-4000-8000-0000000000da.mp3')$$, :'jq2', :'lt2'), 'bad target');
 :as_superuser
 select tests.assert((select count(*) from audio_jobs) = 10, 'ten jobs in all');
+
+\echo '42. mentors schedule mocks for their own groups'
+:as_mentor
+select create_mock_session(:'center_a', 'Mentor mock', :'group1', now() + interval '2 days', :'m_admin') as mm1 \gset
+:as_superuser
+select tests.assert((select examiner_id = :'m_mentor' from mock_sessions where id = :'mm1'), 'the mentor is the examiner (requested examiner ignored)');
+select tests.assert((select count(*) from mock_results where mock_session_id = :'mm1') =
+                    (select count(*) from enrollments where group_id = :'group1' and status = 'active'), 'participants from the group');
+:as_mentor
+select tests.expect_fail(format($$select create_mock_session(%L, 'Not my group', %L, now() + interval '2 days')$$, :'center_a', :'g3'), 'forbidden');
+select tests.expect_fail(format($$select create_mock_session(%L, 'No group', null, now() + interval '2 days')$$, :'center_a'), 'forbidden');
+:as_mentor2
+select tests.expect_fail(format($$select create_mock_session(%L, 'Other mentor', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+:as_student
+select tests.expect_fail(format($$select create_mock_session(%L, 'Student', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select create_mock_session(%L, 'Other centre', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+-- the mentor runs it: enters bands and releases; families see it only after release
+:as_mentor
+select save_mock_results(:'mm1', format('[{"student_id":"%s","reading":6.5,"listening":7,"writing":6,"speaking":6.5}]', :'st1')::jsonb);
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'mm1'), 0);
+:as_mentor
+select release_mock_results(:'mm1');
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L and released_at is not null', :'mm1'), 1);
+:as_admin
+select tests.assert(create_mock_session(:'center_a', 'Admin mock', :'g3', now() + interval '3 days', :'m_admin') is not null, 'staff still schedule any group');
 
 \echo 'ALL TESTS PASSED'
