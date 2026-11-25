@@ -4,6 +4,9 @@
 //   node tests/e2e/pilot-qa.mjs            (desktop + phone screenshots in /tmp/lg-qa)
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+// read-only check against the LOCAL QA database (never production)
+const localSql = (q) => execFileSync("su", ["postgres", "-c", `psql -qtA -d linguabc_local -c "${q}"`], { encoding: "utf8" }).trim();
 import { uz } from "../../src/i18n/uz.ts";
 import { ru } from "../../src/i18n/ru.ts";
 
@@ -423,6 +426,102 @@ if (process.env.QA_SETTINGS) {
     await admin.goto(`${BASE}/settings`);
     await expectText(admin, /Chilonzor 9, Tashkent/);
     if (await admin.locator('input[name="address"]').count()) throw new Error("admin can edit");
+  });
+}
+
+if (process.env.QA_SUGGEST) {
+  await step(student, "student", "sees rule-based suggestions on My plan", async () => {
+    await student.goto(`${BASE}/student/plan`);
+    await expectText(student, Tin("Suggestions for you"));
+    const card = student.locator("section, div").filter({ hasText: Tin("Suggestions for you") }).last();
+    const items = await student.locator("li").filter({ hasText: /practice|homework|attendance|mock|track/i }).count();
+    if (items < 1) throw new Error("no suggestion shown");
+    void card;
+  });
+}
+
+if (process.env.QA_ONLINE_MOCK) {
+  let sessionUrl = "";
+  await step(admin, "admin", "schedules an online mock with the published reading test", async () => {
+    await admin.goto(`${BASE}/mocks`);
+    await admin.getByRole("button", { name: Tin("Create mock session") }).first().click();
+    const d = dialog(admin);
+    await d.locator('input[name="name"]').fill("QA Online Mock");
+    const g = d.locator('select[name="group_id"]');
+    const o = await g.locator("option").allInnerTexts(); await g.selectOption({ index: Math.max(0, o.findIndex((x) => /QA B2 Morning/.test(x))) });
+    // the exam opens 15 minutes before the start and closes 12 hours after: start it now (Tashkent time)
+    const tk = new Date(Date.now() + 5 * 3600_000).toISOString();
+    await d.locator('input[name="date"]').fill(tk.slice(0, 10));
+    await d.locator('input[name="time"]').fill(tk.slice(11, 16));
+    await submitDialog(admin, "Create mock session");
+    await admin.waitForTimeout(1500);
+    await admin.goto(`${BASE}/mocks`);
+    await admin.getByText("QA Online Mock").first().click();
+    await admin.waitForURL(/\/mocks\/[0-9a-f-]{36}/);
+    sessionUrl = admin.url();
+    const reading = admin.locator("select").filter({ has: admin.locator("option", { hasText: "QA Reading Test" }) }).first();
+    await reading.selectOption({ label: "QA Reading Test · B2" });
+    await admin.getByRole("button", { name: T("Save tests") }).click();
+    await admin.waitForTimeout(1500);
+  });
+  let examUrl = "";
+  await step(student, "student", "takes the reading test: timer, answers, autosave", async () => {
+    await student.goto(`${BASE}/student/mocks`);
+    const start = student.getByRole("link", { name: /^(Start|Continue)$/ }).first();
+    examUrl = BASE + (await start.getAttribute("href"));
+    await student.goto(examUrl);
+    await student.getByRole("button", { name: /start the test/ }).click();
+    await student.getByText(/minutes left/).waitFor({ timeout: 15000 });
+    const timer = await student.locator("header p.text-\\[20px\\]").first().innerText();
+    if (!/^(59|60):\d\d$/.test(timer.trim())) throw new Error(`timer shows ${timer}`);
+    for (let n = 1; n <= 13; n++) {
+      await student.locator(`#q-${n}`).getByText(n % 2 ? "TRUE" : "FALSE", { exact: true }).click();
+    }
+    // autosave: the answers reach the database before any submit ("Saved" is hidden on phones)
+    let saved = 0;
+    for (let i = 0; i < 20 && saved < 13; i++) {
+      await student.waitForTimeout(500);
+      saved = Number(localSql("select coalesce(max((select count(*) from jsonb_object_keys(answers))), 0) from mock_attempts where submitted_at is null"));
+    }
+    if (saved < 13) throw new Error(`only ${saved} answers autosaved`);
+  });
+  await step(student, "student", "submits; the result waits for the mentor", async () => {
+    await student.getByRole("button", { name: /^Submit$/ }).first().click();
+    await student.getByRole("button", { name: /^Submit$/ }).last().click();
+    await student.waitForTimeout(2000);
+    await student.goto(`${BASE}/student/progress`);
+    if (await student.getByText(/QA Online Mock/).count()) throw new Error("result visible before release");
+  });
+  await step(admin, "admin", "sees the auto-marked reading band and releases", async () => {
+    admin.on("dialog", (dlg) => dlg.accept());
+    await admin.goto(sessionUrl);
+    const sel = admin.getByLabel(/Aziz QA Reading/);
+    const v = await sel.inputValue();
+    if (!v) throw new Error("reading band not filled by auto-marking");
+    for (const m of ["Listening", "Writing", "Speaking"]) await admin.getByLabel(new RegExp(`Aziz QA ${m}`)).selectOption({ label: "6.0" });
+    await admin.getByRole("button", { name: T("Save results") }).click();
+    await admin.waitForTimeout(1500);
+    await admin.reload();
+    await admin.getByRole("button", { name: Tin("Send results") }).click();
+    await admin.waitForTimeout(2000);
+    // (the sheet shows "Sent to family" without a reload only with PR #40)
+    if (localSql("select count(*) from mock_results r join mock_sessions s on s.id = r.mock_session_id where s.name = 'QA Online Mock' and r.released_at is not null") !== "1") throw new Error("not released");
+    if (localSql("select reading_band from mock_results r join mock_sessions s on s.id = r.mock_session_id where s.name = 'QA Online Mock'") !== "4.5") throw new Error("reading band is not the auto-marked 4.5 (13/40)");
+  });
+  await step(student, "student", "sees the released result; cannot take the test again", async () => {
+    await student.goto(`${BASE}/student/progress`);
+    await expectText(student, /QA Online Mock/, 10000);
+    await student.goto(examUrl);
+    if (await student.getByRole("button", { name: /start the test/ }).count()) {
+      await student.getByRole("button", { name: /start the test/ }).click();
+      await student.getByText(/already|submitted|finished|closed/i).first().waitFor({ timeout: 10000 });
+    }
+    if (localSql("select count(*) from mock_attempts a join mock_sessions s on s.id = a.mock_session_id where s.name = 'QA Online Mock'") !== "1") throw new Error("a second attempt was created");
+  });
+  await step(owner, "visitor", "a signed-out visitor cannot open the exam", async () => {
+    const other = await (await ctx()).newPage();
+    await other.goto(examUrl);
+    await other.waitForURL(/login/, { timeout: 10000 });
   });
 }
 

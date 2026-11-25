@@ -13,10 +13,12 @@ QA_MOCK=1 node tests/e2e/pilot-qa.mjs           # + mentor schedules a mock, ent
 SKIP_MIGRATIONS="^(0029|0030|0031|0032|0033)_" bash supabase/local/up.sh   # production-like DB (migrations not applied yet)
 QA_TG_INACTIVE=1 node tests/e2e/pilot-qa.mjs    # #36 code on a DB without the Telegram migrations
 QA_SETTINGS=1 node tests/e2e/pilot-qa.mjs       # owner settings (PR #42)
+QA_SUGGEST=1 node tests/e2e/pilot-qa.mjs        # student suggestions on My plan (PR #43)
+QA_ONLINE_MOCK=1 node tests/e2e/pilot-qa.mjs    # online reading mock: schedule, exam with timer and autosave, auto-marking, release, access
 ```
 
 - **Stack:** local Postgres 16 (all migrations in `supabase/migrations`), `supabase/gotrue:v2.170.0` and `postgrest/postgrest:v12.2.3` from Docker Hub, `supabase/local/gateway.mjs` in place of Kong. `up.sh` drops and recreates the `linguabc_local` database each run.
 - **Keys:** a local-only JWT secret; `.env.qa` is git-ignored and holds no production value. The script refuses any base URL that is not localhost.
-- **Seed:** one synthetic library article (`supabase/local/seed.sql`); production's library is not copied.
+- **Seed:** one synthetic library article and one published 40-question reading test (`supabase/local/seed.sql`); production's library is not copied. Listening exams need Storage audio, which the local stack does not have.
 - **Not covered locally:** Storage (listening audio), Realtime (live bell), pg_cron, AI and Fish Audio (no keys), email/SMS, Telegram.
 - **What it proves:** the pages, server actions, RLS and RPCs work together for owner, admin, mentor and student on this code. It does not prove production config (Vercel env, Supabase Auth settings, domain).
