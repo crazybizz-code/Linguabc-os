@@ -95,6 +95,7 @@ export async function loadProgress(supabase: Client, studentId: string) {
 
   return {
     attendancePct,
+    attendanceCounted: counted.length,
     attendanceByMonth,
     homework: homework.slice(0, 40),
     homeworkDone: doneHw.length,
