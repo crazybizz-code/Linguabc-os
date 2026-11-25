@@ -30,6 +30,48 @@ Tasodifiy qiymat: `openssl rand -base64 36 | tr '+/' '-_' | tr -d '='`.
 
 Bot tokeni o‘rnatilmasa: webhook 503, Parents sahifasida “Telegram bot sozlanmagan”, staff actions’dagi jo‘natish hech narsa qilmaydi.
 
+## Production sozlash checklisti
+_Holat (2026-11-25): bot BotFather’da yaratilgan, guruhlarga qo‘shish o‘chirilgan (asoschi). **Webhook va rejali xabarlar hali YOQILMAYDI.** Token hech qachon chatga yozilmaydi; faqat Vercel va Supabase Vault’ga._
+
+**A. Kod va baza (har biri alohida tasdiq bilan)**
+- [ ] #35 ko‘rib chiqildi va merge qilindi
+- [ ] 0031 → 0032 productionga qo‘llandi (`DEPLOY-TELEGRAM-MIGRATIONS.md`), har biridan keyin rollback’li SQL tekshiruv
+- [ ] #36 `main` ga qayta yo‘naltirildi, diff va CI qayta tekshirildi, merge qilindi
+- [ ] Vercel production deploy muvaffaqiyatli
+
+**B. BotFather (asoschi)**
+- [x] Bot yaratildi
+- [x] `/setjoingroups` → Disable
+- [ ] `/setprivacy` → Enable
+- [ ] `/setdescription`, `/setabouttext` (o‘zbekcha: “LinguABC ota-onalar boti. Havola faqat markazdan olinadi.”)
+- [ ] `/setcommands`: `start - Boshlash`, `stop - Botni uzish`
+
+**C. Vercel → Settings → Environment Variables (Production, “Sensitive”)**
+- [ ] `TELEGRAM_BOT_TOKEN`
+- [ ] `TELEGRAM_BOT_USERNAME` (maxfiy emas)
+- [ ] `TELEGRAM_WEBHOOK_SECRET` — 32+ belgi (`openssl rand -base64 36 | tr '+/' '-_' | tr -d '='`)
+- [ ] `TELEGRAM_DISPATCH_SECRET` — boshqa 32+ belgi
+- [ ] Qayta deploy; `/parents` da “Telegram link” tugmasi chiqadi (webhook hali o‘chiq — havola bot ochadi, lekin bot javob bermaydi)
+
+**D. Yoqishdan oldingi tekshiruv (QA markazi `qa-*`, asoschi telefoni)**
+- [ ] `getWebhookInfo` → `url` bo‘sh (hali yoqilmagan)
+- [ ] Lokal testlar yashil: SQL (to‘liq va `PROD_SHAPE=1`), `test:ts`, `telegram.db.e2e.mjs`, lokal brauzer QA
+
+**E. Webhook’ni yoqish (alohida tasdiq)**
+- [ ] `setWebhook` (`secret_token`, `allowed_updates=["message","callback_query","my_chat_member"]`, `drop_pending_updates=true`) — buyruq quyida
+- [ ] `getWebhookInfo`: `pending_update_count = 0`, `last_error_message` yo‘q
+- [ ] Kalitsiz so‘rov: `curl -X POST https://<domen>/api/telegram/webhook` → 401
+- [ ] QA markazida: havola → `/start` → “ulandi”; ikki bola; boshqa telefon bilan o‘sha havola → rad; uzish; bloklash/ochish
+- [ ] Davomatda “kelmadi” → ota-ona telefonida xabar (darhol, `after()` orqali)
+
+**F. Rejali jo‘natish (0033, alohida tasdiq)**
+- [ ] Supabase’da `pg_net` yoqish (0033 o‘zi yoqadi)
+- [ ] Vault: `telegram_dispatch_url` = `https://<domen>/api/telegram/dispatch`, `telegram_dispatch_secret` = Vercel’dagi bilan bir xil
+- [ ] 0033 qo‘llash → `cron.job` da `telegram-dispatch`, `telegram-prune`
+- [ ] 1 soat kuzatish: `net._http_response` da 200 lar, `telegram_outbox` da `failed` yo‘q
+
+**Orqaga qaytarish:** `deleteWebhook` (darhol to‘xtaydi) → kerak bo‘lsa `cron.unschedule('telegram-dispatch')` → migratsiya rollback’lari.
+
 ## Yoqish tartibi (har bir qadam asoschi tasdig‘i bilan)
 1. PR’lar ko‘rib chiqiladi; 0031 → 0032 qo‘llanadi (`DEPLOY-TELEGRAM-MIGRATIONS.md`).
 2. BotFather: `/newbot`; `/setprivacy` → Enable; `/setjoingroups` → **Disable** (botni guruhga qo‘shib bo‘lmasin).
