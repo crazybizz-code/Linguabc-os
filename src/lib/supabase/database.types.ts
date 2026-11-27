@@ -2003,6 +2003,7 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_code: string }; Returns: string }
+      mentor_kpis: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       approve_assignment: { Args: { p_assignment: string }; Returns: undefined }
       assign_homework: {
         Args: { p_assignment: string; p_due_at: string; p_group: string }
