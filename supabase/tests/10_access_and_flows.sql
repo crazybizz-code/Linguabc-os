@@ -1637,6 +1637,11 @@ update enrollments set status = 'active', end_date = null where id in (:'e1', :'
 
 
 \echo '42. mentors schedule mocks for their own groups'
+-- start from a known state: Aziz (st1) is in group1 (other sections may have moved him)
+:as_superuser
+update enrollments set status = 'completed' where student_id = :'st1' and status = 'active' and group_id <> :'group1';
+update enrollments set status = 'active', end_date = null where id = :'e1'
+  and not exists (select 1 from enrollments where student_id = :'st1' and group_id = :'group1' and status = 'active');
 :as_mentor
 select create_mock_session(:'center_a', 'Mentor mock', :'group1', now() + interval '2 days', :'m_admin') as mm1 \gset
 :as_superuser
