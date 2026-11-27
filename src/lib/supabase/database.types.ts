@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      telegram_links: {
+        Row: { blocked_at: string | null; center_id: string; chat_id: number; id: string; last_seen_at: string | null; linked_at: string; membership_id: string; revoked_at: string | null; revoked_by: string | null; telegram_user_id: number; username: string | null }
+        Insert: { blocked_at?: string | null; center_id: string; chat_id: number; id?: string; last_seen_at?: string | null; linked_at?: string; membership_id: string; revoked_at?: string | null; revoked_by?: string | null; telegram_user_id: number; username?: string | null }
+        Update: { blocked_at?: string | null; center_id?: string; chat_id?: number; id?: string; last_seen_at?: string | null; linked_at?: string; membership_id?: string; revoked_at?: string | null; revoked_by?: string | null; telegram_user_id?: number; username?: string | null }
+        Relationships: []
+      }
       practice_attempts: {
         Row: { center_id: string; created_at: string; earned: number; id: string; item_id: string; score: number | null; skill: Database["public"]["Enums"]["skill"]; student_id: string; total: number }
         Insert: { center_id: string; created_at?: string; earned?: number; id?: string; item_id: string; score?: number | null; skill: Database["public"]["Enums"]["skill"]; student_id: string; total?: number }
@@ -453,6 +459,8 @@ export type Database = {
           receipt_seq: number
           slug: string
           timezone: string
+          phone: string | null
+          address: string | null
         }
         Insert: {
           created_at?: string
@@ -462,6 +470,8 @@ export type Database = {
           receipt_seq?: number
           slug: string
           timezone?: string
+          phone?: string | null
+          address?: string | null
         }
         Update: {
           created_at?: string
@@ -471,6 +481,8 @@ export type Database = {
           receipt_seq?: number
           slug?: string
           timezone?: string
+          phone?: string | null
+          address?: string | null
         }
         Relationships: []
       }
@@ -2003,6 +2015,10 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_code: string }; Returns: string }
+      telegram_queue_health: { Args: { p_center: string }; Returns: Json }
+      issue_telegram_link: { Args: { p_guardian: string }; Returns: { token: string; expires_at: string; membership_id: string }[] }
+      attach_guardian_to_parent: { Args: { p_guardian: string; p_parent: string }; Returns: undefined }
+      revoke_telegram_link: { Args: { p_membership: string }; Returns: number }
       approve_assignment: { Args: { p_assignment: string }; Returns: undefined }
       assign_homework: {
         Args: { p_assignment: string; p_due_at: string; p_group: string }

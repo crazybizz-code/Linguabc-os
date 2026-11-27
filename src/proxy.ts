@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/supabase/config";
 
 // The voice-worker webhook has no session: it is signed (HMAC) and checked per job (see its route).
-const PUBLIC_PATHS = ["/login", "/register", "/join", "/forgot-password", "/auth", "/api/audio-jobs/callback"];
+const PUBLIC_PATHS = ["/login", "/register", "/join", "/forgot-password", "/auth", "/api/audio-jobs/callback", "/api/telegram/webhook", "/api/telegram/dispatch"];
 
 /**
  * Refreshes the Supabase session cookie on every request and sends

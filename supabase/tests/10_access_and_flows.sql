@@ -1563,6 +1563,39 @@ select revoke_telegram_link(:'m_par');
 :as_service_role
 select tests.expect_fail(format($$select tg_child_attendance(111, %L)$$, :'st1'), 'forbidden');
 
+\echo '37. Telegram dispatch tick (pg_net and Vault stubbed)'
+:as_superuser
+select tests.assert(app.tg_dispatch_tick() = 0, 'no Vault: nothing is called');
+create schema if not exists vault;
+create table vault.decrypted_secrets (name text, decrypted_secret text);
+create schema if not exists net;
+create table net.calls (url text, body jsonb, headers jsonb);
+create function net.http_post(url text, body jsonb, headers jsonb, timeout_milliseconds int) returns bigint
+language sql as $$ insert into net.calls values (url, body, headers); select 1::bigint; $$;
+delete from telegram_outbox;
+select tests.assert(app.tg_dispatch_tick() = 0, 'nothing due: no call');
+-- queue one message for a live link
+:as_admin
+select token as tg_d from issue_telegram_link(:'g1') \gset
+:as_service_role
+select tests.assert((tg_redeem_link(:'tg_d', 111, 111, null)->>'ok')::boolean, 'relinked');
+:as_superuser
+select app.notify(:'center_a', array[:'m_par']::uuid[], 'payment', 'Payment received', 'x', jsonb_build_object('student_id', :'st1', 'amount', 1000));
+select tests.assert(app.tg_dispatch_tick() = 0, 'secrets missing: no call');
+insert into vault.decrypted_secrets values ('telegram_dispatch_url', 'http://insecure.example'), ('telegram_dispatch_secret', 's3cret-s3cret-s3cret-s3cret-1234');
+select tests.assert(app.tg_dispatch_tick() = 0, 'plain http refused');
+update vault.decrypted_secrets set decrypted_secret = 'https://app.example/api/telegram/dispatch' where name = 'telegram_dispatch_url';
+select tests.assert(app.tg_dispatch_tick() = 1, 'due message: one call');
+select tests.assert(app.tg_dispatch_tick() = 0, 'at most one call a minute');
+select tests.assert((select count(*) = 1 and bool_and(headers->>'Authorization' = 'Bearer s3cret-s3cret-s3cret-s3cret-1234') from net.calls), 'bearer secret sent');
+update telegram_dispatch_state set last_called_at = now() - interval '2 minutes';
+select tests.assert(app.tg_dispatch_tick() = 1, 'next minute: called again');
+:as_admin
+select tests.expect_fail($$select app.tg_dispatch_tick()$$, 'permission denied');
+select tests.expect_fail($$select * from telegram_dispatch_state$$, 'permission denied');
+:as_superuser
+drop schema net cascade;
+drop schema vault cascade;
 \echo '39. Telegram: group notices follow the child''s current enrolment'
 -- parent 111 (m_par): Aziz (st1) in group1; Dilnoza (st2) moves to B1 Evening (g3)
 :as_admin
@@ -1630,5 +1663,27 @@ select * from record_payment(:'inv_tg', 1000, 'cash');
 select tests.assert((select count(*) from payments where student_id = :'st1') = :pay_before + 1, 'payment saved although Telegram queuing failed');
 :as_superuser
 alter table telegram_outbox drop constraint tg_test_break;
+
+\echo '45. Telegram delivery health (no sensitive data)'
+:as_superuser
+insert into telegram_outbox (center_id, notification_id, link_id, status, last_error, attempts)
+select n.center_id, n.id, l.id, 'failed', '429 Too Many Requests: retry after 30 for chat 777 Karim', 6
+from notifications n, telegram_links l
+where n.center_id = :'center_a' and l.center_id = :'center_a'
+  and not exists (select 1 from telegram_outbox o where o.notification_id = n.id and o.link_id = l.id)
+limit 1;
+:as_admin
+select telegram_queue_health(:'center_a') as h \gset
+select tests.assert((:'h'::jsonb->>'failed')::int >= 1, 'failures counted');
+select tests.assert(:'h'::jsonb->'failure_classes' ? '429', 'failure class is the status only');
+select tests.assert(:'h'::text !~ '(Karim|777|chat|Too Many)', 'no names, chat ids or Telegram text');
+:as_ownerA
+select tests.assert(telegram_queue_health(:'center_a') ? 'linked_parents', 'owner sees it');
+:as_mentor
+select tests.expect_fail(format($$select telegram_queue_health(%L)$$, :'center_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select telegram_queue_health(%L)$$, :'center_a'), 'forbidden');
+:as_parent
+select tests.expect_fail(format($$select telegram_queue_health(%L)$$, :'center_a'), 'forbidden');
 
 \echo 'ALL TESTS PASSED'
