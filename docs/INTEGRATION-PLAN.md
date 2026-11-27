@@ -63,3 +63,10 @@ MCP `apply_migration` with `name` = the file name (e.g. `0034_expenses`) and the
 | 0033 | `deleteWebhook`; `rollback/0033_telegram_dispatch.down.sql` |
 | 0032, 0031 | their rollback files (links and queue lost; parents relink) |
 Code rollback: revert the merge commit on `main` (Vercel redeploys). Each rollback script is tested to give back the exact earlier schema (`pg_dump -s` diff empty).
+
+## 6. Integration preview (2026-11-27, local only, not pushed)
+All open V1 PRs merged in the planned order onto `main` `e120631`: #36 → #37 → #38 → #39 → #40 → #42 → #43.
+- Textual conflicts only where PRs append to the same files: `actions.ts`, `uz.ts`/`ru.ts`, `database.types.ts`, `sidebar.tsx`, `supabase/tests/10_access_and_flows.sql`, `supabase/tests/run.sh`. All are "keep both" (one hand fix: a `Relationships: []` line in the types file). No RPC is defined or replaced by two PRs.
+- **Cross-PR test interactions found and fixed in the PR branches**: §40 (#38) changes `g3`'s mentor and moves a student, which §42 (#40) assumed unchanged; §44 (#42) clears the centre phone and §40 renames a student, which the bot e2e test assumed. Tests now pick their data from the database at that moment.
+- Result on the merged tree: `supabase/tests/run.sh` all sections pass (31–45 incl. 34, 34b, 35, 36, 43b), bot e2e 5/5, `test:ts` 50/50, `tsc` + `eslint` clean, `next build` clean.
+- So the sequence in section 3 merges without surprises; each later PR only needs `main` merged in and the same "keep both" resolution.
