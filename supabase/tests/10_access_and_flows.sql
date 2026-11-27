@@ -336,7 +336,7 @@ select tests.expect_fail(format($$select create_mock_session(%L, 'Bad examiner',
 select tests.expect_fail(format($$select create_mock_session(%L, 'No modules', %L, now(), null, null, '{}')$$, :'center_a', :'group1'), 'at least one');
 select tests.expect_fail(format($$select create_mock_session(%L, 'Vocab', %L, now(), null, null, '{vocabulary}')$$, :'center_a', :'group1'), 'at least one');
 :as_mentor
-select tests.expect_fail(format($$select create_mock_session(%L, 'Mentor mock', %L, now())$$, :'center_a', :'group1'), 'forbidden');
+-- 0037 lets a mentor schedule a mock for a group they lead; see section 42.
 select save_mock_results(:'ms2', jsonb_build_array(jsonb_build_object('student_id', :'st1', 'reading', 6.5, 'listening', 7)));
 select tests.assert((select status from mock_results where mock_session_id = :'ms2' and student_id = :'st1') = 'in_progress', 'partial result');
 select tests.assert((select status from mock_sessions where id = :'ms2') = 'in_progress', 'session in progress');
@@ -1630,5 +1630,46 @@ select * from record_payment(:'inv_tg', 1000, 'cash');
 select tests.assert((select count(*) from payments where student_id = :'st1') = :pay_before + 1, 'payment saved although Telegram queuing failed');
 :as_superuser
 alter table telegram_outbox drop constraint tg_test_break;
+-- put the enrolments back as the earlier sections left them
+:as_superuser
+delete from enrollments where student_id in (:'st1', :'st2') and group_id = :'g3';
+update enrollments set status = 'active', end_date = null where id in (:'e1', :'e2');
 
+
+\echo '42. mentors schedule mocks for their own groups'
+-- start from a known state: Aziz (st1) is in group1 (other sections may have moved him)
+:as_superuser
+update enrollments set status = 'completed' where student_id = :'st1' and status = 'active' and group_id <> :'group1';
+update enrollments set status = 'active', end_date = null where id = :'e1'
+  and not exists (select 1 from enrollments where student_id = :'st1' and group_id = :'group1' and status = 'active');
+:as_mentor
+select create_mock_session(:'center_a', 'Mentor mock', :'group1', now() + interval '2 days', :'m_admin') as mm1 \gset
+:as_superuser
+select tests.assert((select examiner_id = :'m_mentor' from mock_sessions where id = :'mm1'), 'the mentor is the examiner (requested examiner ignored)');
+select tests.assert((select count(*) from mock_results where mock_session_id = :'mm1') =
+                    (select count(*) from enrollments where group_id = :'group1' and status = 'active'), 'participants from the group');
+:as_mentor
+-- a group this mentor does not lead (chosen now: earlier sections may change mentors)
+:as_superuser
+select id as g_not_mine from groups where center_id = :'center_a' and mentor_id is distinct from :'m_mentor' and status = 'active' order by name limit 1 \gset
+:as_mentor
+select tests.expect_fail(format($$select create_mock_session(%L, 'Not my group', %L, now() + interval '2 days')$$, :'center_a', :'g_not_mine'), 'forbidden');
+select tests.expect_fail(format($$select create_mock_session(%L, 'No group', null, now() + interval '2 days')$$, :'center_a'), 'forbidden');
+:as_mentor2
+select tests.expect_fail(format($$select create_mock_session(%L, 'Other mentor', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+:as_student
+select tests.expect_fail(format($$select create_mock_session(%L, 'Student', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select create_mock_session(%L, 'Other centre', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
+-- the mentor runs it: enters bands and releases; families see it only after release
+:as_mentor
+select save_mock_results(:'mm1', format('[{"student_id":"%s","reading":6.5,"listening":7,"writing":6,"speaking":6.5}]', :'st1')::jsonb);
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L', :'mm1'), 0);
+:as_mentor
+select release_mock_results(:'mm1');
+:as_student
+select tests.expect_count(format('select * from mock_results where mock_session_id = %L and released_at is not null', :'mm1'), 1);
+:as_admin
+select tests.assert(create_mock_session(:'center_a', 'Admin mock', :'g3', now() + interval '3 days', :'m_admin') is not null, 'staff still schedule any group');
 \echo 'ALL TESTS PASSED'

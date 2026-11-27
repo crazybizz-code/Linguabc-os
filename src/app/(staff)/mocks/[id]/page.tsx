@@ -79,7 +79,8 @@ export default async function MockSessionPage({ params }: PageProps<"/mocks/[id]
             <h2 className="text-[15px] font-semibold">{t("Results")}</h2>
             <p className="text-[12px] text-muted-foreground">{canEdit ? t("Online reading and listening fill in by themselves. Add writing and speaking, save, then send the results — families see nothing until you do.") : t("Only managers and the session's examiner can enter results.")}</p>
           </div>
-          <ResultsSheet sessionId={s.id} modules={[...modules]} initial={rows} canEdit={canEdit} />
+          {/* keyed on what is released, so the sheet picks up the refresh after "Send results" */}
+          <ResultsSheet key={rows.filter((r) => r.released).length} sessionId={s.id} modules={[...modules]} initial={rows} canEdit={canEdit} />
           {canRun && rows.some((r) => !r.released) && <ReleaseBar sessionId={s.id} ready={rows.filter((r) => !r.released && (r.absent || modules.every((m) => r[m] != null))).length} />}
         </Card>
         <div className="space-y-5">

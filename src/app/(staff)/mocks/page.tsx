@@ -63,11 +63,19 @@ export default async function MocksPage({ searchParams }: PageProps<"/mocks">) {
         eyebrow={t("Academic operations")}
         title={t("Mocks")}
         description={t("Real exam conditions, measured the same way every time — results land straight in each student's record.")}
-        actions={<>{tabs}{isStaff && (
+        actions={<>{tabs}{isStaff ? (
           <CreateMock
             groups={groups.data ?? []}
             managers={(staff.data ?? []).filter((m) => m.role !== "mentor").map((m) => ({ id: m.id, name: m.full_name }))}
             mentors={(staff.data ?? []).filter((m) => m.role === "mentor").map((m) => ({ id: m.id, name: m.full_name }))}
+            rooms={rooms.data ?? []}
+          />
+        ) : workspace.role === "mentor" && (
+          // 0037: a mentor schedules mocks for the groups they lead and is the examiner.
+          <CreateMock
+            groups={(groups.data ?? []).filter((g) => g.mentor_id === workspace.membershipId)}
+            managers={[]}
+            mentors={[{ id: workspace.membershipId, name: workspace.fullName }]}
             rooms={rooms.data ?? []}
           />
         )}</>}
