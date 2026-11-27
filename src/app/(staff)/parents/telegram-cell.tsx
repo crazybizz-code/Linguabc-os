@@ -41,7 +41,8 @@ export function TelegramCell({ guardianId, membershipId, status, linkedAt, candi
           {botReady && <IssueLink guardianId={guardianId} label={t("New link")} small />}
         </div>
       )}
-      {membershipId && candidates.length > 0 && <AttachChild membershipId={membershipId} parentName={parentName} candidates={candidates} />}
+      {/* Stays mounted after a successful add (the list is then empty) so the dialog can show the result. */}
+      {membershipId && <AttachChild membershipId={membershipId} parentName={parentName} candidates={candidates} />}
     </div>
   );
 }
@@ -96,9 +97,11 @@ function AttachChild({ membershipId, parentName, candidates }: { membershipId: s
   const t = useT();
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`${buttonSecondary} h-7 px-2.5 text-[11.5px]`}>
-        <UserPlus className="h-3.5 w-3.5" strokeWidth={1.8} /> {t("Add another child")}
-      </button>
+      {candidates.length > 0 && (
+        <button type="button" onClick={() => setOpen(true)} className={`${buttonSecondary} h-7 px-2.5 text-[11.5px]`}>
+          <UserPlus className="h-3.5 w-3.5" strokeWidth={1.8} /> {t("Add another child")}
+        </button>
+      )}
       <Dialog open={open} onClose={() => { setOpen(false); if (state?.ok) router.refresh(); }}
         title={t("Add another child to {name}'s account", { name: parentName })}
         description={t("Only when you have checked with the parent that both children are theirs. Matching names or phone numbers are not proof.")} width="max-w-[520px]">
