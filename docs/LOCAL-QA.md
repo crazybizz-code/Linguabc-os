@@ -15,6 +15,8 @@ QA_TG_INACTIVE=1 node tests/e2e/pilot-qa.mjs    # #36 code on a DB without the T
 QA_SETTINGS=1 node tests/e2e/pilot-qa.mjs       # owner settings (PR #42)
 QA_SUGGEST=1 node tests/e2e/pilot-qa.mjs        # student suggestions on My plan (PR #43)
 QA_ONLINE_MOCK=1 node tests/e2e/pilot-qa.mjs    # online reading mock: schedule, exam with timer and autosave, auto-marking, release, access
+node supabase/local/fake-telegram.mjs QA_ONLINE_MOCK=1 node tests/e2e/pilot-qa.mjs    # online reading mock: schedule, exam with timer and autosave, auto-marking, release, access          # fake api.telegram.org on 127.0.0.1:8081 (getMe ok); next dev with TELEGRAM_API_BASE=http://127.0.0.1:8081
+QA_PARENTS=ready|expect-token|expect-username|expect-db node tests/e2e/pilot-qa.mjs   # parent rows and Telegram readiness (PR #36)
 ```
 
 - **Stack:** local Postgres 16 (all migrations in `supabase/migrations`), `supabase/gotrue:v2.170.0` and `postgrest/postgrest:v12.2.3` from Docker Hub, `supabase/local/gateway.mjs` in place of Kong. `up.sh` drops and recreates the `linguabc_local` database each run.

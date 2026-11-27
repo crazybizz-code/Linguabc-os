@@ -197,6 +197,68 @@ if (process.env.QA_TG_INACTIVE) {
   });
 }
 
+if (process.env.QA_PARENTS) {
+  // QA_PARENTS=expect-<reason> checks the not-ready message; QA_PARENTS=ready runs the linking flow.
+  const mode = process.env.QA_PARENTS;
+  await step(admin, "admin", "a second family with the SAME parent name and phone stays a separate row", async () => {
+    await admin.goto(`${BASE}/students`);
+    await admin.getByRole("button", { name: Tin("Add student") }).first().click();
+    const d = dialog(admin);
+    const fill = async (label, v) => { const el = d.getByLabel(Tin(label)); if (await el.count()) await el.first().fill(v); };
+    for (let i = 0; i < 6; i++) {
+      await fill("Full name", "Dilnoza QA"); await fill("Parent or guardian name", "Karim QA"); await fill("Parent phone", "+998901000011");
+      const next = d.getByRole("button", { name: T("Continue") });
+      if (await next.count() && await next.isEnabled()) { await next.click(); continue; }
+      break;
+    }
+    await d.locator('button[type="submit"]').last().click();
+    await d.getByRole("button", { name: T("Done") }).click();
+    await admin.goto(`${BASE}/parents`);
+    const rows = admin.locator("li").filter({ hasText: "Karim QA" });
+    if (await rows.count() !== 2) throw new Error(`expected 2 separate rows, got ${await rows.count()}`);
+    for (let i = 0; i < 2; i++) {
+      const txt = await rows.nth(i).innerText();
+      if (/Aziz QA/.test(txt) && /Dilnoza QA/.test(txt)) throw new Error("two children shown as one family");
+    }
+  });
+  if (mode.startsWith("expect-")) {
+    await step(admin, "admin", `Telegram linking is not offered (${mode})`, async () => {
+      await admin.goto(`${BASE}/parents`);
+      if (await admin.getByRole("button", { name: T("Telegram link") }).count()) throw new Error("link button shown while not ready");
+      const want = { "expect-token": "bot token is missing", "expect-username": "bot username is missing", "expect-db": "database update is not applied" }[mode];
+      await expectText(admin, new RegExp(want));
+    });
+  } else {
+    await step(admin, "admin", "ready bot: issues a one-time link for the first family", async () => {
+      await admin.goto(`${BASE}/parents`);
+      const row = admin.locator("li").filter({ hasText: "Aziz QA" }).filter({ hasText: "Karim QA" }).first();
+      await row.getByRole("button", { name: T("Telegram link") }).click();
+      await expectText(dialog(admin), /t\.me\/linguabc_qa_bot\?start=[A-Za-z0-9_-]{32}/, 10000);
+      await dialog(admin).getByRole("button", { name: "Close" }).click();
+    });
+    await step(admin, "admin", "adding the other child needs an explicit choice and confirmation", async () => {
+      await admin.goto(`${BASE}/parents`);
+      const row = admin.locator("li").filter({ hasText: "Aziz QA" }).first();
+      await row.getByRole("button", { name: T("Add another child") }).click();
+      const d = dialog(admin);
+      const opt = await d.locator('select[name="guardian_id"] option').allInnerTexts();
+      if (!opt.some((o) => /Dilnoza QA — Karim QA .*same phone/.test(o))) throw new Error(`candidate not offered/marked: ${opt.join(" | ")}`);
+      await d.locator('select[name="guardian_id"]').selectOption({ index: 1 });
+      // without the confirmation the browser refuses (required) and nothing changes
+      await d.getByRole("button", { name: T("Add child") }).click();
+      if (await d.getByText(Tin("Added. The parent now sees this child too.")).count()) throw new Error("added without confirmation");
+      await d.locator('input[name="confirm_same_person"]').check();
+      await d.getByRole("button", { name: T("Add child") }).click();
+      await expectText(d, Tin("Added. The parent now sees this child too."), 10000);
+      await d.getByRole("button", { name: "Close" }).click();
+      await admin.goto(`${BASE}/parents`);
+      const merged = admin.locator("li").filter({ hasText: "Aziz QA" }).filter({ hasText: "Dilnoza QA" });
+      if (await merged.count() !== 1) throw new Error("the account does not show both children");
+      if (await admin.locator("li").filter({ hasText: "Karim QA" }).count() !== 1) throw new Error("the second record should now be part of the account");
+    });
+  }
+}
+
 // ------------------------------------------------------------------ mentor
 await step(mentor, "mentor", "sees own group and timetable", async () => {
   await mentor.goto(`${BASE}/schedule`);
