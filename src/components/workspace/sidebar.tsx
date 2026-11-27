@@ -23,6 +23,7 @@ import {
   CalendarDays,
   GraduationCap,
   Bell,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, cn } from "@/components/ui/primitives";
@@ -53,6 +54,7 @@ const I = {
   payments: { href: "/payments", label: "Payments", icon: Wallet },
   parents: { href: "/parents", label: "Parents", icon: HeartHandshake },
   reports: { href: "/reports", label: "Reports", icon: BarChart3 },
+  finance: { href: "/finance", label: "Finance", icon: Receipt },
   staff: { href: "/staff", label: "Staff", icon: ShieldCheck },
   staffMentors: { href: "/staff", label: "Staff & mentors", icon: ShieldCheck },
   mentors: { href: "/mentors", label: "Mentors", icon: GraduationCap },
@@ -63,7 +65,7 @@ const NAV: Record<StaffRole, { sections: Section[]; mobile: Item[] }> = {
   owner: {
     sections: [
       { title: "Centre", items: [I.overview, I.branches, I.groups] },
-      { title: "Operations", items: [I.payments, I.parents] },
+      { title: "Operations", items: [I.payments, I.finance, I.parents] },
       { title: "Performance", items: [I.progress, I.reports, I.staffMentors] },
     ],
     mobile: [I.overview, I.branches, I.groups, I.payments, I.reports],

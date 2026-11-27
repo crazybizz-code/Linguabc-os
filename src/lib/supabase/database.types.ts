@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      expenses: {
+        Row: { amount: number; category: string; center_id: string; corrects: string | null; created_at: string; created_by: string; description: string; id: string; replaced_by: string | null; spent_on: string; void_reason: string | null; voided_at: string | null; voided_by: string | null }
+        Insert: { amount: number; category: string; center_id: string; corrects?: string | null; created_at?: string; created_by: string; description: string; id?: string; replaced_by?: string | null; spent_on: string; void_reason?: string | null; voided_at?: string | null; voided_by?: string | null }
+        Update: { amount?: number; category?: string; center_id?: string; corrects?: string | null; created_at?: string; created_by?: string; description?: string; id?: string; replaced_by?: string | null; spent_on?: string; void_reason?: string | null; voided_at?: string | null; voided_by?: string | null }
+        Relationships: []
+      }
       practice_attempts: {
         Row: { center_id: string; created_at: string; earned: number; id: string; item_id: string; score: number | null; skill: Database["public"]["Enums"]["skill"]; student_id: string; total: number }
         Insert: { center_id: string; created_at?: string; earned?: number; id?: string; item_id: string; score?: number | null; skill: Database["public"]["Enums"]["skill"]; student_id: string; total?: number }
@@ -2003,6 +2009,9 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_code: string }; Returns: string }
+      record_expense: { Args: { p_center: string; p_spent_on: string; p_category: string; p_amount: number; p_description: string; p_corrects?: string }; Returns: string }
+      void_expense: { Args: { p_expense: string; p_reason: string }; Returns: undefined }
+      cash_operating_result: { Args: { p_center: string; p_from: string; p_to: string }; Returns: Json }
       approve_assignment: { Args: { p_assignment: string }; Returns: undefined }
       assign_homework: {
         Args: { p_assignment: string; p_due_at: string; p_group: string }

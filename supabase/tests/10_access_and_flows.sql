@@ -1630,5 +1630,76 @@ select * from record_payment(:'inv_tg', 1000, 'cash');
 select tests.assert((select count(*) from payments where student_id = :'st1') = :pay_before + 1, 'payment saved although Telegram queuing failed');
 :as_superuser
 alter table telegram_outbox drop constraint tg_test_break;
+-- put the enrolments back as the earlier sections left them
+:as_superuser
+delete from enrollments where student_id in (:'st1', :'st2') and group_id = :'g3';
+update enrollments set status = 'active', end_date = null where id in (:'e1', :'e2');
 
+
+\echo '38. expenses and the net cash-based operating result'
+:as_superuser
+select app.center_today(:'center_a') as today_a \gset
+-- owner only: admin, mentor and another centre are refused
+:as_admin
+select tests.expect_fail(format($$select record_expense(%L, %L, 'rent', 5000000, 'November rent')$$, :'center_a', :'today_a'), 'forbidden');
+select tests.expect_fail(format($$select cash_operating_result(%L, %L, %L)$$, :'center_a', :'today_a', :'today_a'), 'forbidden');
+:as_mentor
+select tests.expect_fail(format($$select record_expense(%L, %L, 'rent', 5000000, 'November rent')$$, :'center_a', :'today_a'), 'forbidden');
+:as_ownerB
+select tests.expect_fail(format($$select record_expense(%L, %L, 'rent', 5000000, 'November rent')$$, :'center_a', :'today_a'), 'forbidden');
+select tests.expect_fail(format($$select cash_operating_result(%L, %L, %L)$$, :'center_a', :'today_a', :'today_a'), 'forbidden');
+:as_ownerA
+select record_expense(:'center_a', :'today_a', 'rent', 5000000, 'November rent') as ex1 \gset
+select record_expense(:'center_a', :'today_a', 'salaries', 3000000, 'Mentor salary') as ex2 \gset
+select record_expense(:'center_a', :'today_a', 'supplies', 150000, 'Markers and paper') as ex3 \gset
+select tests.expect_fail(format($$select record_expense(%L, %L::date + 1, 'rent', 1000, 'tomorrow')$$, :'center_a', :'today_a'), 'future');
+select tests.expect_fail(format($$select record_expense(%L, %L, 'rent', 0, 'zero')$$, :'center_a', :'today_a'), 'check constraint');
+select tests.expect_fail(format($$select record_expense(%L, %L, 'rent', -5, 'negative')$$, :'center_a', :'today_a'), 'check constraint');
+select tests.expect_fail(format($$select record_expense(%L, %L, 'bribes', 1000, 'bad category')$$, :'center_a', :'today_a'), 'check constraint');
+select tests.expect_fail(format($$select record_expense(%L, %L, 'rent', 1000, ' ')$$, :'center_a', :'today_a'), 'check constraint');
+-- no direct writes, no edits, no deletes
+select tests.expect_fail(format($$insert into expenses (center_id, spent_on, category, amount, description, created_by) values (%L, %L, 'rent', 1, 'xx', gen_random_uuid())$$, :'center_a', :'today_a'), 'permission denied');
+select tests.expect_fail(format($$update expenses set amount = 1 where id = %L$$, :'ex1'), 'permission denied');
+select tests.expect_fail(format($$delete from expenses where id = %L$$, :'ex1'), 'permission denied');
+:as_superuser
+select tests.expect_fail(format($$update expenses set amount = 1 where id = %L$$, :'ex1'), 'cannot be edited');
+select tests.expect_fail(format($$delete from expenses where id = %L$$, :'ex1'), 'never deleted');
+-- visibility
+:as_ownerA
+select tests.expect_count('select * from expenses', 3);
+:as_admin
+select tests.expect_count('select * from expenses', 0);
+:as_ownerB
+select tests.expect_count('select * from expenses', 0);
+-- void needs a reason, once; a voided entry cannot be edited back
+:as_ownerA
+select tests.expect_fail(format($$select void_expense(%L, '')$$, :'ex3'), 'reason');
+select void_expense(:'ex3', 'entered twice');
+select tests.expect_fail(format($$select void_expense(%L, 'again')$$, :'ex3'), 'already void');
+:as_superuser
+select tests.expect_fail(format($$update expenses set voided_at = null, voided_by = null, void_reason = null where id = %L$$, :'ex3'), 'cannot be edited');
+:as_ownerB
+select tests.expect_fail(format($$select void_expense(%L, 'not mine')$$, :'ex1'), 'forbidden');
+-- correction: right amount recorded, wrong one voided, linked both ways
+:as_ownerA
+select record_expense(:'center_a', :'today_a', 'salaries', 3200000, 'Mentor salary (corrected)', :'ex2') as ex2b \gset
+select tests.assert((select voided_at is not null and void_reason = 'corrected' and replaced_by = :'ex2b' from expenses where id = :'ex2'), 'old entry voided by the correction');
+select tests.assert((select corrects = :'ex2' from expenses where id = :'ex2b'), 'new entry points to the old one');
+select tests.expect_fail(format($$select record_expense(%L, %L, 'salaries', 1, 'twice', %L)$$, :'center_a', :'today_a', :'ex2'), 'already void');
+-- the result: payments minus refunds, minus live expenses; receivables beside it
+select cash_operating_result(:'center_a', date_trunc('month', :'today_a'::date)::date, :'today_a') as cr \gset
+:as_superuser
+select tests.assert((:'cr'::jsonb->>'expenses')::bigint = 5000000 + 3200000, 'voided and corrected entries counted once');
+select tests.assert((:'cr'::jsonb->>'collected')::bigint = (select coalesce(sum(case when kind = 'payment' then amount else -amount end), 0)
+  from payments where center_id = :'center_a' and (paid_at at time zone 'Asia/Tashkent')::date between date_trunc('month', :'today_a'::date)::date and :'today_a'),
+  'collected = payments - refunds in the period');
+select tests.assert((:'cr'::jsonb->>'collected')::bigint > 0, 'there were payments this month');
+select tests.assert((:'cr'::jsonb->>'net_cash_result')::bigint = (:'cr'::jsonb->>'collected')::bigint - (:'cr'::jsonb->>'expenses')::bigint, 'net = collected - expenses');
+select tests.assert((:'cr'::jsonb->'by_category'->>'rent')::bigint = 5000000, 'by category');
+select tests.assert((:'cr'::jsonb->'receivables_now'->>'outstanding')::bigint = (select coalesce(sum(balance), 0) from invoice_balances
+  where center_id = :'center_a' and payment_status in ('pending','partial','overdue')), 'receivables shown, not added');
+select tests.assert(jsonb_array_length(:'cr'::jsonb->'months') = 1, 'one month in the trend');
+select tests.assert((select count(*) from audit_log where table_name = 'expenses') = 6, 'every insert and void audited');
+:as_ownerA
+select tests.expect_fail(format($$select cash_operating_result(%L, %L, %L::date - 1)$$, :'center_a', :'today_a', :'today_a'), 'period');
 \echo 'ALL TESTS PASSED'

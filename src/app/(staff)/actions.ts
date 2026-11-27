@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getStaffContext } from "@/lib/auth/current";
 import { siteUrl } from "@/lib/supabase/config";
+import { EXPENSE_CATEGORIES } from "./finance/categories";
 
 export type ActionState = { error?: string; ok?: boolean; link?: string; id?: string } | undefined;
 
@@ -403,5 +404,42 @@ export async function approveAssignment(id: string): Promise<ActionState> {
   const { error } = await supabase.rpc("approve_assignment", { p_assignment: id });
   if (error) return { error: friendly(error.message) };
   revalidatePath("/homework", "layout");
+  return { ok: true };
+}
+
+// ------------------------------------------------------------------ expenses
+// Owner only; record_expense and void_expense check it in the database.
+
+export async function recordExpense(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase, workspace } = await getStaffContext();
+  const spentOn = str(form.get("spent_on"));
+  const category = str(form.get("category"));
+  const amount = money(form.get("amount"));
+  const description = str(form.get("description"));
+  const corrects = optional(form.get("corrects"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(spentOn)) return { error: "Choose the date the money was spent." };
+  if (!(EXPENSE_CATEGORIES as readonly string[]).includes(category)) return { error: "Choose a category." };
+  if (!amount || amount <= 0) return { error: "Enter the amount spent." };
+  if (description.length < 2 || description.length > 500) return { error: "Describe the expense (2–500 characters)." };
+  const { error } = await supabase.rpc("record_expense", {
+    p_center: workspace.centerId, p_spent_on: spentOn, p_category: category, p_amount: amount, p_description: description,
+    ...(corrects ? { p_corrects: corrects } : {}),
+  });
+  if (error) {
+    if (/future/i.test(error.message)) return { error: "The date cannot be in the future." };
+    if (/already void/i.test(error.message)) return { error: "That expense was already voided." };
+    return { error: friendly(error.message) };
+  }
+  revalidatePath("/finance");
+  return { ok: true };
+}
+
+export async function voidExpense(_: ActionState, form: FormData): Promise<ActionState> {
+  const { supabase } = await getStaffContext();
+  const reason = str(form.get("reason"));
+  if (reason.length < 3) return { error: "Give a reason for voiding." };
+  const { error } = await supabase.rpc("void_expense", { p_expense: str(form.get("expense_id")), p_reason: reason });
+  if (error) return { error: /already void/i.test(error.message) ? "That expense was already voided." : friendly(error.message) };
+  revalidatePath("/finance");
   return { ok: true };
 }
