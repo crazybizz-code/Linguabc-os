@@ -17,13 +17,16 @@ export type TelegramStatus = "linked" | "blocked" | "none";
  * disconnect, and adding another child to the same parent account. The
  * database decides who may do this (owner and admin of the centre).
  */
-export function TelegramCell({ guardianId, membershipId, status, linkedAt, attachable, botReady }: {
+export type AttachCandidate = { guardianId: string; guardianName: string; phone: string | null; child: string; samePhone: boolean };
+
+export function TelegramCell({ guardianId, membershipId, status, linkedAt, candidates, botReady, parentName }: {
   guardianId: string;
   membershipId: string | null;
   status: TelegramStatus;
   linkedAt: string | null;
-  attachable: { guardianId: string; child: string }[];
+  candidates: AttachCandidate[];
   botReady: boolean;
+  parentName: string;
 }) {
   const t = useT();
   return (
@@ -38,7 +41,7 @@ export function TelegramCell({ guardianId, membershipId, status, linkedAt, attac
           {botReady && <IssueLink guardianId={guardianId} label={t("New link")} small />}
         </div>
       )}
-      {membershipId && attachable.map((a) => <Attach key={a.guardianId} guardianId={a.guardianId} membershipId={membershipId} child={a.child} />)}
+      {membershipId && candidates.length > 0 && <AttachChild membershipId={membershipId} parentName={parentName} candidates={candidates} />}
     </div>
   );
 }
@@ -81,17 +84,50 @@ function Revoke({ membershipId }: { membershipId: string }) {
   );
 }
 
-function Attach({ guardianId, membershipId, child }: { guardianId: string; membershipId: string; child: string }) {
+/**
+ * Add another child to this parent's account. The admin picks the child's
+ * parent record and confirms it is the same person; nothing is matched
+ * automatically by name or phone (a same-phone record is only marked).
+ */
+function AttachChild({ membershipId, parentName, candidates }: { membershipId: string; parentName: string; candidates: AttachCandidate[] }) {
+  const [open, setOpen] = useState(false);
   const [state, run] = useActionState(attachGuardianToParent, undefined as ActionState);
+  const router = useRouter();
   const t = useT();
-  if (state?.ok) return null;
   return (
-    <form action={run} onSubmit={(e) => { if (!confirm(t("Add {child} to this parent's account? The parent will see this child in Telegram.", { child }))) e.preventDefault(); }}>
-      <input type="hidden" name="guardian_id" value={guardianId} />
-      <input type="hidden" name="membership_id" value={membershipId} />
-      <Submit icon={UserPlus} label={t("Add {child} to this account", { child })} small />
-      {state?.error && <p className="mt-1 text-[11.5px] text-[#B4483D]">{t(state.error)}</p>}
-    </form>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={`${buttonSecondary} h-7 px-2.5 text-[11.5px]`}>
+        <UserPlus className="h-3.5 w-3.5" strokeWidth={1.8} /> {t("Add another child")}
+      </button>
+      <Dialog open={open} onClose={() => { setOpen(false); if (state?.ok) router.refresh(); }}
+        title={t("Add another child to {name}'s account", { name: parentName })}
+        description={t("Only when you have checked with the parent that both children are theirs. Matching names or phone numbers are not proof.")} width="max-w-[520px]">
+        {state?.ok ? (
+          <p className="text-[13px] text-[#3F6B4A]">{t("Added. The parent now sees this child too.")}</p>
+        ) : (
+          <form action={run} className="space-y-4">
+            <input type="hidden" name="membership_id" value={membershipId} />
+            <label className="block">
+              <span className="mb-1.5 block text-[11.5px] font-medium text-[#3B4A42]">{t("Child and their parent record")}</span>
+              <select name="guardian_id" required defaultValue="" className="h-10 w-full rounded-[10px] border border-border/80 bg-[#FCF8F4] px-3 text-[13px]">
+                <option value="" disabled>{t("Choose")}</option>
+                {candidates.map((c) => (
+                  <option key={c.guardianId} value={c.guardianId}>
+                    {`${c.child} — ${c.guardianName}${c.phone ? ` · ${c.phone}` : ""}${c.samePhone ? ` (${t("same phone")})` : ""}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-start gap-2 text-[12.5px]">
+              <input type="checkbox" name="confirm_same_person" required className="mt-0.5 accent-[#12392B]" />
+              {t("I confirmed with the parent that this child is theirs.")}
+            </label>
+            {state?.error && <p className="text-[12px] text-[#B4483D]">{t(state.error)}</p>}
+            <Submit icon={UserPlus} label={t("Add child")} />
+          </form>
+        )}
+      </Dialog>
+    </>
   );
 }
 

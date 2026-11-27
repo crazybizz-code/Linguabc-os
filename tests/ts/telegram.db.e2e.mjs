@@ -58,21 +58,30 @@ test("linked parent: two children, every menu reads real data", async () => {
   const t = telegram();
   await handleUpdate({ update_id: 1, message: { message_id: 1, from: { id: 111 }, chat: { id: 111, type: "private" }, text: "/start" } }, { rpc, send: t.send });
   const buttons = t.sent.at(-1)[1].reply_markup.inline_keyboard.flat().map((b) => b.callback_data);
-  assert.ok(buttons.includes(`s:${kid("Aziz Karimov")}`) && buttons.includes(`s:${kid("Dilnoza Rahimova")}`), "both children offered");
+  // every current child of this parent account is offered (from the database, not by name)
+  const mine = sql(`reset role; select string_agg(s.id::text, ',') from guardians g join students s on s.id = g.student_id
+    where g.membership_id = '${PARENT()}' and s.status in ('lead','active','paused')`).split(",").filter(Boolean);
+  assert.ok(mine.length >= 1, "fixture: the parent has a current child");
+  if (mine.length > 1) assert.ok(mine.every((id) => buttons.includes(`s:${id}`)), "all children offered");
   for (const sec of ["prof", "grp", "sch", "att", "pay", "hw", "res", "con"]) {
-    await handleUpdate(cb(111, `v:${sec}:${kid("Aziz Karimov")}`), { rpc, send: t.send });
+    await handleUpdate(cb(111, `v:${sec}:${mine[0]}`), { rpc, send: t.send });
     const text = lastText(t);
-    assert.ok(text.startsWith("<b>Aziz Karimov</b>"), `${sec} shows the child`);
+    assert.ok(text.startsWith(`<b>${sql(`reset role; select full_name from students where id = '${mine[0]}'`)}</b>`), `${sec} shows the child`);
     assert.notEqual(text, TEXT.forbidden);
   }
-  assert.match(lastText(t), /\+998712000000/, "centre phone from 0032");
+  const phone = sql(`reset role; select coalesce(c.phone, b.phone, '') from students s join centers c on c.id = s.center_id
+    left join branches b on b.id = s.branch_id where s.id = '${mine[0]}'`);
+  assert.ok(lastText(t).includes(phone || "Telefon kiritilmagan"), "centre contact from the database (0032)");
 });
 
 test("unrelated Telegram user and another family's child are refused by the database", async () => {
   const t = telegram();
   await handleUpdate(cb(999, `v:pay:${kid("Aziz Karimov")}`), { rpc, send: t.send });
   assert.equal(lastText(t), TEXT.forbidden);
-  await handleUpdate(cb(111, `v:pay:${kid("Third Student")}`), { rpc, send: t.send });
+  const stranger = sql(`reset role; select s.id from students s where s.center_id = (select center_id from memberships where id = '${PARENT()}')
+    and not exists (select 1 from guardians g where g.student_id = s.id and g.membership_id = '${PARENT()}') limit 1`);
+  assert.ok(stranger, "fixture: a child of another family");
+  await handleUpdate(cb(111, `v:pay:${stranger}`), { rpc, send: t.send });
   assert.equal(lastText(t), TEXT.forbidden);
   const direct = await rpc("tg_child_payments", { p_tg_user: 999, p_student: kid("Aziz Karimov") });
   assert.match(direct.error?.message ?? "", /forbidden/);

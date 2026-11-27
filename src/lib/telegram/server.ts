@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { telegramSender, type TgSend } from "./api.ts";
+import { telegramApiBase, telegramSender, type TgSend } from "./api.ts";
+import { checkReadiness, type Readiness } from "./readiness.ts";
 import type { Rpc } from "./bot.ts";
 import { dispatchOutbox } from "./dispatch.ts";
 
@@ -22,13 +23,36 @@ export function telegramConfig() {
     const { data, error } = await admin.rpc(fn as never, args as never);
     return { data, error: error ? { message: error.message } : null };
   };
-  const send: TgSend = telegramSender(token);
+  const send: TgSend = telegramSender(token, fetch, 10_000, telegramApiBase(process.env.TELEGRAM_API_BASE));
   return { rpc, send };
 }
 
-export function botUsername(): string | null {
-  const name = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "");
-  return name && /^[A-Za-z0-9_]{5,32}$/.test(name) ? name : null;
+// Cached per server instance: a working bot for 5 minutes, a failure for 30 s.
+let cached: { at: number; value: Readiness } | null = null;
+
+/**
+ * Can parents be linked right now? Checks configuration, the database
+ * functions (0031/0032) and the token with Telegram (getMe). Returns only a
+ * reason code and the public bot username; never a secret.
+ */
+export async function telegramReadiness(): Promise<Readiness> {
+  if (cached && Date.now() - cached.at < (cached.value.ready ? 300_000 : 30_000)) return cached.value;
+  const admin = createAdminClient();
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const value = await checkReadiness(
+    { token, username: process.env.TELEGRAM_BOT_USERNAME, webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET, hasServiceKey: admin !== null },
+    {
+      // Telegram user 0 never has a link: an empty list means the functions exist.
+      dbReady: async () => { const { error } = await admin!.rpc("tg_children" as never, { p_tg_user: 0 } as never); return !error; },
+      getMe: async () => {
+        const r = await telegramSender(token!, fetch, 5_000, telegramApiBase(process.env.TELEGRAM_API_BASE))("getMe", {});
+        const u = (r.result as { username?: string } | undefined)?.username;
+        return r.ok && u ? u : null;
+      },
+    },
+  );
+  cached = { at: Date.now(), value };
+  return value;
 }
 
 /** Send what is queued now (after a staff action). Never throws: the cron run retries. */

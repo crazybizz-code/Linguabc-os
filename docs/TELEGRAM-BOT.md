@@ -28,7 +28,11 @@ Staff action (davomat, to‘lov, mock release, eslatma)
 
 Tasodifiy qiymat: `openssl rand -base64 36 | tr '+/' '-_' | tr -d '='`.
 
-Bot tokeni o‘rnatilmasa: webhook 503, Parents sahifasida “Telegram bot sozlanmagan”, staff actions’dagi jo‘natish hech narsa qilmaydi.
+**Bot tayyorligi (Parents sahifasi, serverda tekshiriladi):** havola faqat hammasi joyida bo‘lsa taklif qilinadi — token, username, webhook kaliti (32+ belgi), server kaliti (`SUPABASE_SECRET_KEY`), bazadagi bot funksiyalari (0031/0032) va Telegram `getMe` tokenni tan olib, username mos kelishi. Aks holda sahifada sabab ko‘rsatiladi (masalan “bot token is missing”, “database update is not applied yet”), maxfiy qiymat esa hech qachon brauzerga chiqmaydi. Natija server nusxasida 5 daqiqa (xato bo‘lsa 30 s) keshlanadi.
+
+**Ota-ona qatorlari:** bitta qator = bitta ota-ona hisobi (membership) yoki hali hisobga bog‘lanmagan bitta guardian yozuvi. Ism yoki telefon bir xilligi qatorlarni birlashtirmaydi. Ikkinchi farzand faqat admin “Add another child” orqali yozuvni tanlab, “ota-ona bilan tasdiqladim” belgisini qo‘yganda qo‘shiladi; bir xil telefon faqat ishora sifatida belgilanadi.
+
+`TELEGRAM_API_BASE` — faqat lokal QA uchun (soxta Telegram, `supabase/local/fake-telegram.mjs`); ilova uni faqat `http://127.0.0.1:<port>` yoki `http://localhost:<port>` bo‘lsa qabul qiladi, aks holda har doim `https://api.telegram.org`. Productionda qo‘ymang.
 
 ## Production sozlash checklisti
 _Holat (2026-11-25): bot BotFather’da yaratilgan, guruhlarga qo‘shish o‘chirilgan (asoschi). **Webhook va rejali xabarlar hali YOQILMAYDI.** Token hech qachon chatga yozilmaydi; faqat Vercel va Supabase Vault’ga._

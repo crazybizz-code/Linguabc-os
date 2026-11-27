@@ -13,10 +13,21 @@ export type TgResult = {
 export type TgSend = (method: string, body: Record<string, unknown>) => Promise<TgResult>;
 
 /** A sender bound to one bot token. 10-second timeout per call. */
-export function telegramSender(token: string, fetchImpl: typeof fetch = fetch, timeoutMs = 10_000): TgSend {
+export const TELEGRAM_API = "https://api.telegram.org";
+
+/**
+ * Where Telegram calls go. Always api.telegram.org, except a local fake
+ * Telegram for the local QA stack (TELEGRAM_API_BASE on localhost only), so
+ * a misconfigured value can never send the token to another host.
+ */
+export function telegramApiBase(override: string | undefined): string {
+  return override && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(override) ? override : TELEGRAM_API;
+}
+
+export function telegramSender(token: string, fetchImpl: typeof fetch = fetch, timeoutMs = 10_000, base: string = TELEGRAM_API): TgSend {
   return async (method, body) => {
     try {
-      const res = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
+      const res = await fetchImpl(`${base}/bot${token}/${method}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),

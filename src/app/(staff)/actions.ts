@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { botUsername, kickTelegramDispatch } from "@/lib/telegram/server";
+import { kickTelegramDispatch, telegramReadiness } from "@/lib/telegram/server";
 import { z } from "zod";
 import { getStaffContext } from "@/lib/auth/current";
 import { siteUrl } from "@/lib/supabase/config";
@@ -420,8 +420,9 @@ const tgFriendly = (m: string) =>
   /could not find the function|does not exist|schema cache/i.test(m) ? "The Telegram bot is not set up yet." : friendly(m);
 export async function issueTelegramLink(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase } = await getStaffContext();
-  const bot = botUsername();
-  if (!bot) return { error: "The Telegram bot is not set up yet." };
+  const ready = await telegramReadiness();
+  if (!ready.ready || !ready.username) return { error: "The Telegram bot is not set up yet." };
+  const bot = ready.username;
   const { data, error } = await supabase.rpc("issue_telegram_link", { p_guardian: str(form.get("guardian_id")) });
   if (error) return { error: tgFriendly(error.message) };
   const token = data?.[0]?.token;
@@ -442,6 +443,9 @@ export async function revokeTelegramLink(_: ActionState, form: FormData): Promis
 
 export async function attachGuardianToParent(_: ActionState, form: FormData): Promise<ActionState> {
   const { supabase } = await getStaffContext();
+  // Same name or phone proves nothing: the admin confirms it is the same person.
+  if (form.get("confirm_same_person") !== "on") return { error: "Confirm that you checked this is the same parent." };
+  if (!str(form.get("guardian_id"))) return { error: "Choose the child's parent record to add." };
   const { error } = await supabase.rpc("attach_guardian_to_parent", {
     p_guardian: str(form.get("guardian_id")), p_parent: str(form.get("membership_id")),
   });
