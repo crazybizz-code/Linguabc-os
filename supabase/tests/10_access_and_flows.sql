@@ -1644,7 +1644,11 @@ select tests.assert((select examiner_id = :'m_mentor' from mock_sessions where i
 select tests.assert((select count(*) from mock_results where mock_session_id = :'mm1') =
                     (select count(*) from enrollments where group_id = :'group1' and status = 'active'), 'participants from the group');
 :as_mentor
-select tests.expect_fail(format($$select create_mock_session(%L, 'Not my group', %L, now() + interval '2 days')$$, :'center_a', :'g3'), 'forbidden');
+-- a group this mentor does not lead (chosen now: earlier sections may change mentors)
+:as_superuser
+select id as g_not_mine from groups where center_id = :'center_a' and mentor_id is distinct from :'m_mentor' and status = 'active' order by name limit 1 \gset
+:as_mentor
+select tests.expect_fail(format($$select create_mock_session(%L, 'Not my group', %L, now() + interval '2 days')$$, :'center_a', :'g_not_mine'), 'forbidden');
 select tests.expect_fail(format($$select create_mock_session(%L, 'No group', null, now() + interval '2 days')$$, :'center_a'), 'forbidden');
 :as_mentor2
 select tests.expect_fail(format($$select create_mock_session(%L, 'Other mentor', %L, now() + interval '2 days')$$, :'center_a', :'group1'), 'forbidden');
